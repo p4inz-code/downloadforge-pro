@@ -42,12 +42,14 @@ async function init() {
   injectMainWorldSniffer();
   setupSnifferListener();
   setupMessageListener();
-  initVideoOverlay();
 
   try {
     const settings = await StorageService.getSettings();
     if (settings.autoScan) {
       await runScan(settings);
+    }
+    if (settings.enableVideoOverlay !== false) {
+      initVideoOverlay();
     }
   } catch (err) {
     reportError(`Init failed: ${err.message}`);

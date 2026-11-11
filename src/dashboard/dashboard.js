@@ -253,11 +253,14 @@ async function loadSettings() {
   const settings = await StorageService.getSettings();
 
   // Populate toggles
-  const boolKeys = ['autoScan','deduplicateUrls','showImages','showDocuments','showArchives','showStreams','defaultSaveAs','showBadge','debugMode'];
+  const boolKeys = ['autoScan','deduplicateUrls','showImages','showDocuments','showArchives','showStreams','enableVideoOverlay','directDiskStream','defaultSaveAs','showBadge','debugMode'];
   for (const key of boolKeys) {
     const el = $(`s-${key}`);
     if (el) el.checked = settings[key] ?? false;
   }
+
+  const concurrencyEl = $('s-concurrencyMode');
+  if (concurrencyEl) concurrencyEl.value = settings.concurrencyMode || 'turbo';
 
   const minSize = $('s-minFileSizeBytes');
   if (minSize) minSize.value = settings.minFileSizeBytes ?? 1024;
@@ -269,6 +272,8 @@ async function loadSettings() {
       const el = $(`s-${key}`);
       if (el) updated[key] = el.checked;
     }
+    if (concurrencyEl) updated.concurrencyMode = concurrencyEl.value;
+
     const minSizeVal = parseInt($('s-minFileSizeBytes')?.value || '0', 10);
     if (!isNaN(minSizeVal)) updated.minFileSizeBytes = minSizeVal;
 

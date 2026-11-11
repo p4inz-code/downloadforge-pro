@@ -219,6 +219,12 @@
         showDocuments: true,
         showArchives: true,
         showStreams: true,
+        enableVideoOverlay: true,
+        // floating in-video download pill
+        concurrencyMode: "turbo",
+        // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
+        directDiskStream: true,
+        // zero-RAM direct streaming via File System Access API
         companionEnabled: false,
         companionHost: "com.obsidianlabs.downloadforge",
         debugMode: false,
@@ -831,11 +837,13 @@
         injectMainWorldSniffer();
         setupSnifferListener();
         setupMessageListener();
-        initVideoOverlay();
         try {
           const settings = await StorageService.getSettings();
           if (settings.autoScan) {
             await runScan(settings);
+          }
+          if (settings.enableVideoOverlay !== false) {
+            initVideoOverlay();
           }
         } catch (err) {
           reportError(`Init failed: ${err.message}`);

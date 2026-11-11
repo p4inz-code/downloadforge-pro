@@ -31,6 +31,10 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       Settings
     </a>
+    <a class="nav-item" id="nav-studio" href="../downloader/downloader.html" target="_blank">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Stream Studio
+    </a>
     <a class="nav-item" data-view="companion" href="#">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
       Desktop App
@@ -177,6 +181,26 @@
         <div class="setting-row">
           <div class="setting-info"><div class="setting-label">Show stream manifests</div><div class="setting-desc">Show non-DRM HLS streams (m3u8)</div></div>
           <label class="toggle"><input type="checkbox" id="s-showStreams"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Floating video overlay</div><div class="setting-desc">Render quick 1-click download pill over web video players</div></div>
+          <label class="toggle"><input type="checkbox" id="s-enableVideoOverlay"/><span class="toggle-track"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Stream Studio & Acceleration</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Speed concurrency profile</div><div class="setting-desc">Simultaneous download connections for HLS/DASH streams</div></div>
+          <select class="input input-sm" id="s-concurrencyMode">
+            <option value="turbo">⚡ Turbo (8 Threads - Recommended)</option>
+            <option value="maximum">🚀 Max Aggression (16 Threads)</option>
+            <option value="balanced">🛡️ Balanced (4 Threads)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Zero-RAM direct streaming</div><div class="setting-desc">Stream 1-2GB+ videos directly to SSD via File System Access API</div></div>
+          <label class="toggle"><input type="checkbox" id="s-directDiskStream"/><span class="toggle-track"></span></label>
         </div>
       </div>
 

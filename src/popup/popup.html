@@ -61,16 +61,20 @@
      EMPTY STATE
 ══════════════════════════════════════════ -->
 <div class="state-panel" id="state-empty" hidden>
-  <div class="state-icon">📭</div>
+  <div class="state-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+  </div>
   <span class="state-text">No downloadable resources found</span>
-  <span class="state-sub">Try rescanning or check a media-rich page</span>
+  <span class="state-sub">Play video or refresh the page to detect media</span>
 </div>
 
 <!-- ══════════════════════════════════════════
      ERROR STATE
 ══════════════════════════════════════════ -->
 <div class="state-panel" id="state-error" hidden>
-  <div class="state-icon">⚠️</div>
+  <div class="state-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+  </div>
   <span class="state-text" id="error-text">Scan failed</span>
   <button class="btn-text" id="btn-error-retry">Try again</button>
 </div>
@@ -79,7 +83,9 @@
      UNSUPPORTED PAGE STATE
 ══════════════════════════════════════════ -->
 <div class="state-panel" id="state-unsupported" hidden>
-  <div class="state-icon">🚫</div>
+  <div class="state-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
+  </div>
   <span class="state-text">This page can't be scanned</span>
   <span class="state-sub">DownloadForge works on regular web pages only</span>
 </div>
@@ -92,23 +98,29 @@
   <!-- Category filter tabs -->
   <div class="filter-bar" id="filter-bar" role="tablist">
     <button class="filter-tab active" data-cat="all" role="tab">All <span class="tab-count" id="count-all">0</span></button>
-    <button class="filter-tab" data-cat="video" role="tab">
-      🎬 <span class="tab-count" id="count-video">0</span>
+    <button class="filter-tab" data-cat="stream" role="tab" title="Streams (HLS/m3u8)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+      <span class="tab-count" id="count-stream">0</span>
     </button>
-    <button class="filter-tab" data-cat="audio" role="tab">
-      🎵 <span class="tab-count" id="count-audio">0</span>
+    <button class="filter-tab" data-cat="video" role="tab" title="Videos (MP4/WebM)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/></svg>
+      <span class="tab-count" id="count-video">0</span>
     </button>
-    <button class="filter-tab" data-cat="image" role="tab">
-      🖼️ <span class="tab-count" id="count-image">0</span>
+    <button class="filter-tab" data-cat="audio" role="tab" title="Audio">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      <span class="tab-count" id="count-audio">0</span>
     </button>
-    <button class="filter-tab" data-cat="document" role="tab">
-      📄 <span class="tab-count" id="count-document">0</span>
+    <button class="filter-tab" data-cat="image" role="tab" title="Images">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      <span class="tab-count" id="count-image">0</span>
     </button>
-    <button class="filter-tab" data-cat="archive" role="tab">
-      📦 <span class="tab-count" id="count-archive">0</span>
+    <button class="filter-tab" data-cat="document" role="tab" title="Documents">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+      <span class="tab-count" id="count-document">0</span>
     </button>
-    <button class="filter-tab" data-cat="stream" role="tab">
-      📡 <span class="tab-count" id="count-stream">0</span>
+    <button class="filter-tab" data-cat="archive" role="tab" title="Archives">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+      <span class="tab-count" id="count-archive">0</span>
     </button>
   </div>
 

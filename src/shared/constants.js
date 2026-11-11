@@ -197,6 +197,9 @@ export const DEFAULT_SETTINGS = {
   showDocuments:        true,
   showArchives:         true,
   showStreams:          true,
+  enableVideoOverlay:   true,            // floating in-video download pill
+  concurrencyMode:      'turbo',         // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
+  directDiskStream:     true,            // zero-RAM direct streaming via File System Access API
   companionEnabled:     false,
   companionHost:        'com.obsidianlabs.downloadforge',
   debugMode:            false,
