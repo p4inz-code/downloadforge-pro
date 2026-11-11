@@ -8009,8 +8009,9 @@
         console.warn("[DownloadForge Worker] Init fetch error:", e.message);
       }
     }
+    const isFmp4 = streamType === "dash" || !!initUrl || segments.some((s) => /\.m4s(\?|$)/i.test(s.url) || /\.mp4(\?|$)/i.test(s.url));
     let transmuxer = null;
-    if (streamType === "hls") {
+    if (streamType === "hls" && !isFmp4) {
       transmuxer = new import_mux.default.mp4.Transmuxer({ keepOriginalTimestamps: false });
       transmuxer.on("data", (segment) => {
         const initData = segment.initSegment;
@@ -8032,7 +8033,7 @@
         const buf = downloadedBuffers[nextExpected];
         downloadedBuffers[nextExpected] = null;
         if (buf.byteLength > 0) {
-          if (streamType === "hls" && transmuxer) {
+          if (transmuxer) {
             transmuxer.push(new Uint8Array(buf));
           } else {
             self.postMessage({

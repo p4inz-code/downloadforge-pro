@@ -79,8 +79,9 @@ async function runDownloadPipeline(config) {
   }
 
   // 2. Setup Transmuxer for HLS Transport Streams
+  const isFmp4 = streamType === 'dash' || !!initUrl || segments.some(s => /\.m4s(\?|$)/i.test(s.url) || /\.mp4(\?|$)/i.test(s.url));
   let transmuxer = null;
-  if (streamType === 'hls') {
+  if (streamType === 'hls' && !isFmp4) {
     transmuxer = new muxjs.mp4.Transmuxer({ keepOriginalTimestamps: false });
     transmuxer.on('data', (segment) => {
       const initData = segment.initSegment;
@@ -107,10 +108,10 @@ async function runDownloadPipeline(config) {
       downloadedBuffers[nextExpected] = null; // free memory
 
       if (buf.byteLength > 0) {
-        if (streamType === 'hls' && transmuxer) {
+        if (transmuxer) {
           transmuxer.push(new Uint8Array(buf));
         } else {
-          // DASH / progressive MP4: transfer directly to main thread disk stream
+          // DASH / CMAF / fMP4: transfer directly to main thread disk stream
           self.postMessage({
             type: 'CHUNK',
             chunk: buf,

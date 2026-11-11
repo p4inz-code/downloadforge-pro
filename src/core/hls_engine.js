@@ -144,6 +144,10 @@ export class HLSEngine {
 
     this.onStatus(`Found ${segments.length} media segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ''}. Initializing engine...`);
 
+    if (!initUrl && segments[0]?.initMap?.url) {
+      initUrl = segments[0].initMap.url;
+    }
+
     // Attempt Offscreen Web Worker Execution (Zero UI Jank)
     if (this.useWorker && typeof Worker !== 'undefined') {
       try {
@@ -219,12 +223,22 @@ export class HLSEngine {
     const downloadedBuffers = new Array(total);
     let nextToPumpIndex = 0;
 
+    const isFmp4 = streamType === 'dash' || !!initUrl || !!segments[0]?.initMap?.url || segments.some(s => /\.m4s(\?|$)/i.test(s.url));
+
     // Pumps ready chunks sequentially into transmuxer and immediately releases RAM
     const pumpNextSegments = () => {
       while (nextToPumpIndex < total && downloadedBuffers[nextToPumpIndex] !== undefined) {
         const buf = downloadedBuffers[nextToPumpIndex];
         if (buf) {
-          transmuxer.push(buf);
+          if (!isFmp4) {
+            transmuxer.push(buf);
+          } else {
+            if (writableStream) {
+              queueStreamWrite(buf);
+            } else {
+              inMemoryMedia.push(buf);
+            }
+          }
           if (writableStream) {
             // Free memory to GC immediately in direct-to-disk mode
             downloadedBuffers[nextToPumpIndex] = null;

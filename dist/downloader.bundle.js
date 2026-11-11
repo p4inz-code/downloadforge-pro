@@ -8664,6 +8664,9 @@
         }
       }
       this.onStatus(`Found ${segments.length} media segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ""}. Initializing engine...`);
+      if (!initUrl && segments[0]?.initMap?.url) {
+        initUrl = segments[0].initMap.url;
+      }
       if (this.useWorker && typeof Worker !== "undefined") {
         try {
           this.onStatus("Spawning dedicated offscreen Web Worker...");
@@ -8727,11 +8730,20 @@
       const startTime = performance.now();
       const downloadedBuffers = new Array(total);
       let nextToPumpIndex = 0;
+      const isFmp4 = streamType === "dash" || !!initUrl || !!segments[0]?.initMap?.url || segments.some((s) => /\.m4s(\?|$)/i.test(s.url));
       const pumpNextSegments = () => {
         while (nextToPumpIndex < total && downloadedBuffers[nextToPumpIndex] !== void 0) {
           const buf = downloadedBuffers[nextToPumpIndex];
           if (buf) {
-            transmuxer.push(buf);
+            if (!isFmp4) {
+              transmuxer.push(buf);
+            } else {
+              if (writableStream) {
+                queueStreamWrite(buf);
+              } else {
+                inMemoryMedia.push(buf);
+              }
+            }
             if (writableStream) {
               downloadedBuffers[nextToPumpIndex] = null;
             }

@@ -636,4 +636,81 @@ input[type="checkbox"]:checked::after {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Custom Confirmation Modal (No OS Dialogs) ─────────── */
+.custom-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+}
+
+.custom-modal-box {
+  background: #18191d;
+  border: 1px solid #2a2d33;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalPop 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.custom-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #2a2d33;
+}
+
+.custom-modal-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #eceef1;
+}
+
+.custom-modal-close {
+  background: none;
+  border: none;
+  color: #9097a2;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.custom-modal-close:hover {
+  color: #eceef1;
+}
+
+.custom-modal-body {
+  padding: 18px;
+  color: #9097a2;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.custom-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  background: #141518;
+  border-top: 1px solid #2a2d33;
+}
+
 [hidden] { display: none !important; }
+

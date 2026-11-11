@@ -272,7 +272,22 @@
     </div>
   </div>
 
-</main>
+<!-- ══ CUSTOM CONFIRMATION MODAL (NO OS NATIVE DIALOGUES) ══ -->
+<div class="custom-modal-overlay" id="confirmModal" style="display: none;">
+  <div class="custom-modal-box">
+    <div class="custom-modal-header">
+      <h3 id="confirmModalTitle">Confirm Action</h3>
+      <button class="custom-modal-close" id="btnConfirmClose">&times;</button>
+    </div>
+    <div class="custom-modal-body" id="confirmModalMessage">
+      Are you sure you want to proceed?
+    </div>
+    <div class="custom-modal-footer">
+      <button class="btn-secondary" id="btnConfirmCancel">Cancel</button>
+      <button class="btn-primary" id="btnConfirmOk">Confirm</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══ TOAST ════════════════════════════════════════════════ -->
 <div class="toast" id="toast"></div>

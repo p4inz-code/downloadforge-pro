@@ -151,7 +151,8 @@ function setupHistoryControls() {
   });
 
   clearBtn?.addEventListener('click', async () => {
-    if (!confirm('Clear all download history?')) return;
+    const ok = await showCustomConfirm('Clear History', 'Are you sure you want to clear all download history?', 'Clear History', true);
+    if (!ok) return;
     await StorageService.clearHistory();
     allHistory = [];
     renderHistory([]);
@@ -289,7 +290,13 @@ async function loadSettings() {
 
   // Clear all data
   $('btn-clear-all-data')?.addEventListener('click', async () => {
-    if (!confirm('This will clear ALL DownloadForge data including history, rules, and settings. Continue?')) return;
+    const ok = await showCustomConfirm(
+      'Clear All Data',
+      'This will clear ALL DownloadForge data including history, domain rules, and settings. Continue?',
+      'Erase All Data',
+      true
+    );
+    if (!ok) return;
     await StorageService.clearAll();
     showToast('All data cleared');
     await loadSettings();
@@ -364,3 +371,48 @@ function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function showCustomConfirm(title, message, confirmText = 'Confirm', isDanger = false) {
+  return new Promise((resolve) => {
+    const modal = $('confirmModal');
+    const titleEl = $('confirmModalTitle');
+    const msgEl = $('confirmModalMessage');
+    const btnOk = $('btnConfirmOk');
+    const btnCancel = $('btnConfirmCancel');
+    const btnClose = $('btnConfirmClose');
+
+    if (!modal || !btnOk || !btnCancel) {
+      resolve(true);
+      return;
+    }
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    btnOk.textContent = confirmText;
+    btnOk.className = isDanger ? 'btn-secondary btn-danger' : 'btn-primary';
+
+    modal.style.display = 'flex';
+
+    const cleanup = (confirmed) => {
+      modal.style.display = 'none';
+      btnOk.removeEventListener('click', onOk);
+      btnCancel.removeEventListener('click', onCancel);
+      btnClose?.removeEventListener('click', onCancel);
+      document.removeEventListener('keydown', onKeyDown);
+      resolve(confirmed);
+    };
+
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') cleanup(false);
+      else if (e.key === 'Enter') cleanup(true);
+    };
+
+    btnOk.addEventListener('click', onOk);
+    btnCancel.addEventListener('click', onCancel);
+    btnClose?.addEventListener('click', onCancel);
+    document.addEventListener('keydown', onKeyDown);
+  });
+}
+
