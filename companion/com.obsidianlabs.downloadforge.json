@@ -1,0 +1,9 @@
+{
+  "name": "com.obsidianlabs.downloadforge",
+  "description": "DownloadForge native companion app by ObsidianLabs",
+  "path": "downloadforge-companion",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://YOUR_EXTENSION_ID_HERE/"
+  ]
+}

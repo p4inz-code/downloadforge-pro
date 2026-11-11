@@ -1,0 +1,92 @@
+{
+  "manifest_version": 3,
+  "name": "DownloadForge",
+  "short_name": "DownloadForge",
+  "version": "1.0.0",
+  "description": "Detect and download videos, audio, images, documents and archives from any webpage. By ObsidianLabs.",
+
+  "author": "ObsidianLabs — p4inz",
+
+  "icons": {
+    "16":  "assets/icons/icon16.png",
+    "32":  "assets/icons/icon32.png",
+    "48":  "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16":  "assets/icons/icon16.png",
+      "32":  "assets/icons/icon32.png",
+      "48":  "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    },
+    "default_title": "DownloadForge — Click to detect resources"
+  },
+
+  "background": {
+    "service_worker": "src/background/service_worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content_script.bundle.js"],
+      "css": ["src/content/video_overlay.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "storage",
+    "tabs",
+    "nativeMessaging",
+    "declarativeNetRequest"
+  ],
+
+  "optional_permissions": [
+    "webRequest"
+  ],
+
+  "optional_host_permissions": [],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/content/*", "dist/*", "src/onboarding/*", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "options_page": "src/dashboard/dashboard.html",
+
+  "commands": {
+    "open-popup": {
+      "suggested_key": {
+        "default": "Alt+D",
+        "mac": "Alt+D"
+      },
+      "description": "Open DownloadForge popup"
+    },
+    "rescan-page": {
+      "suggested_key": {
+        "default": "Alt+R",
+        "mac": "Alt+R"
+      },
+      "description": "Rescan current page for resources"
+    }
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

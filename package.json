@@ -1,0 +1,18 @@
+{
+  "name": "dowloadforge-ext-chrome",
+  "version": "1.0.0",
+  "description": "**By ObsidianLabs — Built by p4inz**",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "mux.js": "^6.3.0"
+  }
+}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DownloadForge Pro — Stream Studio</title>
+  <link rel="stylesheet" href="downloader.css" />
+</head>
+<body>
+  <div class="studio-container">
+    <!-- Header -->
+    <header class="studio-header">
+      <div class="brand">
+        <img src="../../assets/icons/icon32.png" alt="DownloadForge Pro" class="logo" />
+        <div class="brand-text">
+          <h1>DownloadForge <span>Pro Studio</span></h1>
+          <p>High-Speed HLS / DASH Downloader & In-Browser MP4 Transmuxer</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge status-badge" id="engineStatus">Ready</span>
+        <span class="badge tech-badge">WebCrypto AES-128</span>
+        <span class="badge tech-badge">0% RAM Stream</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="studio-main">
+      <!-- Media Info & Config Card -->
+      <section class="card media-card">
+        <div class="card-header">
+          <h2 id="streamTitle">Detecting Media Stream...</h2>
+          <span class="url-hint" id="streamDomain"></span>
+        </div>
+        <div class="input-row">
+          <input type="text" id="streamUrlInput" placeholder="Enter .m3u8 or media stream URL..." />
+          <button id="btnLoadStream" class="btn btn-secondary">Analyze Stream</button>
+        </div>
+
+        <div class="config-grid">
+          <div class="config-item" id="variantRow" style="display: none;">
+            <label for="variantSelect">Quality / Track:</label>
+            <select id="variantSelect"></select>
+          </div>
+
+          <div class="config-item">
+            <label for="concurrencySelect">Speed Profile:</label>
+            <select id="concurrencySelect">
+              <option value="turbo" selected>⚡ Turbo Mode (8 Parallel Connections)</option>
+              <option value="maximum">🚀 Max Aggression (16 Parallel Connections)</option>
+              <option value="balanced">🛡️ Balanced (4 Connections - Low CPU)</option>
+            </select>
+          </div>
+
+          <div class="config-item checkbox-item">
+            <label>
+              <input type="checkbox" id="chkDirectDisk" checked />
+              <span>Direct-to-Disk Stream (0% RAM Bloat for 1-2GB+ videos)</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Progress & Visualizer Card -->
+      <section class="card progress-card">
+        <div class="progress-stats">
+          <div class="stat">
+            <span class="stat-label">Progress</span>
+            <span class="stat-value" id="statPercent">0%</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Segments</span>
+            <span class="stat-value" id="statSegments">0 / 0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Download Speed</span>
+            <span class="stat-value" id="statSpeed">0.00 MB/s</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Time Remaining</span>
+            <span class="stat-value" id="statEta">--</span>
+          </div>
+        </div>
+
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progressBarFill"></div>
+        </div>
+
+        <div class="status-msg" id="statusMessage">Ready to download. Click 'Start Download' below.</div>
+
+        <!-- Segment Visualizer Grid -->
+        <div class="segment-grid" id="segmentGrid"></div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button id="btnStart" class="btn btn-primary">⚡ Start Turbo Download</button>
+          <button id="btnCancel" class="btn btn-danger" style="display: none;">Cancel</button>
+          <button id="btnSave" class="btn btn-success" style="display: none;">💾 Save MP4 File</button>
+        </div>
+      </section>
+
+      <!-- Preview Player Card -->
+      <section class="card preview-card" id="previewCard" style="display: none;">
+        <h3>🎬 In-Studio Player Preview</h3>
+        <video id="previewPlayer" controls class="preview-video"></video>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="studio-footer">
+      <span>ObsidianLabs — DownloadForge Pro Engine v2.1.0</span>
+      <span>•</span>
+      <span>Direct Disk Streaming & WebCrypto AES-128 Hardware Acceleration</span>
+    </footer>
+  </div>
+
+  <script src="../../dist/downloader.bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public config — read only, no write from client
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Pings — write only via server SDK (Cloud Functions), no direct client write
+    match /pings/{doc} {
+      allow read:  if false;
+      allow write: if false; // only Cloud Functions write here
+    }
+
+    // Everything else — deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

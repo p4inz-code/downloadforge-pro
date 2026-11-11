@@ -1,0 +1,448 @@
+// ============================================================
+// DownloadForge — background/service_worker.js
+// ObsidianLabs | p4inz
+//
+// MV3 Service Worker — central message hub.
+// Responsibilities:
+//   - Receive scan results from content scripts
+//   - Serve resources to popup on request
+//   - Manage icon badge state per tab
+//   - Trigger downloads via chrome.downloads API
+//   - Route messages to companion bridge
+//   - Handle tab lifecycle (cleanup on close/navigate)
+// ============================================================
+
+import { MSG, BADGE, STORAGE, LIMITS, DEFAULT_SETTINGS, APP } from '../shared/constants.js';
+import { StorageService } from '../storage/storage.js';
+import { Logger } from '../utils/logger.js';
+import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
+
+const log = new Logger('ServiceWorker');
+
+// ── Per-tab resource store ───────────────────────────────────
+// Map<tabId, { resources: [], scannedAt: timestamp, scanning: bool }>
+const tabStore = new Map();
+
+// ── Install / startup ────────────────────────────────────────
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  log.info(`DownloadForge ${APP.VERSION} installed. Reason: ${reason}`);
+
+  if (reason === 'install') {
+    await StorageService.initDefaults();
+    // Open onboarding on first install
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard/dashboard.html?view=onboarding') });
+  }
+
+  if (reason === 'update') {
+    log.info('Extension updated — storage schema preserved.');
+  }
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+  log.info('Browser startup — DownloadForge service worker ready.');
+  // Re-enable network observer if user previously granted webRequest
+  const hasWR = await chrome.permissions.contains({ permissions: ['webRequest'] });
+  if (hasWR) startNetworkObserver();
+});
+
+// ── Tab lifecycle cleanup ────────────────────────────────────
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabStore.has(tabId)) {
+    tabStore.delete(tabId);
+    log.debug(`Tab ${tabId} closed — cleared resource store.`);
+  }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // Page navigated — invalidate cached scan
+  if (changeInfo.status === 'loading' && changeInfo.url) {
+    if (tabStore.has(tabId)) {
+      tabStore.delete(tabId);
+    }
+    setBadgeState(tabId, 'none');
+  }
+});
+
+// ── Message routing ──────────────────────────────────────────
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const { type, payload } = message;
+  const tabId = sender.tab?.id ?? payload?.tabId;
+
+  log.debug(`Message received: ${type}`, { tabId });
+
+  switch (type) {
+
+    // ── Content script → SW: scan completed ─────────────────
+    case MSG.SCAN_RESULT:
+      handleScanResult(tabId, payload, sendResponse);
+      return true;
+
+    // ── Content script → SW: scan errored ───────────────────
+    case MSG.SCAN_ERROR:
+      handleScanError(tabId, payload);
+      sendResponse({ ok: true });
+      return false;
+
+    // ── Popup → SW: get cached resources for current tab ────
+    case MSG.GET_RESOURCES:
+      handleGetResources(tabId, sendResponse);
+      return true;
+
+    // ── Popup → SW: trigger single download ─────────────────
+    case MSG.DOWNLOAD_ITEM:
+      handleDownload(payload, sendResponse);
+      return true;
+
+    // ── Popup → SW: batch download ───────────────────────────
+    case MSG.DOWNLOAD_BATCH:
+      handleBatchDownload(payload, sendResponse);
+      return true;
+
+    // ── Popup → SW: open full dashboard ─────────────────────
+    case MSG.OPEN_DASHBOARD:
+      chrome.runtime.openOptionsPage();
+      sendResponse({ ok: true });
+      return false;
+
+    // ── Popup/Dashboard → SW: rescan current tab ────────────
+    case MSG.RESCAN:
+      handleRescan(tabId ?? payload?.tabId, sendResponse);
+      return true;
+
+    // ── Companion bridge status check ───────────────────────
+    case MSG.COMPANION_CHECK:
+      handleCompanionCheck(sendResponse);
+      return true;
+
+    // ── Send item to companion app ───────────────────────────
+    case MSG.COMPANION_SEND:
+      handleCompanionSend(payload, sendResponse);
+      return true;
+
+    default:
+      log.warn(`Unknown message type: ${type}`);
+      sendResponse({ ok: false, error: `Unknown message type: ${type}` });
+      return false;
+  }
+});
+
+// ── Handler: scan result from content script ─────────────────
+function handleScanResult(tabId, payload, sendResponse) {
+  if (!tabId) {
+    log.warn('SCAN_RESULT received without tabId — dropping.');
+    sendResponse({ ok: false, error: 'missing tabId' });
+    return;
+  }
+
+  const { resources = [], scanDurationMs = 0, pageUrl = '', incremental = false } = payload;
+
+  let finalResources = resources;
+  if (incremental && tabStore.has(tabId)) {
+    const existing = tabStore.get(tabId)?.resources || [];
+    const urlSet = new Set(existing.map(r => r.url));
+    const newItems = resources.filter(r => !urlSet.has(r.url));
+    finalResources = [...newItems, ...existing];
+  }
+
+  // Enforce resource cap
+  const capped = finalResources.slice(0, LIMITS.MAX_RESOURCES_PER_SCAN);
+
+  tabStore.set(tabId, {
+    resources: capped,
+    scannedAt: Date.now(),
+    scanDurationMs,
+    pageUrl: pageUrl || tabStore.get(tabId)?.pageUrl || '',
+    scanning: false,
+  });
+
+  const count = capped.length;
+  log.info(`Tab ${tabId}: scan complete — ${count} resources found in ${scanDurationMs}ms`);
+
+  // Update badge
+  if (count > 0) {
+    setBadgeState(tabId, 'active', count);
+  } else {
+    setBadgeState(tabId, 'none');
+  }
+
+  sendResponse({ ok: true, count });
+}
+
+// ── Handler: scan error from content script ──────────────────
+function handleScanError(tabId, payload) {
+  const { error = 'unknown error' } = payload;
+  log.error(`Tab ${tabId}: scan error — ${error}`);
+
+  if (tabId) {
+    setBadgeState(tabId, 'error');
+    // Preserve any previously scanned resources
+    const existing = tabStore.get(tabId);
+    if (existing) {
+      existing.scanning = false;
+      existing.lastError = error;
+    } else {
+      tabStore.set(tabId, {
+        resources: [],
+        scannedAt: Date.now(),
+        scanning: false,
+        lastError: error,
+      });
+    }
+  }
+}
+
+// ── Handler: popup requests resources ────────────────────────
+async function handleGetResources(tabId, sendResponse) {
+  if (!tabId) {
+    // Popup opened without knowing tabId — resolve active tab
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      tabId = tab?.id;
+    } catch (err) {
+      log.error('Failed to resolve active tab:', err);
+      sendResponse({ ok: false, error: 'Cannot resolve active tab', resources: [] });
+      return;
+    }
+  }
+
+  const entry = tabStore.get(tabId);
+
+  if (!entry) {
+    // No scan yet — trigger one now
+    sendResponse({ ok: true, resources: [], scanning: true, needsScan: true, tabId });
+    triggerScanOnTab(tabId);
+    return;
+  }
+
+  sendResponse({
+    ok: true,
+    resources: entry.resources,
+    scannedAt: entry.scannedAt,
+    scanDurationMs: entry.scanDurationMs,
+    pageUrl: entry.pageUrl,
+    scanning: entry.scanning,
+    lastError: entry.lastError ?? null,
+    tabId,
+  });
+}
+
+// ── Handler: trigger rescan ───────────────────────────────────
+async function handleRescan(tabId, sendResponse) {
+  if (!tabId) {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      tabId = tab?.id;
+    } catch (err) {
+      sendResponse({ ok: false, error: 'Cannot resolve active tab' });
+      return;
+    }
+  }
+
+  // Clear existing cache
+  tabStore.delete(tabId);
+  setBadgeState(tabId, 'scanning');
+
+  triggerScanOnTab(tabId);
+  sendResponse({ ok: true, tabId });
+}
+
+// ── Trigger content script scan via scripting API ────────────
+async function triggerScanOnTab(tabId) {
+  try {
+    // Mark as scanning
+    const entry = tabStore.get(tabId) ?? { resources: [], scannedAt: null };
+    entry.scanning = true;
+    tabStore.set(tabId, entry);
+    setBadgeState(tabId, 'scanning');
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['dist/content_script.bundle.js'],
+    });
+
+    log.debug(`Scan triggered on tab ${tabId}`);
+  } catch (err) {
+    log.error(`Failed to inject content script on tab ${tabId}:`, err.message);
+    setBadgeState(tabId, 'error');
+  }
+}
+
+// ── Handler: single download ──────────────────────────────────
+async function handleDownload(payload, sendResponse) {
+  const { url, filename, saveAs } = payload;
+
+  if (!url) {
+    sendResponse({ ok: false, error: 'No URL provided' });
+    return;
+  }
+
+  try {
+    const settings = await StorageService.getSettings();
+
+    const downloadId = await chrome.downloads.download({
+      url,
+      filename: filename || undefined,
+      saveAs: saveAs ?? settings.defaultSaveAs ?? false,
+      conflictAction: 'uniquify',
+    });
+
+    log.info(`Download started: id=${downloadId} url=${url}`);
+
+    // Save to history
+    await StorageService.addToHistory({
+      url,
+      filename: filename || extractFilenameFromUrl(url),
+      downloadId,
+      startedAt: Date.now(),
+      status: 'started',
+    });
+
+    sendResponse({ ok: true, downloadId });
+  } catch (err) {
+    log.error('Download failed:', err.message);
+    sendResponse({ ok: false, error: err.message });
+  }
+}
+
+// ── Handler: batch download ───────────────────────────────────
+async function handleBatchDownload(payload, sendResponse) {
+  const { items = [] } = payload;
+
+  if (!items.length) {
+    sendResponse({ ok: false, error: 'No items provided' });
+    return;
+  }
+
+  // Safety cap
+  const capped = items.slice(0, LIMITS.MAX_BATCH_DOWNLOAD);
+  const results = [];
+
+  for (const item of capped) {
+    try {
+      const downloadId = await chrome.downloads.download({
+        url: item.url,
+        filename: item.filename || undefined,
+        saveAs: false,
+        conflictAction: 'uniquify',
+      });
+      results.push({ url: item.url, downloadId, ok: true });
+
+      // Small delay between batch items to avoid hammering
+      await sleep(120);
+    } catch (err) {
+      log.warn(`Batch item failed: ${item.url} — ${err.message}`);
+      results.push({ url: item.url, ok: false, error: err.message });
+    }
+  }
+
+  await StorageService.addBatchToHistory(results);
+  sendResponse({ ok: true, results });
+}
+
+// ── Handler: companion check ──────────────────────────────────
+function handleCompanionCheck(sendResponse) {
+  try {
+    const port = chrome.runtime.connectNative('com.obsidianlabs.downloadforge');
+    port.postMessage({ type: 'PING' });
+    port.onMessage.addListener((msg) => {
+      if (msg.type === 'PONG') {
+        sendResponse({ ok: true, available: true, version: msg.version });
+      }
+      port.disconnect();
+    });
+    port.onDisconnect.addListener(() => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ ok: true, available: false, error: chrome.runtime.lastError.message });
+      }
+    });
+  } catch (err) {
+    sendResponse({ ok: true, available: false, error: err.message });
+  }
+}
+
+// ── Handler: send to companion ────────────────────────────────
+function handleCompanionSend(payload, sendResponse) {
+  try {
+    const port = chrome.runtime.connectNative('com.obsidianlabs.downloadforge');
+    port.postMessage({ type: 'DOWNLOAD', payload });
+    port.onMessage.addListener((msg) => {
+      sendResponse({ ok: true, response: msg });
+      port.disconnect();
+    });
+    port.onDisconnect.addListener(() => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+      }
+    });
+  } catch (err) {
+    sendResponse({ ok: false, error: err.message });
+  }
+}
+
+// ── Badge helpers ─────────────────────────────────────────────
+function setBadgeState(tabId, state, count = 0) {
+  let text  = '';
+  let color = BADGE.COLOR_NONE;
+
+  switch (state) {
+    case 'active':
+      text  = count > 99 ? '99+' : String(count);
+      color = BADGE.COLOR_ACTIVE;
+      break;
+    case 'scanning':
+      text  = '…';
+      color = BADGE.COLOR_SCANNING;
+      break;
+    case 'error':
+      text  = '!';
+      color = BADGE.COLOR_ERROR;
+      break;
+    case 'none':
+    default:
+      text  = '';
+      color = BADGE.COLOR_NONE;
+      break;
+  }
+
+  chrome.action.setBadgeText({ text, tabId });
+  chrome.action.setBadgeBackgroundColor({ color, tabId });
+}
+
+// ── Keyboard command handler ──────────────────────────────────
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'rescan-page') {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      log.debug(`Keyboard rescan triggered on tab ${tab.id}`);
+      handleRescan(tab.id, () => {});
+    }
+  }
+});
+
+// ── Download state change tracking ───────────────────────────
+chrome.downloads.onChanged.addListener(async (delta) => {
+  if (delta.state) {
+    const { current } = delta.state;
+    if (current === 'complete' || current === 'interrupted') {
+      await StorageService.updateHistoryItem(delta.id, { status: current });
+      log.debug(`Download ${delta.id} → ${current}`);
+    }
+  }
+});
+
+// ── Utils ─────────────────────────────────────────────────────
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function extractFilenameFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/');
+    return parts[parts.length - 1] || 'download';
+  } catch {
+    return 'download';
+  }
+}
+
+log.info(`DownloadForge service worker loaded — v${APP.VERSION} by ${APP.COMPANY}`);

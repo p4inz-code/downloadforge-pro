@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DownloadForge — Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-logo">⬡</span>
+    <div>
+      <div class="brand-name">DownloadForge</div>
+      <div class="brand-sub">by ObsidianLabs</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-view="history" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      History
+    </a>
+    <a class="nav-item" data-view="rules" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Domain Rules
+    </a>
+    <a class="nav-item" data-view="settings" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Settings
+    </a>
+    <a class="nav-item" data-view="companion" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+      Desktop App
+    </a>
+    <a class="nav-item" data-view="diagnostics" href="#">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Diagnostics
+    </a>
+  </nav>
+
+  <!-- Ad slot — sidebar bottom, non-intrusive -->
+  <div class="sidebar-ad" id="sidebar-ad">
+    <div class="ad-label">Ad</div>
+    <div class="ad-slot" id="ad-slot-sidebar">
+      <!-- Google AdSense or house ad goes here -->
+      <div class="ad-placeholder">
+        <span>Advertisement</span>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ═════════════════════════════════════════════════ -->
+<main class="main">
+
+  <!-- ── HISTORY VIEW ─────────────────────────────────────── -->
+  <div class="view" id="view-history">
+    <div class="view-header">
+      <div>
+        <h1 class="view-title">Download History</h1>
+        <p class="view-sub">All downloads initiated by DownloadForge</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary" id="btn-clear-history">Clear History</button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row" id="history-stats">
+      <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">Total Downloads</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-today">0</div><div class="stat-lbl">Today</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-complete">0</div><div class="stat-lbl">Completed</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-failed">0</div><div class="stat-lbl">Failed</div></div>
+    </div>
+
+    <!-- Filter + search -->
+    <div class="table-toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="table-search" id="history-search" type="text" placeholder="Search by filename or URL…"/>
+      </div>
+      <select class="table-select" id="history-filter-cat">
+        <option value="all">All types</option>
+        <option value="video">Video</option>
+        <option value="audio">Audio</option>
+        <option value="document">Documents</option>
+        <option value="archive">Archives</option>
+        <option value="image">Images</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table" id="history-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="history-check-all"/></th>
+            <th>File</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+      <div class="table-empty" id="history-empty" hidden>No download history yet. Start downloading resources!</div>
+    </div>
+  </div>
+
+  <!-- ── DOMAIN RULES VIEW ────────────────────────────────── -->
+  <div class="view" id="view-rules" hidden>
+    <div class="view-header">
+      <div>
+        <h1 class="view-title">Domain Rules</h1>
+        <p class="view-sub">Include or exclude specific domains from detection</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">Add Rule</h3>
+      <div class="rule-form">
+        <input class="input" id="rule-domain" type="text" placeholder="e.g. example.com"/>
+        <select class="table-select" id="rule-action">
+          <option value="exclude">Exclude (ignore)</option>
+          <option value="include">Include (show only)</option>
+        </select>
+        <input class="input" id="rule-note" type="text" placeholder="Note (optional)"/>
+        <button class="btn-primary" id="btn-add-rule">Add Rule</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 class="card-title">Active Rules</h3>
+      <div id="rules-list">
+        <div class="empty-state" id="rules-empty">No rules yet. Domains you exclude or include will appear here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS VIEW ────────────────────────────────────── -->
+  <div class="view" id="view-settings" hidden>
+    <div class="view-header">
+      <div>
+        <h1 class="view-title">Settings</h1>
+        <p class="view-sub">Configure DownloadForge behaviour</p>
+      </div>
+      <button class="btn-primary" id="btn-save-settings">Save Settings</button>
+    </div>
+
+    <div class="settings-grid">
+
+      <div class="card">
+        <h3 class="card-title">Detection</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Auto-scan on page load</div><div class="setting-desc">Automatically scan when you navigate to a page</div></div>
+          <label class="toggle"><input type="checkbox" id="s-autoScan"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Deduplicate URLs</div><div class="setting-desc">Hide duplicate resource URLs</div></div>
+          <label class="toggle"><input type="checkbox" id="s-deduplicateUrls"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Show images</div><div class="setting-desc">Include image files in results</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showImages"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Show documents</div><div class="setting-desc">Include PDF, DOCX, XLSX etc.</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showDocuments"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Show archives</div><div class="setting-desc">Include ZIP, RAR, 7Z etc.</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showArchives"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Show stream manifests</div><div class="setting-desc">Show non-DRM HLS streams (m3u8)</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showStreams"/><span class="toggle-track"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Downloads</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Always show Save As dialog</div><div class="setting-desc">Prompt for save location on every download</div></div>
+          <label class="toggle"><input type="checkbox" id="s-defaultSaveAs"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Show badge count</div><div class="setting-desc">Show resource count on extension icon</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showBadge"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Min file size (bytes)</div>
+            <div class="setting-desc">Skip resources smaller than this (avoids tiny tracking pixels)</div>
+          </div>
+          <input type="number" class="input input-sm" id="s-minFileSizeBytes" min="0" step="512"/>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Privacy & Data</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Debug mode</div><div class="setting-desc">Verbose console logging for troubleshooting</div></div>
+          <label class="toggle"><input type="checkbox" id="s-debugMode"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="privacy-note">
+          <strong>Privacy:</strong> DownloadForge stores all data locally on your device. No browsing data is sent to any server. No account required.
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-secondary btn-danger" id="btn-clear-all-data">Clear All Data</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── COMPANION VIEW ───────────────────────────────────── -->
+  <div class="view" id="view-companion" hidden>
+    <div class="view-header">
+      <div>
+        <h1 class="view-title">Desktop Companion App</h1>
+        <p class="view-sub">Connect DownloadForge to the ObsidianLabs desktop downloader</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="companion-status" id="companion-status-row">
+        <div class="status-indicator" id="companion-indicator"></div>
+        <span id="companion-status-text">Checking…</span>
+        <button class="btn-secondary" id="btn-check-companion">Check Again</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3 class="card-title">What the desktop app adds</h3>
+      <ul class="feature-list">
+        <li>✅ Advanced queue management with pause &amp; resume</li>
+        <li>✅ HLS stream download and muxing (non-DRM only)</li>
+        <li>✅ Multi-connection downloading for large files</li>
+        <li>✅ Categorized save folders</li>
+        <li>✅ Filename sanitization and collision-safe saving</li>
+        <li>✅ Download hash/checksum verification</li>
+        <li>✅ Scheduling and batch management</li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3 class="card-title">Install Instructions</h3>
+      <ol class="install-steps">
+        <li>Download the companion app for your OS from <strong>obsidianlabs.pages.dev</strong></li>
+        <li>Run the installer — it registers the native messaging host automatically</li>
+        <li>Click "Check Again" above to verify the connection</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ── DIAGNOSTICS VIEW ─────────────────────────────────── -->
+  <div class="view" id="view-diagnostics" hidden>
+    <div class="view-header">
+      <div>
+        <h1 class="view-title">Diagnostics</h1>
+        <p class="view-sub">Extension status and troubleshooting info</p>
+      </div>
+      <button class="btn-secondary" id="btn-run-diag">Run Checks</button>
+    </div>
+
+    <div class="diag-grid" id="diag-grid">
+      <div class="diag-card" id="diag-storage"><div class="diag-label">Storage</div><div class="diag-val">—</div></div>
+      <div class="diag-card" id="diag-permissions"><div class="diag-label">Permissions</div><div class="diag-val">—</div></div>
+      <div class="diag-card" id="diag-companion"><div class="diag-label">Companion App</div><div class="diag-val">—</div></div>
+      <div class="diag-card" id="diag-webrequest"><div class="diag-label">webRequest (optional)</div><div class="diag-val">—</div></div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3 class="card-title">Extension Info</h3>
+      <div class="info-grid">
+        <div class="info-row"><span class="info-key">Version</span><span class="info-val" id="diag-version">—</span></div>
+        <div class="info-row"><span class="info-key">Company</span><span class="info-val">ObsidianLabs</span></div>
+        <div class="info-row"><span class="info-key">Author</span><span class="info-val">p4inz</span></div>
+        <div class="info-row"><span class="info-key">Support</span><span class="info-val"><a href="https://discord.gg/obsidianlabs" target="_blank">discord.gg/obsidianlabs</a></span></div>
+        <div class="info-row"><span class="info-key">Manifest</span><span class="info-val">V3</span></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══ TOAST ════════════════════════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<script src="dashboard.js" type="module"></script>
+</body>
+</html>

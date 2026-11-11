@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Welcome to DownloadForge</title>
+  <style>
+    :root {
+      --bg: #0e1117; --bg2: #141720; --bg3: #1a1e2a;
+      --border: #252b3a; --accent: #f97316; --accent-dim: rgba(249,115,22,.1);
+      --text: #e8eaf0; --text2: #9099b0; --text3: #505878;
+      --green: #22c55e; --blue: #3b82f6; --purple: #a855f7;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+
+    .container { max-width: 640px; width: 100%; }
+
+    /* Header */
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; }
+    .brand-icon { font-size: 36px; color: var(--accent); line-height: 1; }
+    .brand-name { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+    .brand-name span { color: var(--accent); }
+    .brand-sub { font-size: 12px; color: var(--text3); letter-spacing: .5px; margin-top: 2px; }
+
+    .welcome-title { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1.15; margin-bottom: 12px; }
+    .welcome-sub { font-size: 15px; color: var(--text2); line-height: 1.7; margin-bottom: 36px; max-width: 520px; }
+
+    /* Steps */
+    .steps { display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; }
+    .step { display: flex; gap: 16px; align-items: flex-start; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; transition: border-color .2s; }
+    .step:hover { border-color: rgba(249,115,22,.3); }
+    .step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-dim); border: 1.5px solid rgba(249,115,22,.35); color: var(--accent); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-body h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+    .step-body p  { font-size: 12.5px; color: var(--text2); line-height: 1.6; }
+
+    /* Feature grid */
+    .features { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 36px; }
+    .feature { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+    .feature-icon { font-size: 20px; margin-bottom: 8px; }
+    .feature-name { font-size: 12.5px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .feature-desc { font-size: 11.5px; color: var(--text3); line-height: 1.5; }
+
+    /* Optional permission */
+    .perm-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 28px; }
+    .perm-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .perm-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+    .perm-badge { font-size: 10px; padding: 2px 8px; border-radius: 100px; background: rgba(234,179,8,.1); color: #eab308; border: 1px solid rgba(234,179,8,.2); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .perm-desc { font-size: 12px; color: var(--text2); line-height: 1.65; margin-bottom: 14px; }
+    .btn-grant { height: 34px; padding: 0 16px; background: var(--accent); color: #fff; border: none; border-radius: 5px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn-grant:hover { opacity: .9; }
+    .btn-grant:disabled { opacity: .5; cursor: default; }
+    .grant-status { font-size: 11.5px; color: var(--green); margin-top: 8px; display: none; }
+    .grant-status.show { display: block; }
+
+    /* CTA */
+    .cta-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn-primary { height: 42px; padding: 0 24px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: box-shadow .2s, opacity .15s; }
+    .btn-primary:hover { box-shadow: 0 0 24px rgba(249,115,22,.4); opacity: .95; }
+    .btn-secondary { height: 42px; padding: 0 20px; background: transparent; color: var(--text2); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; text-decoration: none; display: inline-flex; align-items: center; }
+    .btn-secondary:hover { border-color: var(--text2); color: var(--text); }
+
+    /* Privacy */
+    .privacy-note { margin-top: 24px; font-size: 11.5px; color: var(--text3); line-height: 1.7; text-align: center; }
+    .privacy-note a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="brand">
+    <span class="brand-icon">⬡</span>
+    <div>
+      <div class="brand-name">Download<span>Forge</span></div>
+      <div class="brand-sub">by ObsidianLabs</div>
+    </div>
+  </div>
+
+  <h1 class="welcome-title">Detect &amp; download<br>anything on the web.</h1>
+  <p class="welcome-sub">DownloadForge scans every page you visit and shows you all downloadable resources — videos, audio, documents, images, archives, and streams — in one clean popup.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Visit any webpage</h3>
+        <p>DownloadForge automatically scans the page as you browse. The icon badge shows how many resources were found.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Click the extension icon</h3>
+        <p>Open the popup to see all detected resources, filtered by type — videos, audio, documents, images, and more.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Download in one click</h3>
+        <p>Hit the download button on any resource. For advanced downloads, connect the free desktop companion app.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🎬</div>
+      <div class="feature-name">Video &amp; Audio</div>
+      <div class="feature-desc">MP4, WebM, MOV, MP3, WAV, FLAC and more</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📄</div>
+      <div class="feature-name">Documents</div>
+      <div class="feature-desc">PDF, DOCX, XLSX, PPTX, CSV, JSON</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📡</div>
+      <div class="feature-name">HLS Streams</div>
+      <div class="feature-desc">Non-DRM M3U8 stream detection &amp; download</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📦</div>
+      <div class="feature-name">Archives</div>
+      <div class="feature-desc">ZIP, RAR, 7Z, TAR, GZ and more</div>
+    </div>
+  </div>
+
+  <!-- Optional webRequest permission -->
+  <div class="perm-card">
+    <div class="perm-header">
+      <span class="perm-title">🔍 Enhanced Detection (Optional)</span>
+      <span class="perm-badge">Optional</span>
+    </div>
+    <p class="perm-desc">
+      Grant the optional <strong>webRequest</strong> permission to also detect resources loaded dynamically
+      over the network — like streaming media and files loaded by JavaScript.
+      This only observes response headers — never reads your data or stores browsing history.
+    </p>
+    <button class="btn-grant" id="btn-grant-wr">Enable Enhanced Detection</button>
+    <div class="grant-status" id="grant-status">✓ Enhanced detection enabled!</div>
+  </div>
+
+  <div class="cta-row">
+    <button class="btn-primary" id="btn-start">Start Using DownloadForge →</button>
+    <a class="btn-secondary" href="https://discord.gg/obsidianlabs" target="_blank">Join Discord</a>
+  </div>
+
+  <p class="privacy-note">
+    DownloadForge stores all data locally. No personal data is collected or sent anywhere.<br>
+    Read our <a href="https://obsidianlabs.pages.dev/privacy" target="_blank">Privacy Policy</a> · Built by <strong>p4inz</strong> @ ObsidianLabs
+  </p>
+
+</div>
+<script>
+  // Grant webRequest permission
+  document.getElementById('btn-grant-wr').addEventListener('click', async () => {
+    try {
+      const granted = await chrome.permissions.request({
+        permissions: ['webRequest'],
+        origins: ['<all_urls>'],
+      });
+      if (granted) {
+        document.getElementById('grant-status').classList.add('show');
+        document.getElementById('btn-grant-wr').disabled = true;
+        document.getElementById('btn-grant-wr').textContent = '✓ Enabled';
+        // Tell service worker to start observer
+        chrome.runtime.sendMessage({ type: 'TOGGLE_NETWORK_OBSERVER', payload: { enable: true } });
+      }
+    } catch (err) {
+      console.warn('Permission request failed:', err);
+    }
+  });
+
+  // Check if already granted
+  chrome.permissions.contains({ permissions: ['webRequest'] }).then(has => {
+    if (has) {
+      document.getElementById('grant-status').classList.add('show');
+      document.getElementById('btn-grant-wr').disabled = true;
+      document.getElementById('btn-grant-wr').textContent = '✓ Already Enabled';
+    }
+  });
+
+  // Close onboarding and go to active tab
+  document.getElementById('btn-start').addEventListener('click', () => window.close());
+</script>
+</body>
+</html>
