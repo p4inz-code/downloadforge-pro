@@ -179,21 +179,19 @@
         // SW → Content
         START_SCAN: "START_SCAN",
         RESCAN: "RESCAN",
-        // Popup → SW
+        // Popup / Content → SW
         GET_RESOURCES: "GET_RESOURCES",
         DOWNLOAD_ITEM: "DOWNLOAD_ITEM",
         DOWNLOAD_BATCH: "DOWNLOAD_BATCH",
         OPEN_DASHBOARD: "OPEN_DASHBOARD",
+        OPEN_DOWNLOADER: "OPEN_DOWNLOADER",
+        OPEN_TAB: "OPEN_TAB",
         COPY_URL: "COPY_URL",
         // SW → Popup
         RESOURCES_READY: "RESOURCES_READY",
         SCAN_PROGRESS: "SCAN_PROGRESS",
         DOWNLOAD_STARTED: "DOWNLOAD_STARTED",
-        DOWNLOAD_FAILED: "DOWNLOAD_FAILED",
-        // Companion bridge
-        COMPANION_CHECK: "COMPANION_CHECK",
-        COMPANION_SEND: "COMPANION_SEND",
-        COMPANION_STATUS: "COMPANION_STATUS"
+        DOWNLOAD_FAILED: "DOWNLOAD_FAILED"
       };
       STORAGE = {
         SETTINGS: "df_settings",
@@ -634,6 +632,12 @@
   });
 
   // src/content/video_overlay.js
+  function registerDetectedMedia(item) {
+    if (item && item.url) {
+      detectedMediaList.unshift(item);
+      if (detectedMediaList.length > 50) detectedMediaList.pop();
+    }
+  }
   function initVideoOverlay() {
     const trackedVideos = /* @__PURE__ */ new WeakSet();
     function attachOverlayToVideo(video) {
@@ -652,23 +656,43 @@
       const pill = document.createElement("button");
       pill.className = "df-pill-btn";
       pill.title = "Download video with DownloadForge Pro";
-      function updatePillState() {
+      function getBestMediaSource() {
         const src = video.currentSrc || video.src || "";
-        const isBlob = src.startsWith("blob:");
+        const matchingStream = detectedMediaList.find((m) => m.url.includes(".m3u8"));
+        if (matchingStream) {
+          return { type: "hls", url: matchingStream.url };
+        }
+        if (src.includes(".m3u8")) {
+          return { type: "hls", url: src };
+        }
+        if (src && !src.startsWith("blob:") && !src.startsWith("data:")) {
+          return { type: "direct", url: src };
+        }
+        return { type: "blob", url: src };
+      }
+      function updatePillState() {
+        const source = getBestMediaSource();
         const height = video.videoHeight || 1080;
         const qualityText = height >= 2160 ? "4K" : height >= 1080 ? "1080p" : height >= 720 ? "720p" : `${height}p`;
-        if (isBlob) {
-          pill.className = "df-pill-btn record-mode";
+        if (source.type === "hls") {
+          pill.className = "df-pill-btn hls-mode";
           pill.innerHTML = `
-          <svg class="df-pill-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>
-          <span>Record Video</span>
+          <svg class="df-pill-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Download Stream</span>
           <span class="df-quality-tag">${qualityText}</span>
         `;
-        } else {
+        } else if (source.type === "direct") {
           pill.className = "df-pill-btn";
           pill.innerHTML = `
           <svg class="df-pill-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Download</span>
+          <span class="df-quality-tag">${qualityText}</span>
+        `;
+        } else {
+          pill.className = "df-pill-btn record-mode";
+          pill.innerHTML = `
+          <svg class="df-pill-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="currentColor"/></svg>
+          <span>Record Video</span>
           <span class="df-quality-tag">${qualityText}</span>
         `;
         }
@@ -679,23 +703,145 @@
       pill.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        const src = video.currentSrc || video.src || "";
-        const title = document.title || "web_video";
-        if (src.startsWith("blob:")) {
-          window.__df_record_mode_active = true;
-          const studioUrl = chrome.runtime.getURL(
-            `src/downloader/downloader.html?mode=record&title=${encodeURIComponent(title)}`
-          );
-          window.open(studioUrl, "_blank");
+        const source = getBestMediaSource();
+        const title = (document.title || "video").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
+        if (source.type === "hls") {
+          chrome.runtime.sendMessage({
+            type: MSG.OPEN_DOWNLOADER || "OPEN_DOWNLOADER",
+            payload: {
+              url: source.url,
+              filename: `${title}.mp4`,
+              mode: "stream",
+              title
+            }
+          });
+        } else if (source.type === "direct") {
+          chrome.runtime.sendMessage({
+            type: MSG.DOWNLOAD_ITEM || "DOWNLOAD_ITEM",
+            payload: {
+              url: source.url,
+              filename: `${title}.mp4`
+            }
+          });
         } else {
-          const studioUrl = chrome.runtime.getURL(
-            `src/downloader/downloader.html?url=${encodeURIComponent(src)}&filename=${encodeURIComponent(title + ".mp4")}`
-          );
-          window.open(studioUrl, "_blank");
+          startInPageRecording(video, title, parent);
         }
       });
       overlay.appendChild(pill);
       parent.appendChild(overlay);
+    }
+    function startInPageRecording(video, title, container) {
+      if (container.querySelector(".df-rec-hud")) return;
+      let stream = null;
+      try {
+        if (typeof video.captureStream === "function") {
+          stream = video.captureStream();
+        } else if (typeof video.mozCaptureStream === "function") {
+          stream = video.mozCaptureStream();
+        }
+      } catch (err) {
+        console.warn("[DownloadForge] captureStream blocked by CORS:", err);
+      }
+      if (!stream) {
+        chrome.runtime.sendMessage({
+          type: MSG.OPEN_DOWNLOADER || "OPEN_DOWNLOADER",
+          payload: { mode: "record", title }
+        });
+        return;
+      }
+      const mimeTypes = [
+        "video/mp4;codecs=avc1,mp4a.40.2",
+        "video/mp4",
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm"
+      ];
+      const mimeType = mimeTypes.find((m) => MediaRecorder.isTypeSupported(m)) || "video/webm";
+      const isMp4 = mimeType.includes("mp4");
+      let chunks = [];
+      let recordedBytes = 0;
+      let secondsElapsed = 0;
+      let timerInterval = null;
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+          recordedBytes += e.data.size;
+        }
+      };
+      const hud = document.createElement("div");
+      hud.className = "df-rec-hud";
+      hud.innerHTML = `
+      <div class="df-rec-badge"><span class="df-rec-dot"></span>REC</div>
+      <div class="df-rec-timer" id="dfRecTimer">00:00</div>
+      <div class="df-rec-size" id="dfRecSize">0.0 MB</div>
+      <div class="df-rec-speeds">
+        <button class="df-spd-btn active" data-spd="1">1x</button>
+        <button class="df-spd-btn" data-spd="2">2x</button>
+        <button class="df-spd-btn" data-spd="4">4x</button>
+        <button class="df-spd-btn" data-spd="8">8x</button>
+        <button class="df-spd-btn" data-spd="16">16x</button>
+      </div>
+      <button class="df-rec-btn df-rec-save" id="dfRecSave">Stop &amp; Save ${isMp4 ? "MP4" : "Video"}</button>
+      <button class="df-rec-btn df-rec-cancel" id="dfRecCancel">Cancel</button>
+    `;
+      container.appendChild(hud);
+      const timerEl = hud.querySelector("#dfRecTimer");
+      const sizeEl = hud.querySelector("#dfRecSize");
+      const saveBtn = hud.querySelector("#dfRecSave");
+      const cancelBtn = hud.querySelector("#dfRecCancel");
+      const speedBtns = hud.querySelectorAll(".df-spd-btn");
+      speedBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          speedBtns.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const spd = Number(btn.dataset.spd) || 1;
+          video.playbackRate = spd;
+        });
+      });
+      recorder.start(1e3);
+      if (video.paused) {
+        video.play().catch(() => {
+        });
+      }
+      timerInterval = setInterval(() => {
+        secondsElapsed++;
+        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+        const secs = String(secondsElapsed % 60).padStart(2, "0");
+        if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+        if (sizeEl) sizeEl.textContent = `${(recordedBytes / (1024 * 1024)).toFixed(1)} MB`;
+      }, 1e3);
+      function cleanup() {
+        clearInterval(timerInterval);
+        video.playbackRate = 1;
+        if (hud.parentElement) hud.remove();
+      }
+      saveBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Finalizing...";
+        recorder.onstop = () => {
+          const ext = isMp4 ? "mp4" : "webm";
+          const blob = new Blob(chunks, { type: mimeType });
+          const blobUrl = URL.createObjectURL(blob);
+          const filename = `${title}.${ext}`;
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1e4);
+          cleanup();
+        };
+        recorder.stop();
+      });
+      cancelBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        recorder.stop();
+        cleanup();
+      });
     }
     function findVideosRecursively(root = document) {
       if (!root) return [];
@@ -732,8 +878,11 @@
       subtree: true
     });
   }
+  var detectedMediaList;
   var init_video_overlay = __esm({
     "src/content/video_overlay.js"() {
+      init_constants();
+      detectedMediaList = [];
     }
   });
 
@@ -877,6 +1026,7 @@
           if (event.data.type === "MEDIA_DETECTED" && event.data.data) {
             const item = event.data.data;
             if (!item.url || typeof item.url !== "string") return;
+            registerDetectedMedia(item);
             if (!item.url.startsWith("http://") && !item.url.startsWith("https://") && !item.url.startsWith("blob:")) {
               return;
             }

@@ -137,6 +137,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: true });
       return false;
 
+    // ── Content/Popup → SW: open Stream Studio ──────────────
+    case MSG.OPEN_DOWNLOADER:
+    case 'OPEN_DOWNLOADER':
+      handleOpenDownloader(payload, sender, sendResponse);
+      return true;
+
+    // ── Content/Popup → SW: open arbitrary tab safely ───────
+    case MSG.OPEN_TAB:
+    case 'OPEN_TAB':
+      if (payload?.url) {
+        chrome.tabs.create({ url: payload.url, active: payload.active !== false });
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: 'No URL provided' });
+      }
+      return false;
+
     // ── Popup/Dashboard → SW: rescan current tab ────────────
     case MSG.RESCAN:
       handleRescan(tabId ?? payload?.tabId, sendResponse);
@@ -148,6 +165,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
   }
 });
+
+// ── Handler: open Stream Studio ──────────────────────────────
+function handleOpenDownloader(payload, sender, sendResponse) {
+  try {
+    const { url, filename, mode, title } = payload || {};
+    const params = new URLSearchParams();
+    if (mode) params.set('mode', mode);
+    if (url) params.set('url', url);
+    if (filename) params.set('filename', filename);
+    if (title) params.set('title', title);
+    if (sender?.tab?.id) params.set('tabId', String(sender.tab.id));
+    if (sender?.tab?.url) {
+      try {
+        const u = new URL(sender.tab.url);
+        params.set('referer', u.origin);
+      } catch (e) {}
+    }
+
+    const queryStr = params.toString();
+    const studioUrl = chrome.runtime.getURL(
+      queryStr ? `src/downloader/downloader.html?${queryStr}` : 'src/downloader/downloader.html'
+    );
+    chrome.tabs.create({ url: studioUrl, active: true }, (tab) => {
+      sendResponse({ ok: true, tabId: tab?.id });
+    });
+  } catch (err) {
+    log.error('Failed to open downloader:', err);
+    sendResponse({ ok: false, error: err.message });
+  }
+}
 
 // ── Handler: scan result from content script ─────────────────
 function handleScanResult(tabId, payload, sendResponse) {

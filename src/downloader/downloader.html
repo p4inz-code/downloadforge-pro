@@ -8,61 +8,131 @@
 </head>
 <body>
   <div class="studio-container">
-    <!-- Header -->
+    <!-- Top Header -->
     <header class="studio-header">
       <div class="brand">
-        <img src="../../assets/icons/icon32.png" alt="DownloadForge Pro" class="logo" />
+        <svg class="brand-mark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b9bff" stroke-width="2">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
         <div class="brand-text">
-          <h1>DownloadForge <span>Pro Studio</span></h1>
-          <p>High-Speed HLS / DASH Downloader & In-Browser MP4 Transmuxer</p>
+          <h1>DownloadForge <span>Stream Studio</span></h1>
+          <p class="brand-sub">Engineered by Atharva Patil (p4inz) · P4inz Interactive Labs</p>
         </div>
       </div>
       <div class="header-badges">
         <span class="badge status-badge" id="engineStatus">Ready</span>
         <span class="badge tech-badge">WebCrypto AES-128</span>
-        <span class="badge tech-badge">0% RAM Stream</span>
+        <span class="badge tech-badge">Direct-to-Disk</span>
       </div>
     </header>
 
     <!-- Main Content -->
     <main class="studio-main">
-      <!-- Media Info & Config Card -->
+      <!-- Media Info & Source Input Card -->
       <section class="card media-card">
         <div class="card-header">
-          <h2 id="streamTitle">Detecting Media Stream...</h2>
+          <div>
+            <p class="eyebrow">Stream Ingestion</p>
+            <h2 id="streamTitle">Detecting Media Stream...</h2>
+          </div>
           <span class="url-hint" id="streamDomain"></span>
         </div>
+
         <div class="input-row">
-          <input type="text" id="streamUrlInput" placeholder="Enter .m3u8 or media stream URL..." />
-          <button id="btnLoadStream" class="btn btn-secondary">Analyze Stream</button>
+          <input type="text" id="streamUrlInput" placeholder="Paste .m3u8, direct video URL or stream source..." autocomplete="off" spellcheck="false" />
+          <button id="btnLoadStream" class="btn secondary">Analyze Stream</button>
         </div>
 
+        <!-- Settings Grid (Matching FetchV Parity) -->
         <div class="config-grid">
           <div class="config-item" id="variantRow" style="display: none;">
-            <label for="variantSelect">Quality / Track:</label>
-            <select id="variantSelect"></select>
+            <label for="variantSelect">Quality / Resolution Track:</label>
+            <div class="custom-select-wrap">
+              <select id="variantSelect"></select>
+            </div>
           </div>
 
           <div class="config-item">
-            <label for="concurrencySelect">Speed Profile:</label>
-            <select id="concurrencySelect">
-              <option value="turbo" selected>Turbo Mode (8 Parallel Connections - Recommended)</option>
-              <option value="maximum">Maximum Aggression (16 Parallel Connections)</option>
-              <option value="balanced">Balanced Mode (4 Connections - Low CPU)</option>
-            </select>
+            <label for="concurrencySelect">Parallel Worker Threads:</label>
+            <div class="custom-select-wrap">
+              <select id="concurrencySelect">
+                <option value="turbo" selected>Turbo Mode (8 Workers - Recommended)</option>
+                <option value="maximum">Maximum Mode (16 Workers)</option>
+                <option value="ultra">Ultra Mode (32 Workers - Multi-Gigabit)</option>
+                <option value="balanced">Balanced Mode (4 Workers - Low CPU)</option>
+                <option value="gentle">Gentle Mode (2 Workers)</option>
+                <option value="safe">Safe Mode (1 Worker - Strict Anti-Ban)</option>
+              </select>
+            </div>
           </div>
 
-          <div class="config-item checkbox-item">
-            <label>
-              <input type="checkbox" id="chkDirectDisk" checked />
-              <span>Direct-to-Disk Stream (0% RAM Bloat for 1-2GB+ videos)</span>
-            </label>
+          <div class="config-item">
+            <label for="retrySelect">Retry Attempts on Failure:</label>
+            <div class="custom-select-wrap">
+              <select id="retrySelect">
+                <option value="3" selected>3 Retries (Standard)</option>
+                <option value="5">5 Retries (Unstable Connections)</option>
+                <option value="10">10 Retries (Aggressive Persistence)</option>
+                <option value="1">1 Retry (Fail Fast)</option>
+              </select>
+            </div>
           </div>
+
+          <div class="config-item">
+            <label for="timeoutSelect">Segment Request Timeout:</label>
+            <div class="custom-select-wrap">
+              <select id="timeoutSelect">
+                <option value="15000" selected>15 Seconds (Recommended)</option>
+                <option value="10000">10 Seconds (Fast CDNs)</option>
+                <option value="30000">30 Seconds (Slow CDNs)</option>
+                <option value="5000">5 Seconds (Very Fast)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="config-item">
+            <label for="formatSelect">Output Format:</label>
+            <div class="custom-select-wrap">
+              <select id="formatSelect">
+                <option value="mp4" selected>MP4 Video (Video + Audio Synchronized)</option>
+                <option value="audio">Extract Audio Only (M4A / AAC)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="config-item">
+            <label for="customReferer">Custom Referer / Origin Header:</label>
+            <input type="text" id="customReferer" placeholder="Auto-detected from source tab..." />
+          </div>
+        </div>
+
+        <!-- Toggles Row -->
+        <div class="toggles-row">
+          <label class="custom-checkbox-label">
+            <input type="checkbox" id="chkDirectDisk" checked />
+            <span class="checkbox-box"></span>
+            <span>Direct-to-Disk Stream (W3C File System Access API - 0% RAM bloat)</span>
+          </label>
+
+          <label class="custom-checkbox-label">
+            <input type="checkbox" id="chkSkipBroken" checked />
+            <span class="checkbox-box"></span>
+            <span>Skip Broken / 404 Segments (Prevent job abort on single missing chunk)</span>
+          </label>
         </div>
       </section>
 
-      <!-- Progress & Visualizer Card -->
+      <!-- Progress & Metrics Visualizer Card -->
       <section class="card progress-card">
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Live Throughput &amp; Ingestion</p>
+            <div class="status-msg" id="statusMessage">Ready to download. Click 'Start Download' below.</div>
+          </div>
+        </div>
+
         <div class="progress-stats">
           <div class="stat">
             <span class="stat-label">Progress</span>
@@ -73,11 +143,11 @@
             <span class="stat-value" id="statSegments">0 / 0</span>
           </div>
           <div class="stat">
-            <span class="stat-label">Download Speed</span>
+            <span class="stat-label">Speed</span>
             <span class="stat-value" id="statSpeed">0.00 MB/s</span>
           </div>
           <div class="stat">
-            <span class="stat-label">Time Remaining</span>
+            <span class="stat-label">ETA</span>
             <span class="stat-value" id="statEta">--</span>
           </div>
         </div>
@@ -86,20 +156,33 @@
           <div class="progress-bar-fill" id="progressBarFill"></div>
         </div>
 
-        <div class="status-msg" id="statusMessage">Ready to download. Click 'Start Download' below.</div>
-
-        <!-- Segment Visualizer Grid -->
+        <!-- Segment Visualizer Heatmap -->
+        <div class="heatmap-header">
+          <span class="heatmap-title">Segment Heatmap</span>
+          <div class="heatmap-legend">
+            <span class="leg-item"><i class="leg-dot queued"></i> Queued</span>
+            <span class="leg-item"><i class="leg-dot fetching"></i> In Flight</span>
+            <span class="leg-item"><i class="leg-dot done"></i> Decrypted</span>
+            <span class="leg-item"><i class="leg-dot failed"></i> Skipped</span>
+          </div>
+        </div>
         <div class="segment-grid" id="segmentGrid"></div>
 
         <!-- Action Buttons -->
         <div class="action-buttons">
-          <button id="btnStart" class="btn btn-primary">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
-            <span>Start Turbo Download</span>
+          <button id="btnStart" class="btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Start Download</span>
           </button>
-          <button id="btnCancel" class="btn btn-danger" style="display: none;">Cancel</button>
-          <button id="btnSave" class="btn btn-success" style="display: none;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <button id="btnCancel" class="btn danger" style="display: none;">Cancel Download</button>
+          <button id="btnSave" class="btn success" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
             <span>Save MP4 File</span>
           </button>
         </div>
@@ -107,19 +190,21 @@
 
       <!-- Preview Player Card -->
       <section class="card preview-card" id="previewCard" style="display: none;">
-        <h3>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          In-Studio Player Preview
-        </h3>
+        <div class="card-header">
+          <div>
+            <p class="eyebrow">Verification</p>
+            <h3>In-Studio Playback Preview</h3>
+          </div>
+        </div>
         <video id="previewPlayer" controls class="preview-video"></video>
       </section>
     </main>
 
     <!-- Footer -->
     <footer class="studio-footer">
-      <span>P4inz Interactive Labs — DownloadForge Pro Engine v2.1.0</span>
+      <span>P4inz Interactive Labs · <a href="https://atharvapatil.tech" target="_blank">atharvapatil.tech</a></span>
       <span>•</span>
-      <span>Direct Disk Streaming & WebCrypto AES-128 Hardware Acceleration</span>
+      <span>Hardware AES-128 WebCrypto · Direct-to-Disk Zero-RAM Engine</span>
     </footer>
   </div>
 

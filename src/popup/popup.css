@@ -302,7 +302,7 @@ html, body {
 
 .sort-select {
   height: 30px;
-  padding: 0 6px;
+  padding: 0 22px 0 8px;
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -311,6 +311,12 @@ html, body {
   outline: none;
   cursor: pointer;
   flex-shrink: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23949db5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  transition: border-color .15s ease;
 }
 .sort-select:focus { border-color: var(--accent); }
 
@@ -391,12 +397,34 @@ html, body {
 }
 
 .item-check {
-  width: 14px;
-  height: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
   margin-top: 2px;
-  accent-color: var(--accent);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  background: var(--bg3);
+  display: grid;
+  place-content: center;
   flex-shrink: 0;
   cursor: pointer;
+  transition: all 0.12s ease;
+}
+.item-check:hover {
+  border-color: var(--accent);
+}
+.item-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.item-check:checked::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+  transform: rotate(-45deg) translate(0.5px, -0.5px);
 }
 
 .item-icon {

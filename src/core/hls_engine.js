@@ -16,15 +16,22 @@ import muxjs from 'mux.js';
 import { parseHLSManifest } from './hls_parser.js';
 
 export const CONCURRENCY_PROFILES = {
+  SAFE: 1,
+  GENTLE: 2,
   BALANCED: 4,
   TURBO: 8,
   MAXIMUM: 16,
+  ULTRA: 32,
 };
 
 export class HLSEngine {
   constructor(options = {}) {
     this.concurrency = options.concurrency || CONCURRENCY_PROFILES.TURBO;
     this.maxRetries = options.maxRetries || 3;
+    this.timeoutMs = options.timeoutMs || 15000;
+    this.skipFailedSegments = options.skipFailedSegments !== false;
+    this.referer = options.referer || null;
+    this.audioOnly = options.audioOnly || false;
     this.onProgress = options.onProgress || (() => {});
     this.onStatus = options.onStatus || (() => {});
     this.aborted = false;
@@ -199,8 +206,26 @@ export class HLSEngine {
 
         } catch (err) {
           if (this.aborted) throw new Error('Download cancelled by user');
-          console.error(`Failed segment ${index}:`, err);
-          throw new Error(`Segment ${index} failed: ${err.message}`);
+          console.warn(`[DownloadForge] Failed segment ${index}:`, err.message);
+
+          if (this.skipFailedSegments) {
+            // Fill with empty array buffer so sequential pump can advance
+            downloadedBuffers[index] = new Uint8Array(0);
+            completedCount++;
+            pumpNextSegments();
+
+            this.onProgress({
+              completed: completedCount,
+              total,
+              percent: Math.round((completedCount / total) * 100),
+              speedMBs: '0.00',
+              etaSec: 0,
+              index,
+              failed: true,
+            });
+          } else {
+            throw new Error(`Segment ${index} failed: ${err.message}`);
+          }
         }
       }
     };
@@ -305,18 +330,31 @@ export class HLSEngine {
   }
 
   async fetchBufferWithRetry(url, byteRange = null, attempt = 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs || 15000);
+
     try {
       const headers = {};
+      if (this.referer) {
+        headers['Referer'] = this.referer;
+      }
       if (byteRange && byteRange.length > 0) {
         const end = byteRange.offset + byteRange.length - 1;
         headers['Range'] = `bytes=${byteRange.offset}-${end}`;
       }
-      const res = await fetch(url, { cache: 'no-store', headers });
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
       if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
       return await res.arrayBuffer();
     } catch (err) {
+      clearTimeout(timeout);
       if (attempt < this.maxRetries && !this.aborted) {
-        await new Promise(r => setTimeout(r, 1000 * attempt));
+        const backoff = Math.min(800 * attempt, 3000);
+        await new Promise(r => setTimeout(r, backoff));
         return this.fetchBufferWithRetry(url, byteRange, attempt + 1);
       }
       throw err;

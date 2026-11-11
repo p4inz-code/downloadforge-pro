@@ -9,7 +9,7 @@ def package_extension():
     include_dirs = ["dist", "assets", "icons", "src"]
     include_files = ["manifest.json", "README.md", "package.json", "build.js"]
 
-    for version in ["v1.0.1", "v1.0.0"]:
+    for version in ["v1.0.2", "v1.0.1", "v1.0.0"]:
         zip_path = os.path.join(out_dir, f"downloadforge-pro-{version}.zip")
         if os.path.exists(zip_path):
             os.remove(zip_path)

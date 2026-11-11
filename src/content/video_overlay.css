@@ -1,89 +1,199 @@
 /* ============================================================
-   DownloadForge Pro — Floating Video Overlay Styling
+   DownloadForge Pro — Floating Video Overlay & Recording HUD
    P4inz Interactive Labs | p4inz
-   High-end Dark Glassmorphism for in-video download pills
+   Design System Reference: Outlinedesk (p4inz-code.github.io/outlinedesk)
    ============================================================ */
 
 .df-video-overlay-wrap {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 2147483647; /* Maximum z-index above player overlays */
+  top: 12px;
+  right: 12px;
+  z-index: 2147483647;
   pointer-events: auto;
   opacity: 0;
-  transform: translateY(-4px) scale(0.96);
-  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transform: translateY(-2px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  font-family: "IBM Plex Sans", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
   user-select: none;
 }
 
-/* Show when hovering video container or overlay itself */
 .df-video-container-hover .df-video-overlay-wrap,
 .df-video-overlay-wrap:hover {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
 }
 
 .df-pill-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(14, 16, 26, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #f1f3f9;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
+  gap: 7px;
+  background: #18191d;
+  border: 1px solid #2a2d33;
+  color: #eceef1;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(99, 102, 241, 0.2);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .df-pill-btn:hover {
-  background: rgba(22, 25, 42, 0.96);
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.35);
-  transform: scale(1.03);
+  background: #202227;
+  border-color: #626976;
+  color: #ffffff;
 }
 
 .df-pill-icon {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   fill: none;
-  stroke: #818cf8;
-  stroke-width: 2.4;
+  stroke: #5b9bff;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: stroke 0.2s ease;
 }
 
-.df-pill-btn:hover .df-pill-icon {
-  stroke: #a5b4fc;
-}
-
-.df-quality-tag {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Record Mode Pill Variant */
-.df-pill-btn.record-mode {
-  border-color: rgba(239, 68, 68, 0.4);
+.df-pill-btn.hls-mode .df-pill-icon {
+  stroke: #5b9bff;
 }
 
 .df-pill-btn.record-mode .df-pill-icon {
-  stroke: #ef4444;
+  stroke: #ff7b72;
+  fill: #ff7b72;
+}
+
+.df-quality-tag {
+  background: rgba(91, 155, 255, 0.14);
+  border: 1px solid rgba(91, 155, 255, 0.3);
+  color: #7fb0ff;
+  font: 500 10px/1 "IBM Plex Mono", ui-monospace, monospace;
+  padding: 2px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .df-pill-btn.record-mode .df-quality-tag {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: rgba(255, 123, 114, 0.14);
+  border-color: rgba(255, 123, 114, 0.35);
+  color: #ff7b72;
+}
+
+/* ── Outlinedesk Floating In-Page Recording HUD ─────────────── */
+.df-rec-hud {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #18191d;
+  border: 1px solid #2a2d33;
+  border-radius: 8px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  color: #eceef1;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+.df-rec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 600 11px/1 "IBM Plex Mono", ui-monospace, monospace;
+  color: #ff7b72;
+  letter-spacing: 0.05em;
+}
+
+.df-rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff7b72;
+  box-shadow: 0 0 6px #ff7b72;
+  animation: df-rec-pulse 1s infinite alternate;
+}
+
+@keyframes df-rec-pulse {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+.df-rec-timer,
+.df-rec-size {
+  font: 500 12px/1 "IBM Plex Mono", ui-monospace, monospace;
+  color: #eceef1;
+  font-variant-numeric: tabular-nums;
+}
+
+.df-rec-size {
+  color: #9097a2;
+}
+
+.df-rec-speeds {
+  display: inline-flex;
+  background: rgba(236, 238, 241, 0.05);
+  border: 1px solid #2a2d33;
+  border-radius: 4px;
+  padding: 1px;
+  gap: 1px;
+}
+
+.df-spd-btn {
+  background: transparent;
+  border: none;
+  color: #9097a2;
+  font: 500 11px/1 "IBM Plex Mono", ui-monospace, monospace;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.df-spd-btn:hover {
+  color: #eceef1;
+}
+
+.df-spd-btn.active {
+  background: #2a2d33;
+  color: #5b9bff;
+  font-weight: 600;
+}
+
+.df-rec-btn {
+  border: none;
+  border-radius: 5px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.df-rec-save {
+  background: #2f6fe0;
+  color: #ffffff;
+}
+
+.df-rec-save:hover {
+  filter: brightness(1.1);
+}
+
+.df-rec-cancel {
+  background: transparent;
+  border: 1px solid #2a2d33;
+  color: #9097a2;
+}
+
+.df-rec-cancel:hover {
+  background: rgba(236, 238, 241, 0.05);
+  color: #eceef1;
+  border-color: #626976;
 }

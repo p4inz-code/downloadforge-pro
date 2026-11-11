@@ -303,9 +303,6 @@ async function handleItemAction(action, item) {
     case 'open':
       chrome.tabs.create({ url: item.url, active: false });
       break;
-    case 'companion':
-      await sendToCompanion(item);
-      break;
   }
 }
 
@@ -313,10 +310,15 @@ async function downloadItem(item) {
   const isStream = item.category === CATEGORY.STREAM || item.status === STATUS.STREAM || item.url.includes('.m3u8');
 
   if (isStream) {
-    const studioUrl = chrome.runtime.getURL(
-      `src/downloader/downloader.html?url=${encodeURIComponent(item.url)}&filename=${encodeURIComponent(item.filename || 'stream_video.mp4')}`
-    );
-    chrome.tabs.create({ url: studioUrl, active: true });
+    chrome.runtime.sendMessage({
+      type: 'OPEN_DOWNLOADER',
+      payload: {
+        url: item.url,
+        filename: item.filename || 'stream_video.mp4',
+        mode: 'stream',
+        title: item.filename || 'stream_video',
+      },
+    });
     window.close();
     return;
   }
@@ -333,19 +335,6 @@ async function downloadItem(item) {
     }
   } catch (err) {
     showToast('Download failed');
-  }
-}
-
-async function sendToCompanion(item) {
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: MSG.COMPANION_SEND,
-      payload: { url: item.url, filename: item.filename, category: item.category },
-    });
-    if (response?.ok) showToast('Sent to desktop app');
-    else showToast('Companion unavailable');
-  } catch {
-    showToast('Companion unavailable');
   }
 }
 

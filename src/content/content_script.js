@@ -13,7 +13,7 @@
 // ============================================================
 
 import { scanDOM }         from './dom_scanner.js';
-import { initVideoOverlay } from './video_overlay.js';
+import { initVideoOverlay, registerDetectedMedia } from './video_overlay.js';
 import { MSG, CATEGORY, SOURCE, STATUS } from '../shared/constants.js';
 import { StorageService }  from '../storage/storage.js';
 
@@ -71,6 +71,7 @@ function setupSnifferListener() {
     if (event.data.type === 'MEDIA_DETECTED' && event.data.data) {
       const item = event.data.data;
       if (!item.url || typeof item.url !== 'string') return;
+      registerDetectedMedia(item);
 
       // Validate URL protocol strictly against XSS vectors
       if (!item.url.startsWith('http://') && !item.url.startsWith('https://') && !item.url.startsWith('blob:')) {

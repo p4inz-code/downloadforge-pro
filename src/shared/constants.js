@@ -8,7 +8,7 @@
 // ── App Identity ────────────────────────────────────────────
 export const APP = {
   NAME:        'DownloadForge Pro',
-  VERSION:     '1.0.1',
+  VERSION:     '1.0.2',
   COMPANY:     'P4inz Interactive Labs',
   AUTHOR:      'Atharva Patil (p4inz)',
   WEBSITE:     'https://atharvapatil.tech',
@@ -158,11 +158,13 @@ export const MSG = {
   START_SCAN:        'START_SCAN',
   RESCAN:            'RESCAN',
 
-  // Popup → SW
+  // Popup / Content → SW
   GET_RESOURCES:     'GET_RESOURCES',
   DOWNLOAD_ITEM:     'DOWNLOAD_ITEM',
   DOWNLOAD_BATCH:    'DOWNLOAD_BATCH',
   OPEN_DASHBOARD:    'OPEN_DASHBOARD',
+  OPEN_DOWNLOADER:   'OPEN_DOWNLOADER',
+  OPEN_TAB:          'OPEN_TAB',
   COPY_URL:          'COPY_URL',
 
   // SW → Popup
@@ -170,11 +172,6 @@ export const MSG = {
   SCAN_PROGRESS:     'SCAN_PROGRESS',
   DOWNLOAD_STARTED:  'DOWNLOAD_STARTED',
   DOWNLOAD_FAILED:   'DOWNLOAD_FAILED',
-
-  // Companion bridge
-  COMPANION_CHECK:   'COMPANION_CHECK',
-  COMPANION_SEND:    'COMPANION_SEND',
-  COMPANION_STATUS:  'COMPANION_STATUS',
 };
 
 // ── Storage Keys ─────────────────────────────────────────────

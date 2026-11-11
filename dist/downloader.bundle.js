@@ -8357,14 +8357,21 @@
       import_mux = __toESM(require_mux());
       init_hls_parser();
       CONCURRENCY_PROFILES = {
+        SAFE: 1,
+        GENTLE: 2,
         BALANCED: 4,
         TURBO: 8,
-        MAXIMUM: 16
+        MAXIMUM: 16,
+        ULTRA: 32
       };
       HLSEngine = class {
         constructor(options = {}) {
           this.concurrency = options.concurrency || CONCURRENCY_PROFILES.TURBO;
           this.maxRetries = options.maxRetries || 3;
+          this.timeoutMs = options.timeoutMs || 15e3;
+          this.skipFailedSegments = options.skipFailedSegments !== false;
+          this.referer = options.referer || null;
+          this.audioOnly = options.audioOnly || false;
           this.onProgress = options.onProgress || (() => {
           });
           this.onStatus = options.onStatus || (() => {
@@ -8509,8 +8516,23 @@
                 });
               } catch (err) {
                 if (this.aborted) throw new Error("Download cancelled by user");
-                console.error(`Failed segment ${index}:`, err);
-                throw new Error(`Segment ${index} failed: ${err.message}`);
+                console.warn(`[DownloadForge] Failed segment ${index}:`, err.message);
+                if (this.skipFailedSegments) {
+                  downloadedBuffers[index] = new Uint8Array(0);
+                  completedCount++;
+                  pumpNextSegments();
+                  this.onProgress({
+                    completed: completedCount,
+                    total,
+                    percent: Math.round(completedCount / total * 100),
+                    speedMBs: "0.00",
+                    etaSec: 0,
+                    index,
+                    failed: true
+                  });
+                } else {
+                  throw new Error(`Segment ${index} failed: ${err.message}`);
+                }
               }
             }
           };
@@ -8597,18 +8619,30 @@
           return keyBuf;
         }
         async fetchBufferWithRetry(url, byteRange = null, attempt = 1) {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), this.timeoutMs || 15e3);
           try {
             const headers = {};
+            if (this.referer) {
+              headers["Referer"] = this.referer;
+            }
             if (byteRange && byteRange.length > 0) {
               const end = byteRange.offset + byteRange.length - 1;
               headers["Range"] = `bytes=${byteRange.offset}-${end}`;
             }
-            const res = await fetch(url, { cache: "no-store", headers });
+            const res = await fetch(url, {
+              cache: "no-store",
+              headers,
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
             if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
             return await res.arrayBuffer();
           } catch (err) {
+            clearTimeout(timeout);
             if (attempt < this.maxRetries && !this.aborted) {
-              await new Promise((r) => setTimeout(r, 1e3 * attempt));
+              const backoff = Math.min(800 * attempt, 3e3);
+              await new Promise((r) => setTimeout(r, backoff));
               return this.fetchBufferWithRetry(url, byteRange, attempt + 1);
             }
             throw err;
@@ -8636,7 +8670,12 @@
       var variantRow = document.getElementById("variantRow");
       var variantSelect = document.getElementById("variantSelect");
       var concurrencySelect = document.getElementById("concurrencySelect");
+      var retrySelect = document.getElementById("retrySelect");
+      var timeoutSelect = document.getElementById("timeoutSelect");
+      var formatSelect = document.getElementById("formatSelect");
+      var customReferer = document.getElementById("customReferer");
       var chkDirectDisk = document.getElementById("chkDirectDisk");
+      var chkSkipBroken = document.getElementById("chkSkipBroken");
       var statPercent = document.getElementById("statPercent");
       var statSegments = document.getElementById("statSegments");
       var statSpeed = document.getElementById("statSpeed");
@@ -8655,6 +8694,10 @@
         const streamUrl = params.get("url");
         const filename = params.get("filename") || params.get("title");
         const mode = params.get("mode");
+        const referer = params.get("referer");
+        if (referer && customReferer) {
+          customReferer.value = referer;
+        }
         if (filename) {
           targetFilename = filename.endsWith(".mp4") ? filename : `${filename}.mp4`;
           streamTitle.textContent = filename;
@@ -8676,23 +8719,34 @@
         isRecordMode = true;
         engineStatus.textContent = "Record Mode";
         streamTitle.textContent = `Live Buffer Recorder: ${title || "Active Video"}`;
-        streamUrlInput.value = "Capturing active browser player buffer (MSE/blob)...";
+        streamUrlInput.value = "In-page recorder active. Play the video in the source tab to buffer chunks.";
         streamUrlInput.disabled = true;
         btnLoadStream.disabled = true;
-        statusMessage.textContent = "Play or fast-forward the video in the source tab to buffer data, then click End & Save.";
+        statusMessage.textContent = "Stream Studio is ready. To record directly inside the webpage with 1x-16x speedup, use the floating in-video overlay.";
         btnStart.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
-    <span>End Buffer Recording & Save MP4</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+    <span>Save Active Buffer</span>
   `;
       }
       async function analyzeStream(url) {
-        statusMessage.textContent = "Analyzing stream playlist...";
+        statusMessage.textContent = "Analyzing stream playlist and available variants...";
         engineStatus.textContent = "Inspecting";
         try {
           currentManifest = await parseHLSManifest(url);
           if (currentManifest.error) {
-            statusMessage.textContent = `Error: ${currentManifest.error}`;
-            engineStatus.textContent = "Error";
+            if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url)) {
+              statusMessage.textContent = "Direct media file detected. Click Start to download directly.";
+              engineStatus.textContent = "Direct File";
+              btnStart.disabled = false;
+              return;
+            }
+            statusMessage.textContent = `Manifest Note: ${currentManifest.error}. Ready to attempt chunked fetch.`;
+            engineStatus.textContent = "Ready";
+            btnStart.disabled = false;
             return;
           }
           if (currentManifest.type === "master" && currentManifest.variants.length > 0) {
@@ -8700,11 +8754,13 @@
             currentManifest.variants.forEach((v, idx) => {
               const opt = document.createElement("option");
               opt.value = idx;
-              opt.textContent = `${v.label || v.resolution || "Auto"} (${Math.round(v.bandwidth / 1e3)} kbps)`;
+              const res = v.resolution ? `${v.resolution.width}x${v.resolution.height}` : "";
+              const bw = v.bandwidth ? `${Math.round(v.bandwidth / 1e3)} kbps` : "";
+              opt.textContent = `${v.label || res || "Track " + (idx + 1)} ${bw ? `(${bw})` : ""}`;
               variantSelect.appendChild(opt);
             });
             variantRow.style.display = "flex";
-            statusMessage.textContent = `Master playlist loaded with ${currentManifest.variants.length} quality tracks. Ready to download.`;
+            statusMessage.textContent = `Master playlist loaded with ${currentManifest.variants.length} tracks. Ready to download.`;
           } else {
             variantRow.style.display = "none";
             const segCount = currentManifest.segments ? currentManifest.segments.length : 0;
@@ -8714,8 +8770,9 @@
           engineStatus.textContent = "Ready";
           btnStart.disabled = false;
         } catch (err) {
-          statusMessage.textContent = `Failed to analyze stream: ${err.message}`;
-          engineStatus.textContent = "Error";
+          statusMessage.textContent = `Analysis note: ${err.message}`;
+          engineStatus.textContent = "Ready";
+          btnStart.disabled = false;
         }
       }
       function initSegmentGrid(total) {
@@ -8731,8 +8788,32 @@
       async function startDownload() {
         const url = streamUrlInput.value.trim();
         if (!url) return;
+        if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url) && (!currentManifest || currentManifest.error)) {
+          statusMessage.textContent = "Starting direct media download...";
+          try {
+            if (chrome?.downloads?.download) {
+              chrome.downloads.download({
+                url,
+                filename: targetFilename,
+                saveAs: true
+              });
+            } else {
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = targetFilename;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            }
+            statusMessage.textContent = "Direct download started successfully!";
+            engineStatus.textContent = "Downloading";
+          } catch (e) {
+            statusMessage.textContent = `Download error: ${e.message}`;
+          }
+          return;
+        }
         btnStart.style.display = "none";
-        btnCancel.style.display = "inline-block";
+        btnCancel.style.display = "inline-flex";
         btnSave.style.display = "none";
         previewCard.style.display = "none";
         engineStatus.textContent = "Downloading";
@@ -8741,13 +8822,23 @@
           const selectedIndex = parseInt(variantSelect.value, 10) || 0;
           selectedVariant = currentManifest.variants[selectedIndex];
         }
-        const concurrencyMode = concurrencySelect ? concurrencySelect.value : "turbo";
-        const concurrency = concurrencyMode === "maximum" ? CONCURRENCY_PROFILES.MAXIMUM : concurrencyMode === "balanced" ? CONCURRENCY_PROFILES.BALANCED : CONCURRENCY_PROFILES.TURBO;
+        const modeKey = concurrencySelect ? concurrencySelect.value : "turbo";
+        let concurrency = CONCURRENCY_PROFILES.TURBO;
+        if (modeKey === "ultra") concurrency = CONCURRENCY_PROFILES.ULTRA;
+        else if (modeKey === "maximum") concurrency = CONCURRENCY_PROFILES.MAXIMUM;
+        else if (modeKey === "balanced") concurrency = CONCURRENCY_PROFILES.BALANCED;
+        else if (modeKey === "gentle") concurrency = CONCURRENCY_PROFILES.GENTLE;
+        else if (modeKey === "safe") concurrency = CONCURRENCY_PROFILES.SAFE;
+        const maxRetries = retrySelect ? parseInt(retrySelect.value, 10) || 3 : 3;
+        const timeoutMs = timeoutSelect ? parseInt(timeoutSelect.value, 10) || 15e3 : 15e3;
+        const skipFailedSegments = chkSkipBroken ? chkSkipBroken.checked : true;
+        const referer = customReferer ? customReferer.value.trim() : null;
+        const audioOnly = formatSelect ? formatSelect.value === "audio" : false;
         let writableStream = null;
         const useDirectDisk = chkDirectDisk && chkDirectDisk.checked && window.showSaveFilePicker;
-        if (useDirectDisk) {
+        if (useDirectDisk && !audioOnly) {
           try {
-            statusMessage.textContent = "Choose destination file on disk...";
+            statusMessage.textContent = "Choose destination file on local disk...";
             const fileHandle = await window.showSaveFilePicker({
               suggestedName: targetFilename,
               types: [{
@@ -8759,7 +8850,7 @@
             statusMessage.textContent = "Streaming segments directly to disk (0% RAM bloat)...";
           } catch (e) {
             statusMessage.textContent = "Download cancelled: No destination file selected";
-            btnStart.style.display = "inline-block";
+            btnStart.style.display = "inline-flex";
             btnCancel.style.display = "none";
             engineStatus.textContent = "Cancelled";
             return;
@@ -8767,6 +8858,11 @@
         }
         currentEngine = new HLSEngine({
           concurrency,
+          maxRetries,
+          timeoutMs,
+          skipFailedSegments,
+          referer,
+          audioOnly,
           onStatus: (msg) => {
             statusMessage.textContent = msg;
           },
@@ -8778,7 +8874,7 @@
             progressBarFill.style.width = `${info.percent}%`;
             const dot = document.getElementById(`seg_${info.index}`);
             if (dot) {
-              dot.className = "seg-dot done";
+              dot.className = info.failed ? "seg-dot failed" : "seg-dot done";
             }
           }
         });
@@ -8796,7 +8892,7 @@
           } else {
             currentBlob = result.blob;
             statusMessage.textContent = "Transmuxing complete! MP4 is ready.";
-            btnSave.style.display = "inline-block";
+            btnSave.style.display = "inline-flex";
             if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
             currentBlobUrl = URL.createObjectURL(currentBlob);
             previewPlayer.src = currentBlobUrl;
@@ -8805,7 +8901,7 @@
         } catch (err) {
           engineStatus.textContent = "Stopped";
           statusMessage.textContent = `Download stopped: ${err.message}`;
-          btnStart.style.display = "inline-block";
+          btnStart.style.display = "inline-flex";
           btnCancel.style.display = "none";
         }
       }
