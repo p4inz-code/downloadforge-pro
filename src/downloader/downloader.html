@@ -54,6 +54,13 @@
             </div>
           </div>
 
+          <div class="config-item" id="audioTrackRow" style="display: none;">
+            <label for="audioTrackSelect">Audio Track / Language:</label>
+            <div class="custom-select-wrap">
+              <select id="audioTrackSelect"></select>
+            </div>
+          </div>
+
           <div class="config-item" id="subtitleRow" style="display: none;">
             <label for="subtitleSelect">Subtitles / Captions:</label>
             <div class="subtitle-actions">
@@ -192,6 +199,20 @@
         </div>
         <div class="segment-grid" id="segmentGrid"></div>
 
+        <!-- Error Diagnostic Card (Hidden until error occurs) -->
+        <div class="diag-error-box" id="diagErrorBox" style="display: none;">
+          <div class="diag-error-header">
+            <span class="diag-error-code" id="diagErrorCode">[ERR_UNKNOWN]</span>
+            <span class="diag-error-title" id="diagErrorTitle">Stream Ingestion Note</span>
+          </div>
+          <div class="diag-error-desc" id="diagErrorDesc"></div>
+          <div class="diag-error-actions">
+            <button class="btn secondary sm" id="btnAutoHeal">Auto-Fix &amp; Retry</button>
+            <button class="btn secondary sm" id="btnSwitchRecordMode" style="display: none;">Switch to In-Page Buffer Mode</button>
+            <button class="btn secondary sm" id="btnCopyDiagLog">Copy Diagnostic Log</button>
+          </div>
+        </div>
+
         <!-- Action Buttons -->
         <div class="action-buttons">
           <button id="btnStart" class="btn">
@@ -258,6 +279,9 @@
       <span>Dual Protocol (HLS + MPEG-DASH) · Direct-to-Disk Streaming</span>
     </footer>
   </div>
+
+  <!-- Floating Heatmap Tooltip -->
+  <div class="df-tooltip" id="heatmapTooltip" style="display: none;"></div>
 
   <script src="../../dist/downloader.bundle.js"></script>
 </body>

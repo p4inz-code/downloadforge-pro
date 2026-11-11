@@ -689,7 +689,29 @@
           startInPageRecording(video, title, parent);
         }
       });
+      const pipBtn = document.createElement("button");
+      pipBtn.className = "df-action-btn";
+      pipBtn.title = "Picture-in-Picture";
+      pipBtn.innerHTML = `
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2"/>
+        <rect x="12" y="10" width="8" height="8" rx="1"/>
+      </svg>
+    `;
+      pipBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        try {
+          if (document.pictureInPictureElement === video) {
+            await document.exitPictureInPicture();
+          } else if (document.pictureInPictureEnabled) {
+            await video.requestPictureInPicture();
+          }
+        } catch (err) {
+        }
+      });
       overlay.appendChild(pill);
+      overlay.appendChild(pipBtn);
       parent.appendChild(overlay);
     }
     function startInPageRecording(video, title, container) {

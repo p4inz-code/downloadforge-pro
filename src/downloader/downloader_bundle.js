@@ -4,13 +4,15 @@
 //
 // Client Controller for DownloadForge Pro Stream Studio.
 // Integrates HLSEngine, MPEG-DASH Engine, Direct-to-Disk Streaming,
-// Heatmap Visualizer, Time-Range Slicing, Subtitles Extraction,
-// and CLI Command Export.
+// Heatmap Visualizer with Telemetry Tooltips, Time-Range Slicing,
+// Subtitles Extraction, Multi-Audio Selection, Error Intelligence &
+// Self-Healing Triage, and CLI Command Export.
 // ============================================================
 
 import { HLSEngine, CONCURRENCY_PROFILES } from '../core/hls_engine.js';
 import { parseHLSManifest } from '../core/hls_parser.js';
 import { parseDASHManifest } from '../core/dash_parser.js';
+import { classifyError, StreamError, ERROR_CODES, ERROR_METADATA } from '../core/error_handler.js';
 
 let currentEngine = null;
 let currentBlob = null;
@@ -19,6 +21,8 @@ let currentManifest = null;
 let targetFilename = 'downloaded_video.mp4';
 let isRecordMode = false;
 let currentCliCmd = 'ytdlp';
+let lastError = null;
+let segmentTelemetry = [];
 
 // DOM Elements
 const streamTitle = document.getElementById('streamTitle');
@@ -27,6 +31,8 @@ const streamUrlInput = document.getElementById('streamUrlInput');
 const btnLoadStream = document.getElementById('btnLoadStream');
 const variantRow = document.getElementById('variantRow');
 const variantSelect = document.getElementById('variantSelect');
+const audioTrackRow = document.getElementById('audioTrackRow');
+const audioTrackSelect = document.getElementById('audioTrackSelect');
 const subtitleRow = document.getElementById('subtitleRow');
 const subtitleSelect = document.getElementById('subtitleSelect');
 const btnDownloadSubs = document.getElementById('btnDownloadSubs');
@@ -53,6 +59,16 @@ const btnSave = document.getElementById('btnSave');
 const previewCard = document.getElementById('previewCard');
 const previewPlayer = document.getElementById('previewPlayer');
 const engineStatus = document.getElementById('engineStatus');
+
+// Error Diagnostic Card Elements
+const diagErrorBox = document.getElementById('diagErrorBox');
+const diagErrorCode = document.getElementById('diagErrorCode');
+const diagErrorTitle = document.getElementById('diagErrorTitle');
+const diagErrorDesc = document.getElementById('diagErrorDesc');
+const btnAutoHeal = document.getElementById('btnAutoHeal');
+const btnSwitchRecordMode = document.getElementById('btnSwitchRecordMode');
+const btnCopyDiagLog = document.getElementById('btnCopyDiagLog');
+const heatmapTooltip = document.getElementById('heatmapTooltip');
 
 // CLI Modal Elements
 const btnExportCli = document.getElementById('btnExportCli');
@@ -115,6 +131,7 @@ function initRecordMode(title) {
 
 // ── 3. Analyze Stream Manifest (Dual HLS + MPEG-DASH) ─────────
 async function analyzeStream(url) {
+  hideDiagError();
   statusMessage.textContent = 'Analyzing stream playlist and available tracks...';
   engineStatus.textContent = 'Inspecting';
 
@@ -123,6 +140,7 @@ async function analyzeStream(url) {
     statusMessage.textContent = 'Direct media file detected. Click Start to download directly.';
     engineStatus.textContent = 'Direct File';
     variantRow.style.display = 'none';
+    if (audioTrackRow) audioTrackRow.style.display = 'none';
     if (subtitleRow) subtitleRow.style.display = 'none';
     btnStart.disabled = false;
     return;
@@ -145,8 +163,10 @@ async function analyzeStream(url) {
     currentManifest = manifest;
 
     if (currentManifest.error) {
-      statusMessage.textContent = `Manifest Note: ${currentManifest.error}. Ready to attempt chunked fetch.`;
-      engineStatus.textContent = 'Ready';
+      const classified = classifyError(new Error(currentManifest.error), { url });
+      showDiagError(classified);
+      statusMessage.textContent = `Manifest Note: ${currentManifest.error}.`;
+      engineStatus.textContent = 'Error';
       btnStart.disabled = false;
       return;
     }
@@ -175,6 +195,24 @@ async function analyzeStream(url) {
       initSegmentGrid(segCount);
     }
 
+    // Populate Audio Tracks (Multi-Audio Support)
+    if (audioTrackRow && audioTrackSelect) {
+      const audioTracks = currentManifest.audioTracks || [];
+      if (audioTracks.length > 0) {
+        audioTrackSelect.innerHTML = '';
+        audioTracks.forEach((a, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          const bw = a.bandwidth ? ` (${Math.round(a.bandwidth / 1000)} kbps)` : '';
+          opt.textContent = `${a.name || a.language || 'Audio Track ' + (idx + 1)}${bw}`;
+          audioTrackSelect.appendChild(opt);
+        });
+        audioTrackRow.style.display = 'flex';
+      } else {
+        audioTrackRow.style.display = 'none';
+      }
+    }
+
     // Populate Subtitles (if present)
     if (subtitleRow && subtitleSelect) {
       if (currentManifest.subtitles && currentManifest.subtitles.length > 0) {
@@ -194,24 +232,83 @@ async function analyzeStream(url) {
     engineStatus.textContent = 'Ready';
     btnStart.disabled = false;
   } catch (err) {
+    const classified = classifyError(err, { url });
+    showDiagError(classified);
     statusMessage.textContent = `Analysis note: ${err.message}`;
     engineStatus.textContent = 'Ready';
     btnStart.disabled = false;
   }
 }
 
+// ── 4. Segment Grid with Telemetry Tooltips ───────────────────
 function initSegmentGrid(total) {
   segmentGrid.innerHTML = '';
+  segmentTelemetry = new Array(total).fill(null);
+
   for (let i = 0; i < total; i++) {
     const dot = document.createElement('div');
     dot.className = 'seg-dot';
     dot.id = `seg_${i}`;
+    dot.dataset.index = i;
+
+    dot.addEventListener('mouseenter', (e) => {
+      if (!heatmapTooltip) return;
+      const telem = segmentTelemetry[i];
+      const statusText = dot.classList.contains('done') ? 'Decrypted [Ready]' :
+                         dot.classList.contains('failed') ? 'Skipped [404/Error]' :
+                         dot.classList.contains('fetching') ? 'In Flight' : 'Queued';
+
+      heatmapTooltip.innerHTML = `
+        <div><strong>Segment #${i + 1}</strong> of ${total}</div>
+        <div>Status: ${statusText}</div>
+        ${telem?.size ? `<div>Size: ${telem.size}</div>` : ''}
+        ${telem?.duration ? `<div>Duration: ${telem.duration}s</div>` : ''}
+      `;
+      heatmapTooltip.style.display = 'block';
+      heatmapTooltip.style.left = `${e.clientX + 10}px`;
+      heatmapTooltip.style.top = `${e.clientY + 10}px`;
+    });
+
+    dot.addEventListener('mousemove', (e) => {
+      if (!heatmapTooltip || heatmapTooltip.style.display === 'none') return;
+      heatmapTooltip.style.left = `${e.clientX + 10}px`;
+      heatmapTooltip.style.top = `${e.clientY + 10}px`;
+    });
+
+    dot.addEventListener('mouseleave', () => {
+      if (heatmapTooltip) heatmapTooltip.style.display = 'none';
+    });
+
     segmentGrid.appendChild(dot);
   }
   statSegments.textContent = `0 / ${total}`;
 }
 
-// ── 4. Subtitles Download Handler ─────────────────────────────
+// ── 5. Error Diagnostic Management ────────────────────────────
+function showDiagError(err) {
+  lastError = err;
+  if (!diagErrorBox) return;
+
+  diagErrorCode.textContent = `[${err.code || 'ERR_STREAM_FAILED'}]`;
+  diagErrorTitle.textContent = err.meta?.title || 'Stream Ingestion Error';
+  diagErrorDesc.textContent = `${err.message || err.meta?.description || 'Download failed.'} ${err.meta?.suggestedAction || ''}`;
+
+  if (btnAutoHeal) {
+    btnAutoHeal.style.display = err.meta?.canAutoHeal ? 'inline-flex' : 'none';
+  }
+  if (btnSwitchRecordMode) {
+    btnSwitchRecordMode.style.display = err.meta?.alternativeMode === 'record' ? 'inline-flex' : 'none';
+  }
+
+  diagErrorBox.style.display = 'flex';
+}
+
+function hideDiagError() {
+  if (diagErrorBox) diagErrorBox.style.display = 'none';
+  lastError = null;
+}
+
+// ── 6. Subtitles Download Handler ─────────────────────────────
 async function downloadSubtitles() {
   if (!currentManifest || !currentManifest.subtitles || currentManifest.subtitles.length === 0) return;
   const idx = parseInt(subtitleSelect.value, 10) || 0;
@@ -224,7 +321,6 @@ async function downloadSubtitles() {
     const text = await res.text();
     let vttContent = text;
 
-    // Check if it's an m3u8 playlist containing WebVTT chunk urls
     if (text.includes('#EXTM3U')) {
       const lines = text.split('\n');
       const segmentUrls = [];
@@ -274,7 +370,7 @@ async function downloadSubtitles() {
   }
 }
 
-// ── 5. Time Parsing Helper ────────────────────────────────────
+// ── 7. Time Parsing Helper ────────────────────────────────────
 function parseTimeString(str) {
   if (!str) return null;
   const parts = str.trim().split(':').map(val => parseFloat(val));
@@ -289,8 +385,9 @@ function parseTimeString(str) {
   return null;
 }
 
-// ── 6. Start Download & Transmuxing ───────────────────────────
+// ── 8. Start Download & Transmuxing ───────────────────────────
 async function startDownload() {
+  hideDiagError();
   const url = streamUrlInput.value.trim();
   if (!url) return;
 
@@ -315,6 +412,8 @@ async function startDownload() {
       statusMessage.textContent = 'Direct download started successfully!';
       engineStatus.textContent = 'Downloading';
     } catch (e) {
+      const classified = classifyError(e, { url });
+      showDiagError(classified);
       statusMessage.textContent = `Download error: ${e.message}`;
     }
     return;
@@ -330,6 +429,12 @@ async function startDownload() {
   if (currentManifest?.variants && currentManifest.variants.length > 0) {
     const selectedIndex = parseInt(variantSelect.value, 10) || 0;
     selectedVariant = currentManifest.variants[selectedIndex];
+  }
+
+  let selectedAudioTrack = null;
+  if (currentManifest?.audioTracks && currentManifest.audioTracks.length > 0 && audioTrackSelect) {
+    const audioIdx = parseInt(audioTrackSelect.value, 10) || 0;
+    selectedAudioTrack = currentManifest.audioTracks[audioIdx];
   }
 
   // Concurrency mapping
@@ -408,12 +513,19 @@ async function startDownload() {
       if (dot) {
         dot.className = info.failed ? 'seg-dot failed' : 'seg-dot done';
       }
+      if (info.index >= 0 && info.index < segmentTelemetry.length) {
+        segmentTelemetry[info.index] = {
+          size: info.chunkSize ? `${(info.chunkSize / 1024).toFixed(1)} KB` : null,
+          duration: info.duration || null,
+        };
+      }
     }
   });
 
   try {
     const result = await currentEngine.downloadAndMux(url, {
       selectedVariant,
+      selectedAudioTrack,
       manifest: currentManifest,
       writableStream,
       timeRange,
@@ -438,6 +550,8 @@ async function startDownload() {
     }
 
   } catch (err) {
+    const classified = classifyError(err, { url });
+    showDiagError(classified);
     engineStatus.textContent = 'Stopped';
     statusMessage.textContent = `Download stopped: ${err.message}`;
     btnStart.style.display = 'inline-flex';
@@ -445,7 +559,7 @@ async function startDownload() {
   }
 }
 
-// ── 7. Save to Disk Fallback ──────────────────────────────────
+// ── 9. Save to Disk Fallback ──────────────────────────────────
 function saveMp4() {
   if (!currentBlobUrl) return;
 
@@ -468,7 +582,7 @@ function saveMp4() {
   a.remove();
 }
 
-// ── 8. CLI Export Modal Logic ─────────────────────────────────
+// ── 10. CLI Export Modal Logic ────────────────────────────────
 function updateCliCommand() {
   const url = streamUrlInput.value.trim();
   const referer = customReferer ? customReferer.value.trim() : '';
@@ -536,7 +650,43 @@ if (btnExportCli && cliModal) {
   }
 }
 
-// ── 9. Slicer Input Listeners ─────────────────────────────────
+// ── 11. Error Diagnostic Action Handlers ──────────────────────
+if (btnAutoHeal) {
+  btnAutoHeal.addEventListener('click', () => {
+    hideDiagError();
+    const url = streamUrlInput.value.trim();
+    if (url && customReferer && !customReferer.value) {
+      try {
+        customReferer.value = new URL(url).origin;
+      } catch (e) {}
+    }
+    startDownload();
+  });
+}
+
+if (btnSwitchRecordMode) {
+  btnSwitchRecordMode.addEventListener('click', () => {
+    hideDiagError();
+    initRecordMode(targetFilename);
+  });
+}
+
+if (btnCopyDiagLog) {
+  btnCopyDiagLog.addEventListener('click', () => {
+    if (!lastError) return;
+    const logData = {
+      code: lastError.code,
+      message: lastError.message,
+      timestamp: lastError.timestamp || new Date().toISOString(),
+      url: streamUrlInput.value.trim(),
+      meta: lastError.meta,
+    };
+    navigator.clipboard.writeText(JSON.stringify(logData, null, 2)).catch(() => {});
+    statusMessage.textContent = 'Diagnostic error log copied to clipboard';
+  });
+}
+
+// ── 12. Slicer Input Listeners ─────────────────────────────────
 if (sliceStart && sliceEnd && btnClearSlice) {
   const checkSlicerState = () => {
     if (sliceStart.value.trim() || sliceEnd.value.trim()) {
@@ -554,7 +704,7 @@ if (sliceStart && sliceEnd && btnClearSlice) {
   });
 }
 
-// ── 10. Event Listeners ──────────────────────────────────────
+// ── 13. Event Listeners ──────────────────────────────────────
 btnLoadStream.addEventListener('click', () => {
   const url = streamUrlInput.value.trim();
   if (url) analyzeStream(url);
@@ -568,7 +718,11 @@ btnStart.addEventListener('click', startDownload);
 
 btnCancel.addEventListener('click', () => {
   if (currentEngine) {
-    currentEngine.abort();
+    if (currentEngine.stopLive) {
+      currentEngine.stopLiveRecording();
+    } else {
+      currentEngine.abort();
+    }
   }
 });
 

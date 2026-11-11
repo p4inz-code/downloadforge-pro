@@ -219,6 +219,7 @@ function parseMediaPlaylist(lines, baseUrl, result) {
   }
 
   result.duration = totalDuration > 0 ? Math.round(totalDuration) : null;
+  result.isLive = !lines.some(l => l.startsWith('#EXT-X-ENDLIST'));
 }
 
 // ─────────────────────────────────────────────────────────────

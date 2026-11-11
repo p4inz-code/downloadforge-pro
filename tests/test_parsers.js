@@ -7,6 +7,7 @@
 import assert from 'node:assert';
 import { parseISODuration } from '../src/core/dash_parser.js';
 import { CONCURRENCY_PROFILES } from '../src/core/hls_engine.js';
+import { classifyError, ERROR_CODES } from '../src/core/error_handler.js';
 
 console.log('[Test] Running DownloadForge Pro Engine Unit Tests...');
 
@@ -48,4 +49,17 @@ assert.strictEqual(parseTimeString('01:00:00'), 3600, '01:00:00 must equal 3600s
 assert.strictEqual(parseTimeString('invalid'), null, 'invalid must return null');
 console.log('  [PASS] Time-Range Slicer string parser verified');
 
-console.log('[Test] All 3 core test suites passed successfully with zero errors!');
+// 4. Error Classifier & Self-Healing Taxonomy Test
+const err403 = classifyError(new Error('HTTP 403 Forbidden: anti-hotlink check failed'));
+assert.strictEqual(err403.code, ERROR_CODES.ERR_HOTLINK_403, 'Should classify as ERR_HOTLINK_403');
+assert.strictEqual(err403.meta.canAutoHeal, true, 'ERR_HOTLINK_403 should be auto-healable');
+
+const errCors = classifyError(new Error('Failed to fetch: CORS header missing'));
+assert.strictEqual(errCors.code, ERROR_CODES.ERR_CORS_BLOCKED, 'Should classify as ERR_CORS_BLOCKED');
+
+const errDrm = classifyError(new Error('Stream uses Widevine encryption skd://key'));
+assert.strictEqual(errDrm.code, ERROR_CODES.ERR_DRM_PROTECTED, 'Should classify as ERR_DRM_PROTECTED');
+assert.strictEqual(errDrm.meta.alternativeMode, 'record', 'DRM should offer record mode alternative');
+console.log('  [PASS] Error Intelligence & Taxonomy classification verified');
+
+console.log('[Test] All 4 core test suites passed successfully with zero errors!');

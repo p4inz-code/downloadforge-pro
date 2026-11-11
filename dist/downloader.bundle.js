@@ -8319,6 +8319,7 @@
       }
     }
     result.duration = totalDuration > 0 ? Math.round(totalDuration) : null;
+    result.isLive = !lines.some((l) => l.startsWith("#EXT-X-ENDLIST"));
   }
   function parseAttributes(str) {
     const attrs = {};
@@ -8549,6 +8550,128 @@
     }
   }
 
+  // src/core/error_handler.js
+  var ERROR_CODES = {
+    ERR_HOTLINK_403: "ERR_HOTLINK_403",
+    ERR_CORS_BLOCKED: "ERR_CORS_BLOCKED",
+    ERR_CHUNK_404: "ERR_CHUNK_404",
+    ERR_LIVE_DESYNC: "ERR_LIVE_DESYNC",
+    ERR_DRM_PROTECTED: "ERR_DRM_PROTECTED",
+    ERR_STREAM_ABORT: "ERR_STREAM_ABORT",
+    ERR_TIMEOUT_CDN: "ERR_TIMEOUT_CDN",
+    ERR_CODEC_UNSUPPORTED: "ERR_CODEC_UNSUPPORTED",
+    ERR_UNKNOWN: "ERR_UNKNOWN"
+  };
+  var ERROR_METADATA = {
+    [ERROR_CODES.ERR_HOTLINK_403]: {
+      code: ERROR_CODES.ERR_HOTLINK_403,
+      title: "Hotlink / Anti-Leech Protection (403 Forbidden)",
+      description: "The media server rejected the chunk request because the Referer header or origin was missing or expired.",
+      suggestedAction: "Auto-injecting active page origin into network rules and retrying with spoofed headers.",
+      canAutoHeal: true
+    },
+    [ERROR_CODES.ERR_CORS_BLOCKED]: {
+      code: ERROR_CODES.ERR_CORS_BLOCKED,
+      title: "Cross-Origin Resource Sharing (CORS) Blocked",
+      description: "The media CDN restricts direct browser client fetches from non-whitelisted origins.",
+      suggestedAction: "Routing segment fetch through privileged background extension channel.",
+      canAutoHeal: true
+    },
+    [ERROR_CODES.ERR_CHUNK_404]: {
+      code: ERROR_CODES.ERR_CHUNK_404,
+      title: "Missing Media Segment (404 Not Found)",
+      description: "A media segment was not found on the CDN storage cluster.",
+      suggestedAction: "Skipping broken segment and interpolating duration to preserve remaining stream.",
+      canAutoHeal: true
+    },
+    [ERROR_CODES.ERR_LIVE_DESYNC]: {
+      code: ERROR_CODES.ERR_LIVE_DESYNC,
+      title: "Live Stream Window Desynchronization",
+      description: "The broadcast sliding window advanced past the requested chunk before it was fetched.",
+      suggestedAction: "Resynchronizing sequence index to current live broadcast window.",
+      canAutoHeal: true
+    },
+    [ERROR_CODES.ERR_DRM_PROTECTED]: {
+      code: ERROR_CODES.ERR_DRM_PROTECTED,
+      title: "Proprietary DRM Encryption Detected",
+      description: "Stream uses hardware CDM encryption (Widevine / PlayReady / FairPlay). Direct download is restricted.",
+      suggestedAction: "Use the floating In-Page Buffer Recorder HUD on the video player to capture the playback stream.",
+      canAutoHeal: false,
+      alternativeMode: "record"
+    },
+    [ERROR_CODES.ERR_STREAM_ABORT]: {
+      code: ERROR_CODES.ERR_STREAM_ABORT,
+      title: "Stream Ingestion Aborted",
+      description: "The download was stopped by user request or disk handle was closed.",
+      suggestedAction: "Partial stream has been safely finalized to prevent file corruption.",
+      canAutoHeal: false
+    },
+    [ERROR_CODES.ERR_TIMEOUT_CDN]: {
+      code: ERROR_CODES.ERR_TIMEOUT_CDN,
+      title: "CDN Connection Timeout",
+      description: "The CDN server exceeded the latency timeout threshold without delivering data.",
+      suggestedAction: "Exponential backoff retry with alternative connection threads.",
+      canAutoHeal: true
+    },
+    [ERROR_CODES.ERR_CODEC_UNSUPPORTED]: {
+      code: ERROR_CODES.ERR_CODEC_UNSUPPORTED,
+      title: "Non-Standard Audio/Video Codec",
+      description: "The stream uses a container codec not natively decodable by the browser sandbox (e.g. AC-3 Dolby).",
+      suggestedAction: "Export CLI command to download via terminal tools (yt-dlp).",
+      canAutoHeal: false,
+      alternativeMode: "cli"
+    },
+    [ERROR_CODES.ERR_UNKNOWN]: {
+      code: ERROR_CODES.ERR_UNKNOWN,
+      title: "Unexpected Stream Error",
+      description: "An unclassified runtime exception occurred during stream processing.",
+      suggestedAction: "Check network connectivity or retry with Safe Concurrency mode (1 Worker).",
+      canAutoHeal: false
+    }
+  };
+  var StreamError = class extends Error {
+    constructor(code, customMessage = null, originalError = null, context = {}) {
+      const meta = ERROR_METADATA[code] || ERROR_METADATA[ERROR_CODES.ERR_UNKNOWN];
+      super(customMessage || meta.description);
+      this.name = "StreamError";
+      this.code = code;
+      this.meta = meta;
+      this.originalError = originalError;
+      this.context = context;
+      this.timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    }
+  };
+  function classifyError(err, context = {}) {
+    if (err instanceof StreamError) return err;
+    const msg = (err?.message || String(err)).toLowerCase();
+    const status = err?.status || context?.status;
+    if (status === 403 || msg.includes("403") || msg.includes("forbidden") || msg.includes("hotlink")) {
+      return new StreamError(ERROR_CODES.ERR_HOTLINK_403, null, err, context);
+    }
+    if (status === 404 || msg.includes("404") || msg.includes("not found")) {
+      return new StreamError(ERROR_CODES.ERR_CHUNK_404, null, err, context);
+    }
+    if (msg.includes("cors") || msg.includes("failed to fetch") || msg.includes("networkerror")) {
+      return new StreamError(ERROR_CODES.ERR_CORS_BLOCKED, null, err, context);
+    }
+    if (msg.includes("drm") || msg.includes("widevine") || msg.includes("skd://") || msg.includes("fairplay")) {
+      return new StreamError(ERROR_CODES.ERR_DRM_PROTECTED, null, err, context);
+    }
+    if (msg.includes("abort") || msg.includes("cancelled")) {
+      return new StreamError(ERROR_CODES.ERR_STREAM_ABORT, null, err, context);
+    }
+    if (msg.includes("timeout") || msg.includes("timed out")) {
+      return new StreamError(ERROR_CODES.ERR_TIMEOUT_CDN, null, err, context);
+    }
+    if (msg.includes("desync") || msg.includes("rolling window")) {
+      return new StreamError(ERROR_CODES.ERR_LIVE_DESYNC, null, err, context);
+    }
+    if (msg.includes("codec") || msg.includes("unsupported") || msg.includes("ac-3")) {
+      return new StreamError(ERROR_CODES.ERR_CODEC_UNSUPPORTED, null, err, context);
+    }
+    return new StreamError(ERROR_CODES.ERR_UNKNOWN, err?.message, err, context);
+  }
+
   // src/core/hls_engine.js
   var CONCURRENCY_PROFILES = {
     SAFE: 1,
@@ -8573,11 +8696,13 @@
       });
       this.aborted = false;
       this.paused = false;
+      this.stopLive = false;
       this.activeWorker = null;
       this.keyCache = /* @__PURE__ */ new Map();
     }
     abort() {
       this.aborted = true;
+      this.stopLive = true;
       if (this.activeWorker) {
         try {
           this.activeWorker.postMessage({ type: "ABORT" });
@@ -8586,6 +8711,10 @@
         }
         this.activeWorker = null;
       }
+    }
+    stopLiveRecording() {
+      this.stopLive = true;
+      this.onStatus("Finalizing live broadcast stream...");
     }
     /**
      * Main entry point to download an HLS stream and produce an MP4 file.
@@ -8622,17 +8751,17 @@
         if (parseResult.error) {
           throw new Error(`Playlist parse error: ${parseResult.error}`);
         }
-        let mediaUrl = manifestUrl;
-        let targetPlaylist = parseResult;
+        let mediaUrl2 = manifestUrl;
+        let targetPlaylist2 = parseResult;
         if (parseResult.type === "master") {
           const variant = selectedVariant || parseResult.variants[0];
           if (!variant) throw new Error("No valid video variants found in master playlist");
-          mediaUrl = variant.url;
+          mediaUrl2 = variant.url;
           this.onStatus(`Loading video track: ${variant.label || variant.resolution || "best"}...`);
-          targetPlaylist = await parseHLSManifest(mediaUrl);
-          if (targetPlaylist.error) throw new Error(targetPlaylist.error);
+          targetPlaylist2 = await parseHLSManifest(mediaUrl2);
+          if (targetPlaylist2.error) throw new Error(targetPlaylist2.error);
         }
-        segments = targetPlaylist.segments;
+        segments = targetPlaylist2.segments;
         if (!segments || segments.length === 0) {
           throw new Error("Playlist contains zero media segments");
         }
@@ -8662,6 +8791,12 @@
           segments = filtered;
           this.onStatus(`Time slice applied: ${segments.length} segments selected (${startSec}s -> ${endSec}s).`);
         }
+      }
+      if (targetPlaylist?.isLive && (!timeRange || timeRange.endSec === Infinity)) {
+        return await this.downloadLiveStream(mediaUrl, {
+          writableStream,
+          targetDuration: targetPlaylist.targetDuration || 4
+        });
       }
       this.onStatus(`Found ${segments.length} media segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ""}. Initializing engine...`);
       if (!initUrl && segments[0]?.initMap?.url) {
@@ -8844,6 +8979,93 @@
       return { blob: finalBlob, directStream: false };
     }
     /**
+     * Continuous sliding-window DVR recorder for ongoing live broadcasts.
+     */
+    async downloadLiveStream(mediaUrl2, options = {}) {
+      const { writableStream, targetDuration = 4 } = options;
+      this.stopLive = false;
+      this.aborted = false;
+      this.onStatus("Live broadcast stream detected. Initializing sliding-window DVR recorder...");
+      const transmuxer = new import_mux.default.mp4.Transmuxer({ keepOriginalTimestamps: false });
+      const collectedBuffers = [];
+      let writeChain = Promise.resolve();
+      const queueWrite = (u8) => {
+        if (writableStream) {
+          writeChain = writeChain.then(() => writableStream.write(u8));
+        } else {
+          collectedBuffers.push(u8);
+        }
+      };
+      transmuxer.on("data", (segment) => {
+        if (segment.initSegment) queueWrite(new Uint8Array(segment.initSegment));
+        if (segment.data) queueWrite(new Uint8Array(segment.data));
+      });
+      const seenUrls = /* @__PURE__ */ new Set();
+      let recordedSeconds = 0;
+      let completedChunks = 0;
+      let totalBytes = 0;
+      const startTime = performance.now();
+      let pollInterval = Math.max(2e3, targetDuration * 1e3 / 2);
+      while (!this.aborted && !this.stopLive) {
+        try {
+          const playlist = await parseHLSManifest(mediaUrl2);
+          if (playlist.error) {
+            console.warn("[Live DVR] Playlist refresh warning:", playlist.error);
+          } else if (playlist.segments && playlist.segments.length > 0) {
+            for (const seg of playlist.segments) {
+              if (this.aborted || this.stopLive) break;
+              if (seenUrls.has(seg.url)) continue;
+              seenUrls.add(seg.url);
+              try {
+                let segBuf = await this.fetchBufferWithRetry(seg.url, seg.byteRange);
+                if (seg.key && seg.key.method === "AES-128") {
+                  segBuf = await this.decryptSegment(segBuf, seg.key, seg.sequence);
+                }
+                const u8 = new Uint8Array(segBuf);
+                transmuxer.push(u8);
+                completedChunks++;
+                totalBytes += segBuf.byteLength;
+                recordedSeconds += seg.duration || targetDuration;
+                const elapsedSec = (performance.now() - startTime) / 1e3;
+                const speedMBs = elapsedSec > 0 ? (totalBytes / (1024 * 1024) / elapsedSec).toFixed(2) : "0.00";
+                this.onProgress({
+                  percent: 100,
+                  completed: completedChunks,
+                  total: completedChunks,
+                  speedMBs,
+                  etaSec: 0,
+                  isLive: true,
+                  recordedSeconds: Math.round(recordedSeconds),
+                  index: completedChunks - 1
+                });
+                this.onStatus(`Live DVR Recording: ${Math.round(recordedSeconds)}s captured (${completedChunks} chunks, ${speedMBs} MB/s)...`);
+              } catch (chunkErr) {
+                console.warn("[Live DVR] Segment fetch error, continuing:", chunkErr.message);
+              }
+            }
+            if (playlist.segments[playlist.segments.length - 1]?.duration) {
+              pollInterval = Math.max(1500, playlist.segments[playlist.segments.length - 1].duration * 1e3 / 2);
+            }
+          }
+        } catch (e) {
+          console.warn("[Live DVR] Polling error:", e.message);
+        }
+        await new Promise((r) => setTimeout(r, pollInterval));
+      }
+      this.onStatus("Flushing and finalizing live broadcast recording...");
+      try {
+        transmuxer.flush();
+      } catch (e) {
+      }
+      if (writableStream) {
+        await writeChain;
+        await writableStream.close();
+        return { directStream: true, recordedSeconds };
+      }
+      const finalBlob = new Blob(collectedBuffers, { type: "video/mp4" });
+      return { blob: finalBlob, directStream: false, recordedSeconds };
+    }
+    /**
      * Decrypt standard RFC 8216 AES-128 HLS segment via native WebCrypto.
      */
     async decryptSegment(encryptedBuffer, keyInfo, sequenceNumber) {
@@ -8979,12 +9201,16 @@
   var targetFilename = "downloaded_video.mp4";
   var isRecordMode = false;
   var currentCliCmd = "ytdlp";
+  var lastError = null;
+  var segmentTelemetry = [];
   var streamTitle = document.getElementById("streamTitle");
   var streamDomain = document.getElementById("streamDomain");
   var streamUrlInput = document.getElementById("streamUrlInput");
   var btnLoadStream = document.getElementById("btnLoadStream");
   var variantRow = document.getElementById("variantRow");
   var variantSelect = document.getElementById("variantSelect");
+  var audioTrackRow = document.getElementById("audioTrackRow");
+  var audioTrackSelect = document.getElementById("audioTrackSelect");
   var subtitleRow = document.getElementById("subtitleRow");
   var subtitleSelect = document.getElementById("subtitleSelect");
   var btnDownloadSubs = document.getElementById("btnDownloadSubs");
@@ -9011,6 +9237,14 @@
   var previewCard = document.getElementById("previewCard");
   var previewPlayer = document.getElementById("previewPlayer");
   var engineStatus = document.getElementById("engineStatus");
+  var diagErrorBox = document.getElementById("diagErrorBox");
+  var diagErrorCode = document.getElementById("diagErrorCode");
+  var diagErrorTitle = document.getElementById("diagErrorTitle");
+  var diagErrorDesc = document.getElementById("diagErrorDesc");
+  var btnAutoHeal = document.getElementById("btnAutoHeal");
+  var btnSwitchRecordMode = document.getElementById("btnSwitchRecordMode");
+  var btnCopyDiagLog = document.getElementById("btnCopyDiagLog");
+  var heatmapTooltip = document.getElementById("heatmapTooltip");
   var btnExportCli = document.getElementById("btnExportCli");
   var cliModal = document.getElementById("cliModal");
   var btnCloseCliModal = document.getElementById("btnCloseCliModal");
@@ -9062,12 +9296,14 @@
   `;
   }
   async function analyzeStream(url) {
+    hideDiagError();
     statusMessage.textContent = "Analyzing stream playlist and available tracks...";
     engineStatus.textContent = "Inspecting";
     if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url)) {
       statusMessage.textContent = "Direct media file detected. Click Start to download directly.";
       engineStatus.textContent = "Direct File";
       variantRow.style.display = "none";
+      if (audioTrackRow) audioTrackRow.style.display = "none";
       if (subtitleRow) subtitleRow.style.display = "none";
       btnStart.disabled = false;
       return;
@@ -9086,8 +9322,10 @@
       }
       currentManifest = manifest;
       if (currentManifest.error) {
-        statusMessage.textContent = `Manifest Note: ${currentManifest.error}. Ready to attempt chunked fetch.`;
-        engineStatus.textContent = "Ready";
+        const classified = classifyError(new Error(currentManifest.error), { url });
+        showDiagError(classified);
+        statusMessage.textContent = `Manifest Note: ${currentManifest.error}.`;
+        engineStatus.textContent = "Error";
         btnStart.disabled = false;
         return;
       }
@@ -9112,6 +9350,22 @@
         statusMessage.textContent = `Media playlist loaded with ${segCount} segments. Ready to download.`;
         initSegmentGrid(segCount);
       }
+      if (audioTrackRow && audioTrackSelect) {
+        const audioTracks = currentManifest.audioTracks || [];
+        if (audioTracks.length > 0) {
+          audioTrackSelect.innerHTML = "";
+          audioTracks.forEach((a, idx) => {
+            const opt = document.createElement("option");
+            opt.value = idx;
+            const bw = a.bandwidth ? ` (${Math.round(a.bandwidth / 1e3)} kbps)` : "";
+            opt.textContent = `${a.name || a.language || "Audio Track " + (idx + 1)}${bw}`;
+            audioTrackSelect.appendChild(opt);
+          });
+          audioTrackRow.style.display = "flex";
+        } else {
+          audioTrackRow.style.display = "none";
+        }
+      }
       if (subtitleRow && subtitleSelect) {
         if (currentManifest.subtitles && currentManifest.subtitles.length > 0) {
           subtitleSelect.innerHTML = "";
@@ -9129,6 +9383,8 @@
       engineStatus.textContent = "Ready";
       btnStart.disabled = false;
     } catch (err) {
+      const classified = classifyError(err, { url });
+      showDiagError(classified);
       statusMessage.textContent = `Analysis note: ${err.message}`;
       engineStatus.textContent = "Ready";
       btnStart.disabled = false;
@@ -9136,13 +9392,55 @@
   }
   function initSegmentGrid(total) {
     segmentGrid.innerHTML = "";
+    segmentTelemetry = new Array(total).fill(null);
     for (let i = 0; i < total; i++) {
       const dot = document.createElement("div");
       dot.className = "seg-dot";
       dot.id = `seg_${i}`;
+      dot.dataset.index = i;
+      dot.addEventListener("mouseenter", (e) => {
+        if (!heatmapTooltip) return;
+        const telem = segmentTelemetry[i];
+        const statusText = dot.classList.contains("done") ? "Decrypted [Ready]" : dot.classList.contains("failed") ? "Skipped [404/Error]" : dot.classList.contains("fetching") ? "In Flight" : "Queued";
+        heatmapTooltip.innerHTML = `
+        <div><strong>Segment #${i + 1}</strong> of ${total}</div>
+        <div>Status: ${statusText}</div>
+        ${telem?.size ? `<div>Size: ${telem.size}</div>` : ""}
+        ${telem?.duration ? `<div>Duration: ${telem.duration}s</div>` : ""}
+      `;
+        heatmapTooltip.style.display = "block";
+        heatmapTooltip.style.left = `${e.clientX + 10}px`;
+        heatmapTooltip.style.top = `${e.clientY + 10}px`;
+      });
+      dot.addEventListener("mousemove", (e) => {
+        if (!heatmapTooltip || heatmapTooltip.style.display === "none") return;
+        heatmapTooltip.style.left = `${e.clientX + 10}px`;
+        heatmapTooltip.style.top = `${e.clientY + 10}px`;
+      });
+      dot.addEventListener("mouseleave", () => {
+        if (heatmapTooltip) heatmapTooltip.style.display = "none";
+      });
       segmentGrid.appendChild(dot);
     }
     statSegments.textContent = `0 / ${total}`;
+  }
+  function showDiagError(err) {
+    lastError = err;
+    if (!diagErrorBox) return;
+    diagErrorCode.textContent = `[${err.code || "ERR_STREAM_FAILED"}]`;
+    diagErrorTitle.textContent = err.meta?.title || "Stream Ingestion Error";
+    diagErrorDesc.textContent = `${err.message || err.meta?.description || "Download failed."} ${err.meta?.suggestedAction || ""}`;
+    if (btnAutoHeal) {
+      btnAutoHeal.style.display = err.meta?.canAutoHeal ? "inline-flex" : "none";
+    }
+    if (btnSwitchRecordMode) {
+      btnSwitchRecordMode.style.display = err.meta?.alternativeMode === "record" ? "inline-flex" : "none";
+    }
+    diagErrorBox.style.display = "flex";
+  }
+  function hideDiagError() {
+    if (diagErrorBox) diagErrorBox.style.display = "none";
+    lastError = null;
   }
   async function downloadSubtitles() {
     if (!currentManifest || !currentManifest.subtitles || currentManifest.subtitles.length === 0) return;
@@ -9213,6 +9511,7 @@
     return null;
   }
   async function startDownload() {
+    hideDiagError();
     const url = streamUrlInput.value.trim();
     if (!url) return;
     if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url) && (!currentManifest || currentManifest.error)) {
@@ -9235,6 +9534,8 @@
         statusMessage.textContent = "Direct download started successfully!";
         engineStatus.textContent = "Downloading";
       } catch (e) {
+        const classified = classifyError(e, { url });
+        showDiagError(classified);
         statusMessage.textContent = `Download error: ${e.message}`;
       }
       return;
@@ -9248,6 +9549,11 @@
     if (currentManifest?.variants && currentManifest.variants.length > 0) {
       const selectedIndex = parseInt(variantSelect.value, 10) || 0;
       selectedVariant = currentManifest.variants[selectedIndex];
+    }
+    let selectedAudioTrack = null;
+    if (currentManifest?.audioTracks && currentManifest.audioTracks.length > 0 && audioTrackSelect) {
+      const audioIdx = parseInt(audioTrackSelect.value, 10) || 0;
+      selectedAudioTrack = currentManifest.audioTracks[audioIdx];
     }
     const modeKey = concurrencySelect ? concurrencySelect.value : "turbo";
     let concurrency = CONCURRENCY_PROFILES.TURBO;
@@ -9315,11 +9621,18 @@
         if (dot) {
           dot.className = info.failed ? "seg-dot failed" : "seg-dot done";
         }
+        if (info.index >= 0 && info.index < segmentTelemetry.length) {
+          segmentTelemetry[info.index] = {
+            size: info.chunkSize ? `${(info.chunkSize / 1024).toFixed(1)} KB` : null,
+            duration: info.duration || null
+          };
+        }
       }
     });
     try {
       const result = await currentEngine.downloadAndMux(url, {
         selectedVariant,
+        selectedAudioTrack,
         manifest: currentManifest,
         writableStream,
         timeRange
@@ -9340,6 +9653,8 @@
         previewCard.style.display = "block";
       }
     } catch (err) {
+      const classified = classifyError(err, { url });
+      showDiagError(classified);
       engineStatus.textContent = "Stopped";
       statusMessage.textContent = `Download stopped: ${err.message}`;
       btnStart.style.display = "inline-flex";
@@ -9427,6 +9742,40 @@
       });
     }
   }
+  if (btnAutoHeal) {
+    btnAutoHeal.addEventListener("click", () => {
+      hideDiagError();
+      const url = streamUrlInput.value.trim();
+      if (url && customReferer && !customReferer.value) {
+        try {
+          customReferer.value = new URL(url).origin;
+        } catch (e) {
+        }
+      }
+      startDownload();
+    });
+  }
+  if (btnSwitchRecordMode) {
+    btnSwitchRecordMode.addEventListener("click", () => {
+      hideDiagError();
+      initRecordMode(targetFilename);
+    });
+  }
+  if (btnCopyDiagLog) {
+    btnCopyDiagLog.addEventListener("click", () => {
+      if (!lastError) return;
+      const logData = {
+        code: lastError.code,
+        message: lastError.message,
+        timestamp: lastError.timestamp || (/* @__PURE__ */ new Date()).toISOString(),
+        url: streamUrlInput.value.trim(),
+        meta: lastError.meta
+      };
+      navigator.clipboard.writeText(JSON.stringify(logData, null, 2)).catch(() => {
+      });
+      statusMessage.textContent = "Diagnostic error log copied to clipboard";
+    });
+  }
   if (sliceStart && sliceEnd && btnClearSlice) {
     const checkSlicerState = () => {
       if (sliceStart.value.trim() || sliceEnd.value.trim()) {
@@ -9453,7 +9802,11 @@
   btnStart.addEventListener("click", startDownload);
   btnCancel.addEventListener("click", () => {
     if (currentEngine) {
-      currentEngine.abort();
+      if (currentEngine.stopLive) {
+        currentEngine.stopLiveRecording();
+      } else {
+        currentEngine.abort();
+      }
     }
   });
   btnSave.addEventListener("click", saveMp4);

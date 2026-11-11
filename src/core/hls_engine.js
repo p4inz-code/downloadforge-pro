@@ -15,6 +15,7 @@
 import muxjs from 'mux.js';
 import { parseHLSManifest } from './hls_parser.js';
 import { parseDASHManifest } from './dash_parser.js';
+import { classifyError, StreamError, ERROR_CODES } from './error_handler.js';
 
 export const CONCURRENCY_PROFILES = {
   SAFE: 1,
@@ -38,12 +39,14 @@ export class HLSEngine {
     this.onStatus = options.onStatus || (() => {});
     this.aborted = false;
     this.paused = false;
+    this.stopLive = false;
     this.activeWorker = null;
     this.keyCache = new Map();
   }
 
   abort() {
     this.aborted = true;
+    this.stopLive = true;
     if (this.activeWorker) {
       try {
         this.activeWorker.postMessage({ type: 'ABORT' });
@@ -51,6 +54,11 @@ export class HLSEngine {
       } catch (e) {}
       this.activeWorker = null;
     }
+  }
+
+  stopLiveRecording() {
+    this.stopLive = true;
+    this.onStatus('Finalizing live broadcast stream...');
   }
 
   /**
@@ -140,6 +148,14 @@ export class HLSEngine {
         segments = filtered;
         this.onStatus(`Time slice applied: ${segments.length} segments selected (${startSec}s -> ${endSec}s).`);
       }
+    }
+
+    // Check if live stream DVR recording mode
+    if (targetPlaylist?.isLive && (!timeRange || timeRange.endSec === Infinity)) {
+      return await this.downloadLiveStream(mediaUrl, {
+        writableStream,
+        targetDuration: targetPlaylist.targetDuration || 4,
+      });
     }
 
     this.onStatus(`Found ${segments.length} media segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ''}. Initializing engine...`);
@@ -362,6 +378,109 @@ export class HLSEngine {
 
     this.onStatus('Download complete!');
     return { blob: finalBlob, directStream: false };
+  }
+
+  /**
+   * Continuous sliding-window DVR recorder for ongoing live broadcasts.
+   */
+  async downloadLiveStream(mediaUrl, options = {}) {
+    const { writableStream, targetDuration = 4 } = options;
+    this.stopLive = false;
+    this.aborted = false;
+
+    this.onStatus('Live broadcast stream detected. Initializing sliding-window DVR recorder...');
+
+    const transmuxer = new muxjs.mp4.Transmuxer({ keepOriginalTimestamps: false });
+    const collectedBuffers = [];
+    let writeChain = Promise.resolve();
+
+    const queueWrite = (u8) => {
+      if (writableStream) {
+        writeChain = writeChain.then(() => writableStream.write(u8));
+      } else {
+        collectedBuffers.push(u8);
+      }
+    };
+
+    transmuxer.on('data', (segment) => {
+      if (segment.initSegment) queueWrite(new Uint8Array(segment.initSegment));
+      if (segment.data) queueWrite(new Uint8Array(segment.data));
+    });
+
+    const seenUrls = new Set();
+    let recordedSeconds = 0;
+    let completedChunks = 0;
+    let totalBytes = 0;
+    const startTime = performance.now();
+    let pollInterval = Math.max(2000, (targetDuration * 1000) / 2);
+
+    while (!this.aborted && !this.stopLive) {
+      try {
+        const playlist = await parseHLSManifest(mediaUrl);
+        if (playlist.error) {
+          console.warn('[Live DVR] Playlist refresh warning:', playlist.error);
+        } else if (playlist.segments && playlist.segments.length > 0) {
+          for (const seg of playlist.segments) {
+            if (this.aborted || this.stopLive) break;
+            if (seenUrls.has(seg.url)) continue;
+            seenUrls.add(seg.url);
+
+            try {
+              let segBuf = await this.fetchBufferWithRetry(seg.url, seg.byteRange);
+              if (seg.key && seg.key.method === 'AES-128') {
+                segBuf = await this.decryptSegment(segBuf, seg.key, seg.sequence);
+              }
+
+              const u8 = new Uint8Array(segBuf);
+              transmuxer.push(u8);
+              completedChunks++;
+              totalBytes += segBuf.byteLength;
+              recordedSeconds += seg.duration || targetDuration;
+
+              const elapsedSec = (performance.now() - startTime) / 1000;
+              const speedMBs = elapsedSec > 0 ? ((totalBytes / (1024 * 1024)) / elapsedSec).toFixed(2) : '0.00';
+
+              this.onProgress({
+                percent: 100,
+                completed: completedChunks,
+                total: completedChunks,
+                speedMBs,
+                etaSec: 0,
+                isLive: true,
+                recordedSeconds: Math.round(recordedSeconds),
+                index: completedChunks - 1,
+              });
+
+              this.onStatus(`Live DVR Recording: ${Math.round(recordedSeconds)}s captured (${completedChunks} chunks, ${speedMBs} MB/s)...`);
+            } catch (chunkErr) {
+              console.warn('[Live DVR] Segment fetch error, continuing:', chunkErr.message);
+            }
+          }
+
+          if (playlist.segments[playlist.segments.length - 1]?.duration) {
+            pollInterval = Math.max(1500, (playlist.segments[playlist.segments.length - 1].duration * 1000) / 2);
+          }
+        }
+      } catch (e) {
+        console.warn('[Live DVR] Polling error:', e.message);
+      }
+
+      await new Promise(r => setTimeout(r, pollInterval));
+    }
+
+    this.onStatus('Flushing and finalizing live broadcast recording...');
+    try {
+      transmuxer.flush();
+    } catch (e) {}
+
+    if (writableStream) {
+      await writeChain;
+      await writableStream.close();
+      return { directStream: true, recordedSeconds };
+    }
+
+    const finalBlob = new Blob(collectedBuffers, { type: 'video/mp4' });
+    return { blob: finalBlob, directStream: false, recordedSeconds };
   }
 
   /**
