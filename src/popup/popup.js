@@ -41,7 +41,6 @@ const panels = {
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   await loadResources();
-  checkCompanion();
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -233,9 +232,7 @@ function buildItemEl(item) {
       ? `<span class="item-badge auth">Auth</span>`
       : '';
 
-  const companionBtn = companionAvailable
-    ? `<button class="act-btn companion" data-action="companion" title="Send to desktop app"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg></button>`
-    : '';
+  const companionBtn = '';
 
   const iconSvg = LUCIDE_ICONS[item.category] || LUCIDE_ICONS.unknown;
 
@@ -478,19 +475,6 @@ function showPanel(name) {
 function showError(msg) {
   showPanel('error');
   $('error-text').textContent = msg || 'Something went wrong';
-}
-
-// ─────────────────────────────────────────────────────────────
-// Companion check
-// ─────────────────────────────────────────────────────────────
-async function checkCompanion() {
-  try {
-    const response = await chrome.runtime.sendMessage({ type: MSG.COMPANION_CHECK });
-    companionAvailable = response?.available === true;
-    $('companion-banner').hidden = !companionAvailable;
-  } catch {
-    companionAvailable = false;
-  }
 }
 
 // ─────────────────────────────────────────────────────────────

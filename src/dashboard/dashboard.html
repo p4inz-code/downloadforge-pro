@@ -11,7 +11,11 @@
 <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
 <aside class="sidebar">
   <div class="sidebar-brand">
-    <span class="brand-logo">⬡</span>
+    <span class="brand-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      </svg>
+    </span>
     <div>
       <div class="brand-name">DownloadForge</div>
       <div class="brand-sub">by P4inz Interactive Labs</div>
@@ -34,10 +38,6 @@
     <a class="nav-item" id="nav-studio" href="../downloader/downloader.html" target="_blank">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       Stream Studio
-    </a>
-    <a class="nav-item" data-view="companion" href="#">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
-      Desktop App
     </a>
     <a class="nav-item" data-view="diagnostics" href="#">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -193,9 +193,9 @@
         <div class="setting-row">
           <div class="setting-info"><div class="setting-label">Speed concurrency profile</div><div class="setting-desc">Simultaneous download connections for HLS/DASH streams</div></div>
           <select class="input input-sm" id="s-concurrencyMode">
-            <option value="turbo">⚡ Turbo (8 Threads - Recommended)</option>
-            <option value="maximum">🚀 Max Aggression (16 Threads)</option>
-            <option value="balanced">🛡️ Balanced (4 Threads)</option>
+            <option value="turbo">Turbo (8 Threads - Recommended)</option>
+            <option value="maximum">Maximum Aggression (16 Threads)</option>
+            <option value="balanced">Balanced Mode (4 Threads)</option>
           </select>
         </div>
         <div class="setting-row">
@@ -240,46 +240,6 @@
     </div>
   </div>
 
-  <!-- ── COMPANION VIEW ───────────────────────────────────── -->
-  <div class="view" id="view-companion" hidden>
-    <div class="view-header">
-      <div>
-        <h1 class="view-title">Desktop Companion App</h1>
-        <p class="view-sub">Connect DownloadForge to the P4inz Interactive Labs desktop downloader</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="companion-status" id="companion-status-row">
-        <div class="status-indicator" id="companion-indicator"></div>
-        <span id="companion-status-text">Checking…</span>
-        <button class="btn-secondary" id="btn-check-companion">Check Again</button>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3 class="card-title">What the desktop app adds</h3>
-      <ul class="feature-list">
-        <li>✅ Advanced queue management with pause &amp; resume</li>
-        <li>✅ HLS stream download and muxing (non-DRM only)</li>
-        <li>✅ Multi-connection downloading for large files</li>
-        <li>✅ Categorized save folders</li>
-        <li>✅ Filename sanitization and collision-safe saving</li>
-        <li>✅ Download hash/checksum verification</li>
-        <li>✅ Scheduling and batch management</li>
-      </ul>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3 class="card-title">Install Instructions</h3>
-      <ol class="install-steps">
-        <li>Download the companion app for your OS from <strong>P4inz Interactive Labs.pages.dev</strong></li>
-        <li>Run the installer — it registers the native messaging host automatically</li>
-        <li>Click "Check Again" above to verify the connection</li>
-      </ol>
-    </div>
-  </div>
-
   <!-- ── DIAGNOSTICS VIEW ─────────────────────────────────── -->
   <div class="view" id="view-diagnostics" hidden>
     <div class="view-header">
@@ -293,17 +253,20 @@
     <div class="diag-grid" id="diag-grid">
       <div class="diag-card" id="diag-storage"><div class="diag-label">Storage</div><div class="diag-val">—</div></div>
       <div class="diag-card" id="diag-permissions"><div class="diag-label">Permissions</div><div class="diag-val">—</div></div>
-      <div class="diag-card" id="diag-companion"><div class="diag-label">Companion App</div><div class="diag-val">—</div></div>
+      <div class="diag-card" id="diag-dnr"><div class="diag-label">Anti-Hotlink DNR</div><div class="diag-val">Active</div></div>
       <div class="diag-card" id="diag-webrequest"><div class="diag-label">webRequest (optional)</div><div class="diag-val">—</div></div>
     </div>
 
     <div class="card" style="margin-top:16px;">
       <h3 class="card-title">Extension Info</h3>
       <div class="info-grid">
+        <div class="info-row"><span class="info-key">Product</span><span class="info-val">DownloadForge Pro</span></div>
         <div class="info-row"><span class="info-key">Version</span><span class="info-val" id="diag-version">—</span></div>
-        <div class="info-row"><span class="info-key">Company</span><span class="info-val">P4inz Interactive Labs</span></div>
-        <div class="info-row"><span class="info-key">Author</span><span class="info-val">p4inz</span></div>
-        <div class="info-row"><span class="info-key">Support</span><span class="info-val"><a href="https://discord.gg/P4inz Interactive Labs" target="_blank">discord.gg/P4inz Interactive Labs</a></span></div>
+        <div class="info-row"><span class="info-key">Studio</span><span class="info-val">P4inz Interactive Labs</span></div>
+        <div class="info-row"><span class="info-key">Author</span><span class="info-val"><a href="https://atharvapatil.tech" target="_blank">Atharva Patil (p4inz)</a></span></div>
+        <div class="info-row"><span class="info-key">Website</span><span class="info-val"><a href="https://atharvapatil.tech" target="_blank">atharvapatil.tech</a></span></div>
+        <div class="info-row"><span class="info-key">Discord</span><span class="info-val"><a href="https://discord.gg/8UKt8s5FbW" target="_blank">discord.gg/8UKt8s5FbW</a></span></div>
+        <div class="info-row"><span class="info-key">GitHub</span><span class="info-val"><a href="https://github.com/p4inz-code/downloadforge-pro" target="_blank">github.com/p4inz-code/downloadforge-pro</a></span></div>
         <div class="info-row"><span class="info-key">Manifest</span><span class="info-val">V3</span></div>
       </div>
     </div>

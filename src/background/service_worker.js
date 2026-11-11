@@ -142,16 +142,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleRescan(tabId ?? payload?.tabId, sendResponse);
       return true;
 
-    // ── Companion bridge status check ───────────────────────
-    case MSG.COMPANION_CHECK:
-      handleCompanionCheck(sendResponse);
-      return true;
-
-    // ── Send item to companion app ───────────────────────────
-    case MSG.COMPANION_SEND:
-      handleCompanionSend(payload, sendResponse);
-      return true;
-
     default:
       log.warn(`Unknown message type: ${type}`);
       sendResponse({ ok: false, error: `Unknown message type: ${type}` });
@@ -370,46 +360,6 @@ async function handleBatchDownload(payload, sendResponse) {
 
   await StorageService.addBatchToHistory(results);
   sendResponse({ ok: true, results });
-}
-
-// ── Handler: companion check ──────────────────────────────────
-function handleCompanionCheck(sendResponse) {
-  try {
-    const port = chrome.runtime.connectNative(NATIVE_HOST);
-    port.postMessage({ type: 'PING' });
-    port.onMessage.addListener((msg) => {
-      if (msg.type === 'PONG') {
-        sendResponse({ ok: true, available: true, version: msg.version });
-      }
-      port.disconnect();
-    });
-    port.onDisconnect.addListener(() => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ ok: true, available: false, error: chrome.runtime.lastError.message });
-      }
-    });
-  } catch (err) {
-    sendResponse({ ok: true, available: false, error: err.message });
-  }
-}
-
-// ── Handler: send to companion ────────────────────────────────
-function handleCompanionSend(payload, sendResponse) {
-  try {
-    const port = chrome.runtime.connectNative(NATIVE_HOST);
-    port.postMessage({ type: 'DOWNLOAD', payload });
-    port.onMessage.addListener((msg) => {
-      sendResponse({ ok: true, response: msg });
-      port.disconnect();
-    });
-    port.onDisconnect.addListener(() => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ ok: false, error: chrome.runtime.lastError.message });
-      }
-    });
-  } catch (err) {
-    sendResponse({ ok: false, error: err.message });
-  }
 }
 
 // ── Badge helpers ─────────────────────────────────────────────

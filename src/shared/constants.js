@@ -7,12 +7,15 @@
 
 // ── App Identity ────────────────────────────────────────────
 export const APP = {
-  NAME:        'DownloadForge',
+  NAME:        'DownloadForge Pro',
   VERSION:     '1.0.1',
   COMPANY:     'P4inz Interactive Labs',
-  AUTHOR:      'p4inz',
-  SUPPORT_URL: 'https://discord.gg/P4inz Interactive Labs',
-  STORE_URL:   'https://chromewebstore.google.com', // update on publish
+  AUTHOR:      'Atharva Patil (p4inz)',
+  WEBSITE:     'https://atharvapatil.tech',
+  SUPPORT_URL: 'https://discord.gg/8UKt8s5FbW',
+  GITHUB_URL:  'https://github.com/p4inz-code/downloadforge-pro',
+  EMAIL:       'atharva.patil.cg@gmail.com',
+  STORE_URL:   'https://chromewebstore.google.com',
 };
 
 // ── Resource Categories ─────────────────────────────────────
@@ -113,14 +116,14 @@ export const MIME_MAP = {
 // ── Category UI Config (icons use emoji as placeholder —
 //    swap with real SVG icons in assets/) ───────────────────
 export const CATEGORY_META = {
-  [CATEGORY.VIDEO]:    { label: 'Videos',    emoji: '🎬', color: '#f97316' },
-  [CATEGORY.AUDIO]:    { label: 'Audio',     emoji: '🎵', color: '#a855f7' },
-  [CATEGORY.IMAGE]:    { label: 'Images',    emoji: '🖼️',  color: '#3b82f6' },
-  [CATEGORY.DOCUMENT]: { label: 'Documents', emoji: '📄', color: '#22c55e' },
-  [CATEGORY.ARCHIVE]:  { label: 'Archives',  emoji: '📦', color: '#eab308' },
-  [CATEGORY.STREAM]:   { label: 'Streams',   emoji: '📡', color: '#ec4899' },
-  [CATEGORY.OTHER]:    { label: 'Other',     emoji: '🔗', color: '#6b7280' },
-  [CATEGORY.UNKNOWN]:  { label: 'Unknown',   emoji: '❓', color: '#374151' },
+  [CATEGORY.VIDEO]:    { label: 'Videos',    icon: 'video',    color: '#f97316' },
+  [CATEGORY.AUDIO]:    { label: 'Audio',     icon: 'music',    color: '#a855f7' },
+  [CATEGORY.IMAGE]:    { label: 'Images',    icon: 'image',    color: '#3b82f6' },
+  [CATEGORY.DOCUMENT]: { label: 'Documents', icon: 'file-text', color: '#22c55e' },
+  [CATEGORY.ARCHIVE]:  { label: 'Archives',  icon: 'archive',  color: '#eab308' },
+  [CATEGORY.STREAM]:   { label: 'Streams',   icon: 'radio',    color: '#ec4899' },
+  [CATEGORY.OTHER]:    { label: 'Other',     icon: 'link',     color: '#6b7280' },
+  [CATEGORY.UNKNOWN]:  { label: 'Unknown',   icon: 'help',     color: '#374151' },
 };
 
 // ── Detection Sources ────────────────────────────────────────

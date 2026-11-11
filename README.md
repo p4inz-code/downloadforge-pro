@@ -1,11 +1,13 @@
 # DownloadForge Pro (v1.0.1)
 
 **High-Performance In-Browser Video Stream Downloader & Transmuxer for Chrome (Manifest V3)**  
-*Engineered by P4inz Interactive Labs — Maintained by p4inz*
+*Engineered by Atharva Patil ([p4inz](https://atharvapatil.tech)) · P4inz Interactive Labs*
 
 [![Release](https://img.shields.io/badge/release-v1.0.1-6366f1.svg)](https://github.com/p4inz-code/downloadforge-pro/releases)
 [![Chrome MV3](https://img.shields.io/badge/manifest-v3-10b981.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Portfolio](https://img.shields.io/badge/portfolio-atharvapatil.tech-0ea5e9.svg)](https://atharvapatil.tech)
+[![Discord](https://img.shields.io/badge/discord-join-5865f2.svg)](https://discord.gg/8UKt8s5FbW)
 [![Zero Telemetry](https://img.shields.io/badge/telemetry-none-success.svg)](#privacy--security-model)
 
 ---
@@ -33,28 +35,54 @@ Searchable local audit log, rule engine management, and direct download replay.
 
 ---
 
+## How to Pin DownloadForge Pro in Chrome
+
+To keep DownloadForge Pro accessible in the top-right corner of your browser with real-time detected media badge counters:
+
+1. **Click the Extensions icon** in Google Chrome: Click the puzzle piece icon located in the top-right toolbar (next to your profile picture and address bar).
+2. **Find DownloadForge Pro** in the list of installed extensions.
+3. **Click the Pin icon** (pushpin) next to DownloadForge Pro.
+4. **Done**: The DownloadForge Pro hexagon icon is now pinned in your toolbar corner. Whenever a webpage loads video or media streams, the badge counter will dynamically display the number of detected streams.
+
+---
+
+## Desktop App & Standalone Window Mode
+
+DownloadForge Pro does **not** require any external OS background companion binaries, background services, or registry installers. Everything runs inside a sandboxed, zero-dependency browser architecture:
+
+- **100% Custom In-Browser Engine**: Utilizes the W3C File System Access API (`showSaveFilePicker()` and `FileSystemWritableFileStream`) coupled with hardware `crypto.subtle` AES-128 decryption and an in-memory sequential streaming pump. Multi-gigabyte streams are written directly to local disk without browser memory crashes (RAM < 40 MB).
+- **Standalone Desktop App Window Mode**: If you prefer a distraction-free desktop app experience without browser tabs or address bars:
+  - **Method 1 (Chrome App Menu)**: Navigate to Stream Studio (`chrome-extension://<EXTENSION_ID>/src/downloader/downloader.html`), open Chrome's 3-dot menu > **Save and share** > **Install page as app** (or **Create shortcut...** and check **Open as window**).
+  - **Method 2 (Command Line / OS Shortcut)**: Run Chrome with the `--app` flag:
+    ```bash
+    chrome.exe --app="chrome-extension://<EXTENSION_ID>/src/downloader/downloader.html"
+    ```
+  This creates an isolated, frameless desktop window with its own dedicated Windows/macOS taskbar icon.
+
+---
+
 ## Key Features
 
-### 🚀 High-Throughput HLS Ingestion Engine
+### High-Throughput HLS Ingestion Engine
 - **Configurable Thread Concurrency**:
   - `Balanced` (4 workers): Stable for rate-sensitive CDNs.
   - `Turbo` (8 workers): Recommended default for high-speed broadband.
   - `Maximum` (16 workers): Saturates multi-gigabit connections.
 - **Hardware AES-128 Decryption**: Uses the browser's native `window.crypto.subtle` API for multi-megabyte/sec chunk decryption without main-thread jank.
 - **Dual-Track Demuxing**: Automatically extracts separated `#EXT-X-MEDIA:TYPE=AUDIO` tracks and remuxes them alongside the primary video track into standard MP4 containers.
-- **Direct-to-Disk Zero-RAM Streaming**: For 1GB to 4GB+ files, DownloadForge Pro streams transmuxed chunks straight to disk using `showSaveFilePicker()` and `FileSystemWritableFileStream`, keeping the extension's memory footprint under 80 MB.
+- **Direct-to-Disk Zero-RAM Streaming**: For 1GB to 4GB+ files, DownloadForge Pro streams transmuxed chunks straight to disk using `showSaveFilePicker()` and `FileSystemWritableFileStream`, keeping the extension's memory footprint under 40 MB.
 - **Live Visual Segment Heatmap**: Real-time per-chunk status grid (Queued, Fetching, Transmuxed, Error).
 
-### 🎯 Non-Intrusive In-Player Floating Overlay
+### Non-Intrusive In-Player Floating Overlay
 - Automatically anchors a download pill to the top-right corner of any HTML5 `<video>` element on hover.
 - Displays detected resolution tag (e.g. `1080p`, `720p`, `HLS Stream`).
 - Triggers instant highest-bitrate stream capture without opening the popup menu.
 - Keyboard shortcut: **`Alt + D`** to toggle/download active player stream.
 
-### 🛡️ Low-Level Request Sniffer (Main-World Bridge)
+### Low-Level Request Sniffer (Main-World Bridge)
 - Intercepts dynamic `window.fetch`, `XMLHttpRequest`, and `HTMLVideoElement.src` bindings at runtime.
 - **MediaSource Buffer Hook**: Intercepts `SourceBuffer.prototype.appendBuffer` to capture `blob:` streams that do not expose direct manifest URLs.
-- **Anti-Hotlinking Engine**: Utilizes `chrome.declarativeNetRequest` rules to strip extension headers (`Origin: chrome-extension://...`) and mirror target `Referer` headers to bypass CDN 403 anti-scrape barriers.
+- **Anti-Hotlinking Engine**: Utilizes `chrome.declarativeNetRequest` dynamic rules to strip extension origin headers and mirror target `Referer` headers to bypass CDN 403 anti-scrape barriers.
 - **Cryptographic Nonce Handshake**: Content script and main-world sniffer communicate via session-specific token nonces to eliminate cross-extension injection attacks.
 
 ---
@@ -108,7 +136,7 @@ Webpage (DOM & Media)
 3. Open Google Chrome and navigate to `chrome://extensions`.
 4. Enable the **Developer mode** toggle in the top-right corner.
 5. Click **Load unpacked** and select the unzipped directory.
-6. Pin **DownloadForge Pro** to your extension toolbar.
+6. Pin **DownloadForge Pro** to your extension toolbar corner.
 
 ### Option B: Build from Source
 Requirements: Node.js (v18+) and npm.
@@ -133,7 +161,7 @@ npm run build
 ## Privacy & Security Model
 
 - **No Remote Telemetry**: DownloadForge Pro contains zero tracking scripts, zero Google Analytics, and zero third-party CDNs.
-- **Local Transmuxing**: All TS segment processing and MP4 container packaging happen entirely inside your local browser runtime. No video data ever routes through a proxy server.
+- **Local Transmuxing**: All TS segment processing and MP4 container packaging happen entirely inside your local browser runtime. No video data ever routes through an external proxy server.
 - **Strict Content Security Policy (CSP)**: Extension pages are locked down with `script-src 'self'` and `object-src 'none'`.
 - **DRM Policy**: DownloadForge Pro does not decrypt or circumvent proprietary DRM systems (Widevine, PlayReady, FairPlay). Standard clear-key AES-128 streams (RFC 8216) are fully supported.
 
@@ -171,6 +199,17 @@ downloadforge-pro/
 │   └── dashboard/                    # Full media manager page
 └── release/                          # Packaged release archives (.zip)
 ```
+
+---
+
+## Author & Support
+
+- **Author**: Atharva Patil ([p4inz](https://atharvapatil.tech))
+- **Studio**: P4inz Interactive Labs
+- **Portfolio**: [https://atharvapatil.tech](https://atharvapatil.tech)
+- **Discord Community**: [https://discord.gg/8UKt8s5FbW](https://discord.gg/8UKt8s5FbW)
+- **Email**: [atharva.patil.cg@gmail.com](mailto:atharva.patil.cg@gmail.com)
+- **Repository**: [https://github.com/p4inz-code/downloadforge-pro](https://github.com/p4inz-code/downloadforge-pro)
 
 ---
 

@@ -54,7 +54,6 @@ async function loadView(view) {
     case 'history':     await loadHistory(); break;
     case 'rules':       await loadRules(); break;
     case 'settings':    await loadSettings(); break;
-    case 'companion':   await loadCompanion(); break;
     case 'diagnostics': await loadDiagnostics(); break;
   }
 }
@@ -90,17 +89,24 @@ function renderHistory(items) {
     const filename = item.filename || extractFilename(item.url) || 'Unknown';
     const status   = item.status || 'unknown';
     const date     = item.startedAt ? formatRelativeTime(item.startedAt) : '—';
-    const catMeta  = CATEGORY_META[item.category] || { emoji: '🔗' };
+    const catMeta  = CATEGORY_META[item.category] || { label: 'Other', color: '#6b7280' };
 
     tr.innerHTML = `
       <td><input type="checkbox" class="hist-check"/></td>
-      <td class="filename" title="${escHtml(item.url)}">${catMeta.emoji} ${escHtml(filename)}</td>
+      <td class="filename" title="${escHtml(item.url)}">
+        <span class="file-icon-dot" style="background:${catMeta.color}; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px;"></span>
+        ${escHtml(filename)}
+      </td>
       <td class="mono">${escHtml(item.category || '—')}</td>
       <td><span class="status-pill ${status}">${status}</span></td>
       <td class="mono">${escHtml(date)}</td>
       <td>
-        <button class="table-action" data-action="redownload" data-url="${escHtml(item.url)}" data-filename="${escHtml(filename)}" title="Re-download">↓</button>
-        <button class="table-action del" data-action="delete" title="Remove">✕</button>
+        <button class="table-action" data-action="redownload" data-url="${escHtml(item.url)}" data-filename="${escHtml(filename)}" title="Re-download">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button class="table-action del" data-action="delete" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </td>
     `;
 
@@ -234,7 +240,7 @@ function renderRules(rules) {
       <span class="rule-domain">${escHtml(rule.domain)}</span>
       <span class="rule-action-badge ${rule.action}">${rule.action}</span>
       ${rule.note ? `<span class="rule-note">${escHtml(rule.note)}</span>` : ''}
-      <button class="table-action del" data-idx="${idx}" title="Remove rule">✕</button>
+      <button class="table-action del" data-idx="${idx}" title="Remove rule"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
     `;
     el.querySelector('[data-idx]').addEventListener('click', async () => {
       await removeRule(idx);
@@ -290,40 +296,7 @@ async function loadSettings() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────
-// Companion view
-// ─────────────────────────────────────────────────────────────
-async function loadCompanion() {
-  await checkAndShowCompanionStatus();
-
-  $('btn-check-companion')?.addEventListener('click', async () => {
-    $('companion-status-text').textContent = 'Checking…';
-    await checkAndShowCompanionStatus();
-  });
-}
-
-async function checkAndShowCompanionStatus() {
-  const indicator = $('companion-indicator');
-  const text      = $('companion-status-text');
-
-  try {
-    const result = await checkCompanion();
-    if (result.available) {
-      indicator.className = 'status-indicator online';
-      text.textContent = `Connected — v${result.version}`;
-    } else {
-      indicator.className = 'status-indicator offline';
-      text.textContent = `Not found — ${result.error || 'Install the companion app'}`;
-    }
-  } catch (err) {
-    indicator.className = 'status-indicator offline';
-    text.textContent = 'Check failed';
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Diagnostics view
-// ─────────────────────────────────────────────────────────────
+// ── Diagnostics view ─────────────────────────────────────────
 async function loadDiagnostics() {
   $('btn-run-diag')?.addEventListener('click', runDiagnostics);
   await runDiagnostics();
@@ -347,13 +320,8 @@ async function runDiagnostics() {
     setDiag('permissions', 'Error', 'error');
   }
 
-  // Companion
-  try {
-    const c = await checkCompanion();
-    setDiag('companion', c.available ? `Connected v${c.version}` : 'Not installed', c.available ? 'ok' : 'warn');
-  } catch {
-    setDiag('companion', 'Error', 'error');
-  }
+  // Anti-Hotlink DNR
+  setDiag('dnr', 'Active (Origin Stripped)', 'ok');
 
   // webRequest optional
   try {

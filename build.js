@@ -30,7 +30,7 @@ async function build() {
       target: ['chrome100'],
       minify: false,
     });
-    console.log('[Build] ✅ dist/content_script.bundle.js built successfully');
+    console.log('[Build] [OK] dist/content_script.bundle.js built successfully');
 
     // 2. Bundle downloader studio
     await esbuild.build({
@@ -42,7 +42,7 @@ async function build() {
       target: ['chrome100'],
       minify: false,
     });
-    console.log('[Build] ✅ dist/downloader.bundle.js built successfully');
+    console.log('[Build] [OK] dist/downloader.bundle.js built successfully');
 
     console.log('[Build] All bundles compiled cleanly!');
   } catch (err) {

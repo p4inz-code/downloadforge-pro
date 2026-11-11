@@ -13,7 +13,11 @@
 ══════════════════════════════════════════ -->
 <header class="header">
   <div class="header-brand">
-    <span class="header-logo">⬡</span>
+    <span class="header-logo">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+      </svg>
+    </span>
     <span class="header-name">DownloadForge</span>
     <span class="header-by">by P4inz Interactive Labs</span>
   </div>
@@ -131,7 +135,7 @@
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
       </svg>
       <input class="search-input" id="search-input" type="text" placeholder="Search filename, URL…" autocomplete="off" spellcheck="false"/>
-      <button class="search-clear" id="search-clear" hidden>✕</button>
+      <button class="search-clear" id="search-clear" hidden title="Clear search"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
     </div>
     <select class="sort-select" id="sort-select" title="Sort by">
       <option value="type">Type</option>
@@ -169,20 +173,6 @@
   </div>
 
 </div>
-
-<!-- ══════════════════════════════════════════
-     COMPANION BANNER (shown if detected)
-══════════════════════════════════════════ -->
-<div class="companion-banner" id="companion-banner" hidden>
-  <span>🖥 Desktop app connected</span>
-</div>
-
-<!-- ══════════════════════════════════════════
-     AD SLOT (dashboard only — NOT in popup)
-     Ads are only shown in the full dashboard
-     page, never in the popup. This keeps the
-     popup clean and users happy.
-══════════════════════════════════════════ -->
 
 <script src="popup.js" type="module"></script>
 </body>

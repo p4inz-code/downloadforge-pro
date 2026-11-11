@@ -135,14 +135,14 @@
         "application/dash+xml": CATEGORY.STREAM
       };
       CATEGORY_META = {
-        [CATEGORY.VIDEO]: { label: "Videos", emoji: "\u{1F3AC}", color: "#f97316" },
-        [CATEGORY.AUDIO]: { label: "Audio", emoji: "\u{1F3B5}", color: "#a855f7" },
-        [CATEGORY.IMAGE]: { label: "Images", emoji: "\u{1F5BC}\uFE0F", color: "#3b82f6" },
-        [CATEGORY.DOCUMENT]: { label: "Documents", emoji: "\u{1F4C4}", color: "#22c55e" },
-        [CATEGORY.ARCHIVE]: { label: "Archives", emoji: "\u{1F4E6}", color: "#eab308" },
-        [CATEGORY.STREAM]: { label: "Streams", emoji: "\u{1F4E1}", color: "#ec4899" },
-        [CATEGORY.OTHER]: { label: "Other", emoji: "\u{1F517}", color: "#6b7280" },
-        [CATEGORY.UNKNOWN]: { label: "Unknown", emoji: "\u2753", color: "#374151" }
+        [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
+        [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
+        [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
+        [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
+        [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
+        [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },
+        [CATEGORY.OTHER]: { label: "Other", icon: "link", color: "#6b7280" },
+        [CATEGORY.UNKNOWN]: { label: "Unknown", icon: "help", color: "#374151" }
       };
       SOURCE = {
         DOM_ANCHOR: "dom_anchor",
