@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Pro — src/downloader/downloader_bundle.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Client Controller for DownloadForge Pro Studio.
 // Integrates HLSEngine, Direct-to-Disk Streaming, and Record Mode.

@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Companion — main.go
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Native desktop companion app for DownloadForge Chrome extension.
 // Communicates via Chrome Native Messaging protocol (stdin/stdout).
@@ -30,7 +30,7 @@ func main() {
 		defer logFile.Close()
 	}
 
-	log.Printf("DownloadForge Companion starting — v%s by ObsidianLabs", Version)
+	log.Printf("DownloadForge Companion starting — v%s by P4inz Interactive Labs", Version)
 
 	// Load config
 	cfg, err := LoadConfig()

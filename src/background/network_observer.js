@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — background/network_observer.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Optional network observer — only active when the user has
 // granted the optional webRequest + <all_urls> permissions.

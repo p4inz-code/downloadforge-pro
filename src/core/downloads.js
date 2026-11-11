@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/downloads.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Download manager layer.
 // Wraps chrome.downloads API with:

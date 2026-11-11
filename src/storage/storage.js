@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — storage/storage.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Storage abstraction layer.
 // All chrome.storage.local access goes through here.

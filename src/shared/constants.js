@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — shared/constants.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // Central source of truth for all constants used across
 // the extension. Import from here, never hardcode values.
 // ============================================================
@@ -9,9 +9,9 @@
 export const APP = {
   NAME:        'DownloadForge',
   VERSION:     '1.0.0',
-  COMPANY:     'ObsidianLabs',
+  COMPANY:     'P4inz Interactive Labs',
   AUTHOR:      'p4inz',
-  SUPPORT_URL: 'https://discord.gg/obsidianlabs',
+  SUPPORT_URL: 'https://discord.gg/P4inz Interactive Labs',
   STORE_URL:   'https://chromewebstore.google.com', // update on publish
 };
 
@@ -201,14 +201,14 @@ export const DEFAULT_SETTINGS = {
   concurrencyMode:      'turbo',         // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
   directDiskStream:     true,            // zero-RAM direct streaming via File System Access API
   companionEnabled:     false,
-  companionHost:        'com.obsidianlabs.downloadforge',
+  companionHost:        'com.P4inz Interactive Labs.downloadforge',
   debugMode:            false,
   defaultSaveAs:        false,           // trigger save-as dialog
   historyMaxItems:      500,
 };
 
 // ── Native Messaging Host Name ───────────────────────────────
-export const NATIVE_HOST = 'com.obsidianlabs.downloadforge';
+export const NATIVE_HOST = 'com.P4inz Interactive Labs.downloadforge';
 
 // ── Limits ───────────────────────────────────────────────────
 export const LIMITS = {

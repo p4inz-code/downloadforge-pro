@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — utils/url.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 /** Extract file extension from a URL, lowercase, no dot. */

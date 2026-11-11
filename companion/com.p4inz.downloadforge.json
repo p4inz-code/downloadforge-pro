@@ -1,6 +1,6 @@
 {
-  "name": "com.obsidianlabs.downloadforge",
-  "description": "DownloadForge native companion app by ObsidianLabs",
+  "name": "com.P4inz Interactive Labs.downloadforge",
+  "description": "DownloadForge native companion app by P4inz Interactive Labs",
   "path": "downloadforge-companion",
   "type": "stdio",
   "allowed_origins": [

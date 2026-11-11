@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/hls_parser.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // HLS / M3U8 manifest parser.
 // IMPORTANT CONSTRAINTS:

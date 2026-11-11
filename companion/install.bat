@@ -1,7 +1,7 @@
 @echo off
 :: ============================================================
 :: DownloadForge Companion — install.bat
-:: ObsidianLabs | p4inz
+:: P4inz Interactive Labs | p4inz
 ::
 :: Builds and registers the native messaging host on Windows.
 :: Usage: install.bat YOUR_EXTENSION_ID
@@ -10,7 +10,7 @@
 setlocal enabledelayedexpansion
 
 set EXTENSION_ID=%1
-set HOST_NAME=com.obsidianlabs.downloadforge
+set HOST_NAME=com.P4inz Interactive Labs.downloadforge
 set SCRIPT_DIR=%~dp0
 set BINARY_NAME=downloadforge-companion.exe
 
@@ -23,7 +23,7 @@ if "%EXTENSION_ID%"=="" (
 )
 
 echo DownloadForge Companion Installer
-echo ObsidianLabs ^| p4inz
+echo P4inz Interactive Labs ^| p4inz
 echo ==================================
 echo.
 
@@ -45,7 +45,7 @@ set BINARY_PATH=%SCRIPT_DIR%%BINARY_NAME%
 (
   echo {
   echo   "name": "%HOST_NAME%",
-  echo   "description": "DownloadForge native companion app by ObsidianLabs",
+  echo   "description": "DownloadForge native companion app by P4inz Interactive Labs",
   echo   "path": "%BINARY_PATH:\=\\%",
   echo   "type": "stdio",
   echo   "allowed_origins": [

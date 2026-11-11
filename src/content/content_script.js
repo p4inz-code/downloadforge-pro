@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — content/content_script.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Content Script — injected into pages.
 // Responsibilities:

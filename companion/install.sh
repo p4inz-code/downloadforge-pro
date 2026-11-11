@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DownloadForge Companion — install.sh
-# ObsidianLabs | p4inz
+# P4inz Interactive Labs | p4inz
 #
 # Builds and registers the native messaging host on macOS/Linux.
 # Run: bash install.sh YOUR_EXTENSION_ID
@@ -14,7 +14,7 @@ set -e
 EXTENSION_ID="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BINARY_NAME="downloadforge-companion"
-HOST_NAME="com.obsidianlabs.downloadforge"
+HOST_NAME="com.P4inz Interactive Labs.downloadforge"
 
 # ── Validate ─────────────────────────────────────────────────
 if [ -z "$EXTENSION_ID" ]; then
@@ -25,7 +25,7 @@ if [ -z "$EXTENSION_ID" ]; then
 fi
 
 echo "DownloadForge Companion Installer"
-echo "ObsidianLabs | p4inz"
+echo "P4inz Interactive Labs | p4inz"
 echo "=================================="
 echo ""
 
@@ -57,7 +57,7 @@ BINARY_PATH="$SCRIPT_DIR/$BINARY_NAME"
 cat > "$MANIFEST_PATH" <<EOF
 {
   "name": "$HOST_NAME",
-  "description": "DownloadForge native companion app by ObsidianLabs",
+  "description": "DownloadForge native companion app by P4inz Interactive Labs",
   "path": "$BINARY_PATH",
   "type": "stdio",
   "allowed_origins": [

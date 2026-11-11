@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Backend — functions/index.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Firebase Cloud Functions for:
 //   - Remote config delivery (feature flags, ad config)
@@ -35,7 +35,7 @@ exports.getConfig = functions.https.onRequest(async (req, res) => {
       ok: true,
       version: '1.0.0',
       config,
-      company: 'ObsidianLabs',
+      company: 'P4inz Interactive Labs',
     });
   } catch (err) {
     functions.logger.error('getConfig error:', err);
@@ -76,7 +76,7 @@ exports.ping = functions.https.onRequest(async (req, res) => {
 
 // ── Health check ──────────────────────────────────────────────
 exports.health = functions.https.onRequest((req, res) => {
-  res.json({ ok: true, service: 'DownloadForge', company: 'ObsidianLabs' });
+  res.json({ ok: true, service: 'DownloadForge', company: 'P4inz Interactive Labs' });
 });
 
 // ── Default config ────────────────────────────────────────────
@@ -87,7 +87,7 @@ function getDefaultConfig() {
     maxResourcesPerScan: 500,
     hlsEnabled:         true,
     companionEnabled:   true,
-    supportUrl:         'https://discord.gg/obsidianlabs',
-    privacyUrl:         'https://obsidianlabs.pages.dev/privacy',
+    supportUrl:         'https://discord.gg/P4inz Interactive Labs',
+    privacyUrl:         'https://P4inz Interactive Labs.pages.dev/privacy',
   };
 }

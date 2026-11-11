@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — content/dom_scanner.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // DOM Scanner — runs inside the page context.
 // Responsible for extracting all downloadable resource URLs

@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Companion — downloader.go
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // HTTP downloader with:
 //   - Resume support via Range headers (if server supports it)
@@ -94,7 +94,7 @@ func (d *Downloader) Download(ctx context.Context, task DownloadTask, progressCh
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", resumeFrom))
 	}
 
-	req.Header.Set("User-Agent", "DownloadForge/"+Version+" (ObsidianLabs)")
+	req.Header.Set("User-Agent", "DownloadForge/"+Version+" (P4inz Interactive Labs)")
 
 	resp, err := d.client.Do(req)
 	if err != nil {

@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Pro — content/video_overlay.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // In-Page Floating Video Overlay Engine
 // - Attaches subtle glassmorphic download pill to every video player

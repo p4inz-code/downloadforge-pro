@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — build.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Esbuild pipeline to bundle:
 // 1. content_script.js -> dist/content_script.bundle.js (iife)

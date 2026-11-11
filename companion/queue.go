@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Companion — queue.go
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 package main

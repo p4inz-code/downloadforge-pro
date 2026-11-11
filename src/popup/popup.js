@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — popup/popup.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Popup controller. Handles:
 //   - Loading and displaying resources from service worker

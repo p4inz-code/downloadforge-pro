@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — content/injected_sniffer.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Injected into the page's MAIN execution context.
 // Cryptographic token handshake with content_script.

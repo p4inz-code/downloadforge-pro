@@ -1,7 +1,7 @@
 # DownloadForge Pro (v1.0.0)
 
 **High-Performance In-Browser Video Stream Downloader & Transmuxer for Chrome (Manifest V3)**  
-*Engineered by ObsidianLabs — Maintained by p4inz*
+*Engineered by P4inz Interactive Labs — Maintained by p4inz*
 
 [![Release](https://img.shields.io/badge/release-v1.0.0-6366f1.svg)](https://github.com/p4inz-code/downloadforge-pro/releases)
 [![Chrome MV3](https://img.shields.io/badge/manifest-v3-10b981.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)

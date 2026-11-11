@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — utils/format.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 /** Format bytes to human readable string. */

@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/detector.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Detection Orchestrator.
 // Combines results from:

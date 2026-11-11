@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — utils/permissions.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 import { Logger } from './logger.js';

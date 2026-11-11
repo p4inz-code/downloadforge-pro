@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — dashboard/dashboard.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Dashboard controller.
 // Manages: history, domain rules, settings, companion, diagnostics

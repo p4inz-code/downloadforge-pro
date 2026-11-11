@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/rules.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Domain Rules Engine.
 // Manages per-domain include/exclude/preference rules.

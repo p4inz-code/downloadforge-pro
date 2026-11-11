@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/metadata.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Fetches real file metadata (size, mime type, filename) via
 // HTTP HEAD requests. Only runs for resources where size is

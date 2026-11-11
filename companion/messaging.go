@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Companion — messaging.go
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Chrome Native Messaging Protocol implementation.
 // Messages are framed with a 4-byte little-endian length prefix.
@@ -127,7 +127,7 @@ func (m *Messenger) handleMessage(msg *IncomingMessage) {
 			ID:   msg.ID,
 			Payload: map[string]string{
 				"version": Version,
-				"company": "ObsidianLabs",
+				"company": "P4inz Interactive Labs",
 			},
 		})
 

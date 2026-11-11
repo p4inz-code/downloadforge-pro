@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — utils/logger.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 export class Logger {

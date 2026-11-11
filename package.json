@@ -1,7 +1,7 @@
 {
   "name": "dowloadforge-ext-chrome",
   "version": "1.0.0",
-  "description": "**By ObsidianLabs — Built by p4inz**",
+  "description": "**By P4inz Interactive Labs — Built by p4inz**",
   "main": "index.js",
   "scripts": {
     "build": "node build.js",

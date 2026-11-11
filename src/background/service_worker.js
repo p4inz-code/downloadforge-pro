@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — background/service_worker.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // MV3 Service Worker — central message hub.
 // Responsibilities:
@@ -342,7 +342,7 @@ async function handleBatchDownload(payload, sendResponse) {
 // ── Handler: companion check ──────────────────────────────────
 function handleCompanionCheck(sendResponse) {
   try {
-    const port = chrome.runtime.connectNative('com.obsidianlabs.downloadforge');
+    const port = chrome.runtime.connectNative('com.P4inz Interactive Labs.downloadforge');
     port.postMessage({ type: 'PING' });
     port.onMessage.addListener((msg) => {
       if (msg.type === 'PONG') {
@@ -363,7 +363,7 @@ function handleCompanionCheck(sendResponse) {
 // ── Handler: send to companion ────────────────────────────────
 function handleCompanionSend(payload, sendResponse) {
   try {
-    const port = chrome.runtime.connectNative('com.obsidianlabs.downloadforge');
+    const port = chrome.runtime.connectNative('com.P4inz Interactive Labs.downloadforge');
     port.postMessage({ type: 'DOWNLOAD', payload });
     port.onMessage.addListener((msg) => {
       sendResponse({ ok: true, response: msg });

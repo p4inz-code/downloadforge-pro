@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/classifier.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 import { EXT_MAP, MIME_MAP, CATEGORY } from '../shared/constants.js';

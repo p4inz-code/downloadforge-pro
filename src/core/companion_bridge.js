@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge — core/companion_bridge.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // Native Messaging Bridge to the Go desktop companion app.
 // Handles: ping/check, download task dispatch, status query.

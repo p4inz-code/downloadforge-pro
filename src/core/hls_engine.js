@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Pro — core/hls_engine.js
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 //
 // In-Browser Multi-Threaded HLS Downloader & Transmuxer
 // Features:

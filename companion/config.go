@@ -1,6 +1,6 @@
 // ============================================================
 // DownloadForge Companion — config.go
-// ObsidianLabs | p4inz
+// P4inz Interactive Labs | p4inz
 // ============================================================
 
 package main
@@ -59,7 +59,7 @@ func getAppDataDir() string {
 	default: // linux
 		base = filepath.Join(os.Getenv("HOME"), ".config")
 	}
-	dir := filepath.Join(base, "ObsidianLabs", "DownloadForge")
+	dir := filepath.Join(base, "P4inz Interactive Labs", "DownloadForge")
 	os.MkdirAll(dir, 0755)
 	return dir
 }

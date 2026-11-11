@@ -8112,7 +8112,7 @@
         directDiskStream: true,
         // zero-RAM direct streaming via File System Access API
         companionEnabled: false,
-        companionHost: "com.obsidianlabs.downloadforge",
+        companionHost: "com.P4inz Interactive Labs.downloadforge",
         debugMode: false,
         defaultSaveAs: false,
         // trigger save-as dialog
