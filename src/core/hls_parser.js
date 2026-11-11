@@ -28,6 +28,7 @@ export async function parseHLSManifest(url) {
     type: null,          // 'master' | 'media'
     isProtected: false,
     variants: [],        // master playlist variants
+    audioTracks: [],     // master playlist separate audio tracks
     segments: [],        // media playlist segments
     duration: null,
     targetDuration: null,
@@ -103,6 +104,21 @@ function parseM3U8Text(text, baseUrl, result) {
 function parseMasterPlaylist(lines, baseUrl, result) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    if (line.startsWith('#EXT-X-MEDIA:')) {
+      const attrs = parseAttributes(line.replace('#EXT-X-MEDIA:', ''));
+      if (attrs.TYPE === 'AUDIO' && attrs.URI) {
+        result.audioTracks.push({
+          groupId: attrs['GROUP-ID'] || 'default',
+          name: attrs.NAME || 'Audio',
+          language: attrs.LANGUAGE || 'und',
+          default: attrs.DEFAULT === 'YES',
+          url: resolveUrl(attrs.URI, baseUrl),
+        });
+      }
+      continue;
+    }
+
     if (!line.startsWith('#EXT-X-STREAM-INF')) continue;
 
     const attrs = parseAttributes(line.replace('#EXT-X-STREAM-INF:', ''));
@@ -117,6 +133,7 @@ function parseMasterPlaylist(lines, baseUrl, result) {
       bandwidth: parseInt(attrs.BANDWIDTH || '0', 10),
       resolution: attrs.RESOLUTION || null,
       codecs: attrs.CODECS || null,
+      audioGroupId: attrs.AUDIO || null,
       frameRate: parseFloat(attrs['FRAME-RATE'] || '0') || null,
       label: attrs.RESOLUTION || `${Math.round(parseInt(attrs.BANDWIDTH||'0',10)/1000)}k`,
     });

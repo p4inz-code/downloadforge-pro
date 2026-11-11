@@ -8168,6 +8168,8 @@
       isProtected: false,
       variants: [],
       // master playlist variants
+      audioTracks: [],
+      // master playlist separate audio tracks
       segments: [],
       // media playlist segments
       duration: null,
@@ -8225,6 +8227,19 @@
   function parseMasterPlaylist(lines, baseUrl, result) {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (line.startsWith("#EXT-X-MEDIA:")) {
+        const attrs2 = parseAttributes(line.replace("#EXT-X-MEDIA:", ""));
+        if (attrs2.TYPE === "AUDIO" && attrs2.URI) {
+          result.audioTracks.push({
+            groupId: attrs2["GROUP-ID"] || "default",
+            name: attrs2.NAME || "Audio",
+            language: attrs2.LANGUAGE || "und",
+            default: attrs2.DEFAULT === "YES",
+            url: resolveUrl(attrs2.URI, baseUrl)
+          });
+        }
+        continue;
+      }
       if (!line.startsWith("#EXT-X-STREAM-INF")) continue;
       const attrs = parseAttributes(line.replace("#EXT-X-STREAM-INF:", ""));
       const nextLine = lines[i + 1];
@@ -8236,6 +8251,7 @@
         bandwidth: parseInt(attrs.BANDWIDTH || "0", 10),
         resolution: attrs.RESOLUTION || null,
         codecs: attrs.CODECS || null,
+        audioGroupId: attrs.AUDIO || null,
         frameRate: parseFloat(attrs["FRAME-RATE"] || "0") || null,
         label: attrs.RESOLUTION || `${Math.round(parseInt(attrs.BANDWIDTH || "0", 10) / 1e3)}k`
       });
@@ -8380,7 +8396,22 @@
           if (!segments || segments.length === 0) {
             throw new Error("Playlist contains zero media segments");
           }
-          this.onStatus(`Found ${segments.length} segments. Initializing engine...`);
+          let audioSegments = [];
+          if (parseResult.type === "master" && parseResult.audioTracks?.length > 0) {
+            const matchTrack = parseResult.audioTracks.find((t) => t.default) || parseResult.audioTracks[0];
+            if (matchTrack?.url) {
+              try {
+                this.onStatus(`Found paired audio track (${matchTrack.name || matchTrack.language}). Fetching...`);
+                const audioResult = await parseHLSManifest(matchTrack.url);
+                if (audioResult.segments?.length > 0) {
+                  audioSegments = audioResult.segments;
+                }
+              } catch (e) {
+                console.debug("Failed to load separate audio track:", e);
+              }
+            }
+          }
+          this.onStatus(`Found ${segments.length} video segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ""}. Initializing engine...`);
           const transmuxer = new import_mux.default.mp4.Transmuxer({
             keepOriginalTimestamps: false
           });
@@ -8467,6 +8498,21 @@
               transmuxer.push(buffer);
               if (writableStream) {
                 downloadedBuffers[i] = null;
+              }
+            }
+          }
+          if (audioSegments.length > 0 && !this.aborted) {
+            this.onStatus("Multiplexing synchronized audio track into MP4...");
+            for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
+              const aSeg = audioSegments[i];
+              try {
+                let aBuf = await this.fetchBufferWithRetry(aSeg.url);
+                if (aSeg.key && aSeg.key.method === "AES-128") {
+                  aBuf = await this.decryptSegment(aBuf, aSeg.key, aSeg.sequence);
+                }
+                transmuxer.push(new Uint8Array(aBuf));
+              } catch (e) {
+                console.debug(`Audio segment ${i} fetch error:`, e);
               }
             }
           }

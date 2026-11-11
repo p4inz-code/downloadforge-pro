@@ -73,7 +73,24 @@ export class HLSEngine {
       throw new Error('Playlist contains zero media segments');
     }
 
-    this.onStatus(`Found ${segments.length} segments. Initializing engine...`);
+    // Dual-track separate audio stream detection
+    let audioSegments = [];
+    if (parseResult.type === 'master' && parseResult.audioTracks?.length > 0) {
+      const matchTrack = parseResult.audioTracks.find(t => t.default) || parseResult.audioTracks[0];
+      if (matchTrack?.url) {
+        try {
+          this.onStatus(`Found paired audio track (${matchTrack.name || matchTrack.language}). Fetching...`);
+          const audioResult = await parseHLSManifest(matchTrack.url);
+          if (audioResult.segments?.length > 0) {
+            audioSegments = audioResult.segments;
+          }
+        } catch (e) {
+          console.debug('Failed to load separate audio track:', e);
+        }
+      }
+    }
+
+    this.onStatus(`Found ${segments.length} video segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ''}. Initializing engine...`);
 
     // Prepare Transmuxer with DTS/PTS alignment
     const transmuxer = new muxjs.mp4.Transmuxer({
@@ -186,6 +203,24 @@ export class HLSEngine {
         }
       }
     }
+
+    // Feed paired audio segments into transmuxer if present
+    if (audioSegments.length > 0 && !this.aborted) {
+      this.onStatus('Multiplexing synchronized audio track into MP4...');
+      for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
+        const aSeg = audioSegments[i];
+        try {
+          let aBuf = await this.fetchBufferWithRetry(aSeg.url);
+          if (aSeg.key && aSeg.key.method === 'AES-128') {
+            aBuf = await this.decryptSegment(aBuf, aSeg.key, aSeg.sequence);
+          }
+          transmuxer.push(new Uint8Array(aBuf));
+        } catch (e) {
+          console.debug(`Audio segment ${i} fetch error:`, e);
+        }
+      }
+    }
+
     transmuxer.flush();
 
     if (writableStream) {
