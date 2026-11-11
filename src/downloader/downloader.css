@@ -15,11 +15,11 @@
   --chrome: #111215;
   --canvas: #141518;
   --fill: rgba(236, 238, 241, 0.05);
-  --line: #2a2d33;
-  --line-strong: #626976;
+  --line: #333842;
+  --line-strong: #727a8a;
 
-  --text: #eceef1;
-  --muted: #9097a2;
+  --text: #f8fafc;
+  --muted: #cbd5e1;
   --accent: #5b9bff;
   --accent-ink: #7fb0ff;
   --accent-btn: #2f6fe0;

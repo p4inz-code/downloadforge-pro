@@ -62,4 +62,44 @@ assert.strictEqual(errDrm.code, ERROR_CODES.ERR_DRM_PROTECTED, 'Should classify 
 assert.strictEqual(errDrm.meta.alternativeMode, 'record', 'DRM should offer record mode alternative');
 console.log('  [PASS] Error Intelligence & Taxonomy classification verified');
 
-console.log('[Test] All 4 core test suites passed successfully with zero errors!');
+// 5. GitHub Release Semver Comparison
+import { isNewerVersion } from '../src/core/updater.js';
+assert.strictEqual(isNewerVersion('1.1.0', '1.0.3'), true, '1.1.0 must be newer than 1.0.3');
+assert.strictEqual(isNewerVersion('v1.1.0', '1.1.0'), false, 'v1.1.0 equals 1.1.0');
+assert.strictEqual(isNewerVersion('1.0.3', '1.1.0'), false, '1.0.3 is not newer than 1.1.0');
+assert.strictEqual(isNewerVersion('2.0.0', '1.9.9'), true, '2.0.0 is newer than 1.9.9');
+console.log('  [PASS] Auto-Updater Semver comparison engine verified');
+
+// 6. 3D glTF -> GLB Binary Container Packager
+import { createGlbContainer, alignTo4Bytes } from '../src/core/gltf_packager.js';
+assert.strictEqual(alignTo4Bytes(1), 4, '1 aligned to 4 is 4');
+assert.strictEqual(alignTo4Bytes(4), 4, '4 aligned to 4 is 4');
+assert.strictEqual(alignTo4Bytes(7), 8, '7 aligned to 4 is 8');
+
+const sampleGltf = {
+  asset: { version: '2.0', generator: 'DownloadForge 3D Ripper' },
+  scenes: [{ nodes: [0] }],
+  nodes: [{ mesh: 0 }],
+  meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }]
+};
+const dummyBinary = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
+const glbBytes = createGlbContainer(sampleGltf, dummyBinary);
+assert.ok(glbBytes instanceof Uint8Array, 'Packed GLB must be Uint8Array');
+assert.ok(glbBytes.byteLength > 20, 'Packed GLB must have header + chunks');
+
+// Verify 12-byte header magic: 0x46546C67 ("glTF")
+const view = new DataView(glbBytes.buffer, glbBytes.byteOffset, glbBytes.byteLength);
+assert.strictEqual(view.getUint32(0, true), 0x46546C67, 'Magic must match 0x46546C67 (glTF)');
+assert.strictEqual(view.getUint32(4, true), 2, 'glTF Version must be 2');
+console.log('  [PASS] 3D Model glTF-to-GLB packager binary structure verified');
+
+// 7. 3D Model Categorization
+import { inferCategory } from '../src/core/classifier.js';
+import { CATEGORY } from '../src/shared/constants.js';
+assert.strictEqual(inferCategory('https://example.com/asset.glb', null, 'glb'), CATEGORY.MODEL_3D, 'glb should be model_3d');
+assert.strictEqual(inferCategory('https://example.com/mesh.obj', null, 'obj'), CATEGORY.MODEL_3D, 'obj should be model_3d');
+assert.strictEqual(inferCategory('https://example.com/scan.splat', null, 'splat'), CATEGORY.MODEL_3D, 'splat should be model_3d');
+assert.strictEqual(inferCategory('https://example.com/model', 'model/gltf-binary', null), CATEGORY.MODEL_3D, 'model/gltf-binary should be model_3d');
+console.log('  [PASS] 3D Model Classifier & Spatial asset taxonomy verified');
+
+console.log('[Test] All 7 core test suites passed successfully with zero errors!');

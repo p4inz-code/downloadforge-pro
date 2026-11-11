@@ -12,10 +12,11 @@
 //   - Handle tab lifecycle (cleanup on close/navigate)
 // ============================================================
 
-import { MSG, BADGE, STORAGE, LIMITS, DEFAULT_SETTINGS, APP, NATIVE_HOST } from '../shared/constants.js';
+import { MSG, BADGE, STORAGE, LIMITS, DEFAULT_SETTINGS, APP, NATIVE_HOST, UPDATE_CONFIG } from '../shared/constants.js';
 import { StorageService } from '../storage/storage.js';
 import { Logger } from '../utils/logger.js';
 import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
+import { checkForGitHubUpdate, downloadUpdatePackage } from '../core/updater.js';
 
 const log = new Logger('ServiceWorker');
 
@@ -54,10 +55,35 @@ async function configureDeclarativeNetRequestRules() {
   }
 }
 
+// ── Auto-Update Scheduler ──────────────────────────────────
+async function initUpdateScheduler() {
+  if (!chrome.alarms) return;
+  try {
+    chrome.alarms.create(UPDATE_CONFIG.ALARM_NAME, {
+      periodInMinutes: UPDATE_CONFIG.CHECK_INTERVAL_MINUTES,
+    });
+    log.info(`Update check alarm scheduled every ${UPDATE_CONFIG.CHECK_INTERVAL_MINUTES} minutes.`);
+    // Run an initial check in background
+    checkForGitHubUpdate();
+  } catch (err) {
+    log.warn('Failed to schedule update alarm:', err.message);
+  }
+}
+
+if (chrome.alarms) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === UPDATE_CONFIG.ALARM_NAME) {
+      log.debug('Executing scheduled update check...');
+      checkForGitHubUpdate();
+    }
+  });
+}
+
 // ── Install / startup ────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   log.info(`DownloadForge ${APP.VERSION} installed. Reason: ${reason}`);
   await configureDeclarativeNetRequestRules();
+  await initUpdateScheduler();
 
   if (reason === 'install') {
     await StorageService.initDefaults();
@@ -73,6 +99,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 chrome.runtime.onStartup.addListener(async () => {
   log.info('Browser startup — DownloadForge service worker ready.');
   await configureDeclarativeNetRequestRules();
+  await initUpdateScheduler();
   // Re-enable network observer if user previously granted webRequest
   const hasWR = await chrome.permissions.contains({ permissions: ['webRequest'] });
   if (hasWR) startNetworkObserver();
@@ -157,6 +184,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ── Popup/Dashboard → SW: rescan current tab ────────────
     case MSG.RESCAN:
       handleRescan(tabId ?? payload?.tabId, sendResponse);
+      return true;
+
+    // ── Popup/Dashboard → SW: check GitHub for updates ───────
+    case MSG.CHECK_FOR_UPDATES:
+      checkForGitHubUpdate().then((info) => sendResponse(info));
+      return true;
+
+    // ── Popup/Dashboard → SW: download update package ────────
+    case MSG.APPLY_UPDATE:
+      downloadUpdatePackage(payload?.zipUrl, payload?.version)
+        .then((downloadId) => sendResponse({ ok: true, downloadId }))
+        .catch((err) => sendResponse({ ok: false, error: err.message }));
       return true;
 
     default:

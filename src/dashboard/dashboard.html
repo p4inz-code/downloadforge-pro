@@ -45,14 +45,19 @@
     </a>
   </nav>
 
-  <!-- Ad slot — sidebar bottom, non-intrusive -->
-  <div class="sidebar-ad" id="sidebar-ad">
-    <div class="ad-label">Ad</div>
-    <div class="ad-slot" id="ad-slot-sidebar">
-      <!-- Google AdSense or house ad goes here -->
-      <div class="ad-placeholder">
-        <span>Advertisement</span>
-      </div>
+  <!-- Sidebar Theme & Update Controls -->
+  <div class="sidebar-footer-controls">
+    <button class="theme-toggle-btn" id="btnThemeToggle" title="Toggle Light / Dark Mode">
+      <span class="theme-icon" id="themeIcon">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </span>
+      <span id="themeLabel">Light Mode</span>
+    </button>
+    <div class="sidebar-update-box" id="sidebarUpdateBox" style="display: none;">
+      <span class="update-pill-badge">Update Ready</span>
+      <button class="btn-update-sidebar" id="btnSidebarUpdate">Get v1.1.0</button>
     </div>
   </div>
 </aside>
@@ -90,6 +95,7 @@
         <option value="all">All types</option>
         <option value="video">Video</option>
         <option value="audio">Audio</option>
+        <option value="model_3d">3D Models</option>
         <option value="document">Documents</option>
         <option value="archive">Archives</option>
         <option value="image">Images</option>
@@ -220,6 +226,22 @@
             <div class="setting-desc">Skip resources smaller than this (avoids tiny tracking pixels)</div>
           </div>
           <input type="number" class="input input-sm" id="s-minFileSizeBytes" min="0" step="512"/>
+        </div>
+      <div class="card">
+        <h3 class="card-title">3D Models &amp; Spatial Assets</h3>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">3D Model Ripper &amp; Sniffer</div>
+            <div class="setting-desc">Detect and extract GLTF, GLB, OBJ, STL, USDZ, and 3D Gaussian Splats</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s-sniff3d" checked/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Auto-package GLTF to standalone GLB</div>
+            <div class="setting-desc">Bundle fragmented .gltf, .bin buffers, and image textures into a single drag-and-drop .glb</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s-packGltf" checked/><span class="toggle-track"></span></label>
         </div>
       </div>
 

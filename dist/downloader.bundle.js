@@ -7966,6 +7966,8 @@
     ARCHIVE: "archive",
     STREAM: "stream",
     // HLS / m3u8 — non-DRM only
+    MODEL_3D: "model_3d",
+    // 3D Meshes, GLTF/GLB, Splats
     OTHER: "other",
     UNKNOWN: "unknown"
   };
@@ -8028,7 +8030,17 @@
     // Streams (non-DRM, authorized only)
     m3u8: CATEGORY.STREAM,
     m3u: CATEGORY.STREAM,
-    mpd: CATEGORY.STREAM
+    mpd: CATEGORY.STREAM,
+    // 3D Models & Spatial Point Clouds
+    glb: CATEGORY.MODEL_3D,
+    gltf: CATEGORY.MODEL_3D,
+    obj: CATEGORY.MODEL_3D,
+    mtl: CATEGORY.MODEL_3D,
+    fbx: CATEGORY.MODEL_3D,
+    stl: CATEGORY.MODEL_3D,
+    usdz: CATEGORY.MODEL_3D,
+    splat: CATEGORY.MODEL_3D,
+    ply: CATEGORY.MODEL_3D
   };
   var MIME_MAP = {
     "video/mp4": CATEGORY.VIDEO,
@@ -8070,12 +8082,19 @@
     "application/gzip": CATEGORY.ARCHIVE,
     "application/x-mpegURL": CATEGORY.STREAM,
     "application/vnd.apple.mpegurl": CATEGORY.STREAM,
-    "application/dash+xml": CATEGORY.STREAM
+    "application/dash+xml": CATEGORY.STREAM,
+    "model/gltf-binary": CATEGORY.MODEL_3D,
+    "model/gltf+json": CATEGORY.MODEL_3D,
+    "model/obj": CATEGORY.MODEL_3D,
+    "model/stl": CATEGORY.MODEL_3D,
+    "model/vnd.usdz+zip": CATEGORY.MODEL_3D,
+    "application/octet-stream-splat": CATEGORY.MODEL_3D
   };
   var CATEGORY_META = {
     [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
     [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
     [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
+    [CATEGORY.MODEL_3D]: { label: "3D Models", icon: "box", color: "#06b6d4" },
     [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
     [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
     [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },

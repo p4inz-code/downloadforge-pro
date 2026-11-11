@@ -8,7 +8,7 @@
 // ── App Identity ────────────────────────────────────────────
 export const APP = {
   NAME:        'DownloadForge Pro',
-  VERSION:     '1.0.3',
+  VERSION:     '1.1.0',
   COMPANY:     'P4inz Interactive Labs',
   AUTHOR:      'Atharva Patil (p4inz)',
   WEBSITE:     'https://atharvapatil.tech',
@@ -26,6 +26,7 @@ export const CATEGORY = {
   DOCUMENT: 'document',
   ARCHIVE:  'archive',
   STREAM:   'stream',   // HLS / m3u8 — non-DRM only
+  MODEL_3D: 'model_3d', // 3D Meshes, GLTF/GLB, Splats
   OTHER:    'other',
   UNKNOWN:  'unknown',
 };
@@ -62,6 +63,11 @@ export const EXT_MAP = {
 
   // Streams (non-DRM, authorized only)
   m3u8: CATEGORY.STREAM, m3u: CATEGORY.STREAM, mpd: CATEGORY.STREAM,
+
+  // 3D Models & Spatial Point Clouds
+  glb: CATEGORY.MODEL_3D, gltf: CATEGORY.MODEL_3D, obj: CATEGORY.MODEL_3D,
+  mtl: CATEGORY.MODEL_3D, fbx: CATEGORY.MODEL_3D,  stl: CATEGORY.MODEL_3D,
+  usdz: CATEGORY.MODEL_3D, splat: CATEGORY.MODEL_3D, ply: CATEGORY.MODEL_3D,
 };
 
 // ── MIME type → category map ─────────────────────────────────
@@ -111,19 +117,26 @@ export const MIME_MAP = {
   'application/x-mpegURL':        CATEGORY.STREAM,
   'application/vnd.apple.mpegurl': CATEGORY.STREAM,
   'application/dash+xml':         CATEGORY.STREAM,
+
+  'model/gltf-binary':            CATEGORY.MODEL_3D,
+  'model/gltf+json':              CATEGORY.MODEL_3D,
+  'model/obj':                    CATEGORY.MODEL_3D,
+  'model/stl':                    CATEGORY.MODEL_3D,
+  'model/vnd.usdz+zip':           CATEGORY.MODEL_3D,
+  'application/octet-stream-splat': CATEGORY.MODEL_3D,
 };
 
-// ── Category UI Config (icons use emoji as placeholder —
-//    swap with real SVG icons in assets/) ───────────────────
+// ── Category UI Config ───────────────────────────────────────
 export const CATEGORY_META = {
-  [CATEGORY.VIDEO]:    { label: 'Videos',    icon: 'video',    color: '#f97316' },
-  [CATEGORY.AUDIO]:    { label: 'Audio',     icon: 'music',    color: '#a855f7' },
-  [CATEGORY.IMAGE]:    { label: 'Images',    icon: 'image',    color: '#3b82f6' },
+  [CATEGORY.VIDEO]:    { label: 'Videos',    icon: 'video',     color: '#f97316' },
+  [CATEGORY.AUDIO]:    { label: 'Audio',     icon: 'music',     color: '#a855f7' },
+  [CATEGORY.IMAGE]:    { label: 'Images',    icon: 'image',     color: '#3b82f6' },
+  [CATEGORY.MODEL_3D]: { label: '3D Models', icon: 'box',       color: '#06b6d4' },
   [CATEGORY.DOCUMENT]: { label: 'Documents', icon: 'file-text', color: '#22c55e' },
-  [CATEGORY.ARCHIVE]:  { label: 'Archives',  icon: 'archive',  color: '#eab308' },
-  [CATEGORY.STREAM]:   { label: 'Streams',   icon: 'radio',    color: '#ec4899' },
-  [CATEGORY.OTHER]:    { label: 'Other',     icon: 'link',     color: '#6b7280' },
-  [CATEGORY.UNKNOWN]:  { label: 'Unknown',   icon: 'help',     color: '#374151' },
+  [CATEGORY.ARCHIVE]:  { label: 'Archives',  icon: 'archive',   color: '#eab308' },
+  [CATEGORY.STREAM]:   { label: 'Streams',   icon: 'radio',     color: '#ec4899' },
+  [CATEGORY.OTHER]:    { label: 'Other',     icon: 'link',      color: '#6b7280' },
+  [CATEGORY.UNKNOWN]:  { label: 'Unknown',   icon: 'help',      color: '#374151' },
 };
 
 // ── Detection Sources ────────────────────────────────────────
@@ -172,6 +185,11 @@ export const MSG = {
   SCAN_PROGRESS:     'SCAN_PROGRESS',
   DOWNLOAD_STARTED:  'DOWNLOAD_STARTED',
   DOWNLOAD_FAILED:   'DOWNLOAD_FAILED',
+
+  // Update System
+  CHECK_FOR_UPDATES: 'CHECK_FOR_UPDATES',
+  UPDATE_AVAILABLE:  'UPDATE_AVAILABLE',
+  APPLY_UPDATE:      'APPLY_UPDATE',
 };
 
 // ── Storage Keys ─────────────────────────────────────────────
@@ -183,6 +201,15 @@ export const STORAGE = {
   FAVORITES:        'df_favorites',
   COMPANION_CONFIG: 'df_companion',
   LAST_FILTER:      'df_last_filter',
+  UPDATE_INFO:      'df_update_info',
+};
+
+// ── Auto-Update Configuration ───────────────────────────────
+export const UPDATE_CONFIG = {
+  GITHUB_REPO:            'p4inz-code/downloadforge-pro',
+  RELEASES_API:           'https://api.github.com/repos/p4inz-code/downloadforge-pro/releases/latest',
+  CHECK_INTERVAL_MINUTES: 240, // 4 hours
+  ALARM_NAME:             'df_update_check_alarm',
 };
 
 // ── Default Settings ─────────────────────────────────────────

@@ -24,11 +24,31 @@
 
   const MEDIA_REGEX = /\.(m3u8|mpd|mp4|webm|ts|m4s|f4m|flv)(\?|$)/i;
   const MIME_REGEX = /(mpegurl|x-mpegurl|video\/|audio\/|dash\+xml)/i;
+  const MODEL_3D_REGEX = /\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply)(\?|$)/i;
+  const MODEL_3D_MIME_REGEX = /(model\/|gltf|usdz|octet-stream-splat)/i;
+
+  function extractFilename(url) {
+    try {
+      const u = new URL(url);
+      const name = u.pathname.split('/').pop() || '';
+      return decodeURIComponent(name.split('?')[0]);
+    } catch {
+      return '';
+    }
+  }
 
   function notifyDetected(mediaInfo) {
     if (!mediaInfo || !mediaInfo.url) return;
     // Validate protocol
     if (!/^https?:\/\//i.test(mediaInfo.url) && !mediaInfo.url.startsWith('blob:')) return;
+
+    const method = mediaInfo.method || (
+      mediaInfo.initiator?.includes('fetch') ? 'TIER_1_NETWORK_FETCH' :
+      mediaInfo.initiator?.includes('xhr') ? 'TIER_1_NETWORK_XHR' :
+      mediaInfo.initiator?.includes('threejs') ? 'TIER_4_THREEJS_RIPPER' :
+      mediaInfo.initiator?.includes('jwplayer') || mediaInfo.initiator?.includes('videojs') || mediaInfo.initiator?.includes('hydration') || mediaInfo.initiator?.includes('jsonld') ? 'TIER_3_PLAYER_CONFIG' :
+      'TIER_2_DOM_TAG'
+    );
 
     try {
       window.postMessage({
@@ -39,7 +59,8 @@
           url: mediaInfo.url,
           mimeType: mediaInfo.mimeType || '',
           category: mediaInfo.category || 'stream',
-          title: (mediaInfo.title || document.title || 'Video Stream').slice(0, 150),
+          title: (mediaInfo.title || document.title || 'Media Resource').slice(0, 150),
+          method,
           initiator: mediaInfo.initiator || 'network'
         }
       }, '*');
@@ -66,6 +87,13 @@
           category: url.includes('m3u8') ? 'stream' : 'video',
           initiator: 'fetch'
         });
+      } else if (url && MODEL_3D_REGEX.test(url)) {
+        notifyDetected({
+          url,
+          category: 'model_3d',
+          title: extractFilename(url) || '3D Model',
+          initiator: 'fetch-3d'
+        });
       }
 
       try {
@@ -78,6 +106,14 @@
               mimeType: contentType,
               category: contentType.includes('mpegurl') ? 'stream' : 'video',
               initiator: 'fetch-response'
+            });
+          } else if (MODEL_3D_MIME_REGEX.test(contentType)) {
+            notifyDetected({
+              url: response.url || url,
+              mimeType: contentType,
+              category: 'model_3d',
+              title: extractFilename(response.url || url) || '3D Model',
+              initiator: 'fetch-response-3d'
             });
           }
         }
@@ -99,12 +135,21 @@
   };
 
   XMLHttpRequest.prototype.send = function(...args) {
-    if (this._df_url && MEDIA_REGEX.test(this._df_url)) {
-      notifyDetected({
-        url: this._df_url,
-        category: this._df_url.includes('m3u8') ? 'stream' : 'video',
-        initiator: 'xhr'
-      });
+    if (this._df_url) {
+      if (MEDIA_REGEX.test(this._df_url)) {
+        notifyDetected({
+          url: this._df_url,
+          category: this._df_url.includes('m3u8') ? 'stream' : 'video',
+          initiator: 'xhr'
+        });
+      } else if (MODEL_3D_REGEX.test(this._df_url)) {
+        notifyDetected({
+          url: this._df_url,
+          category: 'model_3d',
+          title: extractFilename(this._df_url) || '3D Model',
+          initiator: 'xhr-3d'
+        });
+      }
     }
 
     this.addEventListener('load', function() {
@@ -116,6 +161,14 @@
             mimeType: contentType,
             category: contentType.includes('mpegurl') ? 'stream' : 'video',
             initiator: 'xhr-response'
+          });
+        } else if (MODEL_3D_MIME_REGEX.test(contentType)) {
+          notifyDetected({
+            url: this.responseURL || this._df_url,
+            mimeType: contentType,
+            category: 'model_3d',
+            title: extractFilename(this.responseURL || this._df_url) || '3D Model',
+            initiator: 'xhr-response-3d'
           });
         }
       } catch (e) {}
@@ -190,16 +243,90 @@
     window.Worker.prototype = OriginalWorker.prototype;
   }
 
-  // ── 6. Dynamic DOM MutationObserver for Video Elements ─────
+  // ── 6. 3D Model Elements & WebGL Hook ────────────────────
+  function inspect3DElement(el) {
+    if (!el) return;
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'MODEL-VIEWER') {
+      const src = el.getAttribute('src') || el.src;
+      if (src) {
+        notifyDetected({
+          url: src,
+          category: 'model_3d',
+          title: el.getAttribute('alt') || extractFilename(src) || '3D Model',
+          initiator: 'model-viewer'
+        });
+      }
+      const iosSrc = el.getAttribute('ios-src');
+      if (iosSrc) {
+        notifyDetected({
+          url: iosSrc,
+          category: 'model_3d',
+          title: (el.getAttribute('alt') || extractFilename(iosSrc) || '3D Model') + ' (USDZ)',
+          initiator: 'model-viewer-ios'
+        });
+      }
+    } else if (tag === 'SPLINE-VIEWER') {
+      const url = el.getAttribute('url');
+      if (url) {
+        notifyDetected({
+          url,
+          category: 'model_3d',
+          title: extractFilename(url) || 'Spline 3D Scene',
+          initiator: 'spline-viewer'
+        });
+      }
+    }
+  }
+
+  // Hook Three.js & Babylon.js Loaders if present in page runtime
+  function hookEngineLoaders() {
+    try {
+      if (window.THREE && window.THREE.GLTFLoader && !window.THREE.GLTFLoader.__df_hooked) {
+        window.THREE.GLTFLoader.__df_hooked = true;
+        const origParse = window.THREE.GLTFLoader.prototype.parse;
+        window.THREE.GLTFLoader.prototype.parse = function(data, path, onLoad, onError) {
+          try {
+            if (data instanceof ArrayBuffer) {
+              const blob = new Blob([data], { type: 'model/gltf-binary' });
+              const blobUrl = URL.createObjectURL(blob);
+              notifyDetected({
+                url: blobUrl,
+                mimeType: 'model/gltf-binary',
+                category: 'model_3d',
+                title: (document.title || 'Scene') + ' (Three.js GLB)',
+                initiator: 'threejs-ripper'
+              });
+            }
+          } catch (e) {}
+          return origParse.apply(this, arguments);
+        };
+      }
+    } catch (e) {}
+  }
+
+  hookEngineLoaders();
+  setTimeout(hookEngineLoaders, 1500);
+
+  // Initial scan for static 3D elements in page
+  try {
+    document.querySelectorAll('model-viewer, spline-viewer').forEach(inspect3DElement);
+  } catch (e) {}
+
+  // ── 7. Dynamic DOM MutationObserver for Video & 3D Elements ───
   try {
     const domObserver = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
           if (node.nodeType === 1) {
-            if (node.tagName === 'VIDEO') {
+            const tag = (node.tagName || '').toUpperCase();
+            if (tag === 'VIDEO') {
               inspectVideoElement(node);
+            } else if (tag === 'MODEL-VIEWER' || tag === 'SPLINE-VIEWER') {
+              inspect3DElement(node);
             } else if (node.querySelectorAll) {
               node.querySelectorAll('video').forEach(inspectVideoElement);
+              node.querySelectorAll('model-viewer, spline-viewer').forEach(inspect3DElement);
             }
           }
         }
@@ -207,5 +334,122 @@
     });
     domObserver.observe(document.documentElement, { childList: true, subtree: true });
   } catch (e) {}
+
+  // ── 8. Tier 3: Player Config & Hydration State Extractor ──────
+  function extractFromPlayerConfigs() {
+    try {
+      // A. JWPlayer
+      if (window.jwplayer && typeof window.jwplayer === 'function') {
+        const jw = window.jwplayer();
+        if (jw && typeof jw.getPlaylist === 'function') {
+          const playlist = jw.getPlaylist();
+          if (Array.isArray(playlist)) {
+            for (const item of playlist) {
+              if (item && item.file) {
+                notifyDetected({
+                  url: item.file,
+                  category: item.file.includes('m3u8') ? 'stream' : 'video',
+                  title: item.title || document.title,
+                  method: 'TIER_3_PLAYER_CONFIG',
+                  initiator: 'jwplayer-playlist'
+                });
+              }
+              if (item && Array.isArray(item.sources)) {
+                for (const src of item.sources) {
+                  if (src && src.file) {
+                    notifyDetected({
+                      url: src.file,
+                      category: src.file.includes('m3u8') ? 'stream' : 'video',
+                      title: (item.title || document.title) + (src.label ? ` [${src.label}]` : ''),
+                      method: 'TIER_3_PLAYER_CONFIG',
+                      initiator: 'jwplayer-source'
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // B. Video.js
+      if (window.videojs && typeof window.videojs.getAllPlayers === 'function') {
+        const players = window.videojs.getAllPlayers();
+        for (const p of Object.values(players)) {
+          const currentSrc = p && p.currentSrc && p.currentSrc();
+          if (currentSrc && !currentSrc.startsWith('blob:')) {
+            notifyDetected({
+              url: currentSrc,
+              category: currentSrc.includes('m3u8') ? 'stream' : 'video',
+              title: document.title,
+              method: 'TIER_3_PLAYER_CONFIG',
+              initiator: 'videojs-player'
+            });
+          }
+        }
+      }
+
+      // C. Hls.js & Dash.js global instances
+      if (window.hls && window.hls.url) {
+        notifyDetected({
+          url: window.hls.url,
+          category: 'stream',
+          title: document.title,
+          method: 'TIER_3_PLAYER_CONFIG',
+          initiator: 'hlsjs-instance'
+        });
+      }
+
+      // D. Next.js Hydration (__NEXT_DATA__)
+      const nextDataEl = document.getElementById('__NEXT_DATA__');
+      if (nextDataEl && nextDataEl.textContent) {
+        const text = nextDataEl.textContent;
+        const matches = text.match(/https?:\/\/[^"'\s]+\.(m3u8|mpd|mp4|webm|glb|gltf|splat)[^"'\s]*/gi);
+        if (matches) {
+          for (const matchUrl of matches.slice(0, 10)) {
+            const cleanUrl = matchUrl.replace(/\\u0026/g, '&').replace(/\\\//g, '/');
+            notifyDetected({
+              url: cleanUrl,
+              category: cleanUrl.includes('.glb') || cleanUrl.includes('.gltf') || cleanUrl.includes('.splat') ? 'model_3d' : (cleanUrl.includes('.m3u8') ? 'stream' : 'video'),
+              title: extractFilename(cleanUrl) || document.title,
+              method: 'TIER_3_PLAYER_CONFIG',
+              initiator: 'nextjs-hydration'
+            });
+          }
+        }
+      }
+
+      // E. JSON-LD Schema.org VideoObject
+      const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const s of jsonLdScripts) {
+        try {
+          const parsed = JSON.parse(s.textContent);
+          const checkObj = (obj) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj['@type'] === 'VideoObject' || obj.contentUrl || obj.embedUrl) {
+              const url = obj.contentUrl || obj.embedUrl;
+              if (url && typeof url === 'string' && (MEDIA_REGEX.test(url) || url.startsWith('http'))) {
+                notifyDetected({
+                  url,
+                  category: url.includes('m3u8') ? 'stream' : 'video',
+                  title: obj.name || document.title,
+                  method: 'TIER_3_PLAYER_CONFIG',
+                  initiator: 'schema-org-jsonld'
+                });
+              }
+            }
+            for (const key of Object.keys(obj)) {
+              if (typeof obj[key] === 'object') checkObj(obj[key]);
+            }
+          };
+          checkObj(parsed);
+        } catch (e) {}
+      }
+    } catch (err) {}
+  }
+
+  // Run Tier 3 extraction on load and shortly after
+  setTimeout(extractFromPlayerConfigs, 800);
+  setTimeout(extractFromPlayerConfigs, 2500);
 
 })();

@@ -168,6 +168,8 @@ function applyFilterAndRender() {
 function sortResources(items, mode) {
   return [...items].sort((a, b) => {
     switch (mode) {
+      case 'size':
+        return (b.size || 0) - (a.size || 0);
       case 'name':
         return (a.filename || '').localeCompare(b.filename || '');
       case 'domain':
@@ -176,7 +178,7 @@ function sortResources(items, mode) {
         return (b.detectedAt || 0) - (a.detectedAt || 0);
       case 'type':
       default: {
-        const order = [CATEGORY.VIDEO, CATEGORY.AUDIO, CATEGORY.DOCUMENT, CATEGORY.ARCHIVE, CATEGORY.IMAGE, CATEGORY.STREAM, CATEGORY.OTHER, CATEGORY.UNKNOWN];
+        const order = [CATEGORY.VIDEO, CATEGORY.STREAM, CATEGORY.MODEL_3D, CATEGORY.AUDIO, CATEGORY.DOCUMENT, CATEGORY.ARCHIVE, CATEGORY.IMAGE, CATEGORY.OTHER, CATEGORY.UNKNOWN];
         return order.indexOf(a.category) - order.indexOf(b.category);
       }
     }
@@ -207,6 +209,7 @@ const LUCIDE_ICONS = {
   stream: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>`,
   video: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/></svg>`,
   audio: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
+  model_3d: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
   image: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
   document: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`,
   archive: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
@@ -419,7 +422,7 @@ function updateCounts() {
 
   $('count-all').textContent = total;
 
-  const cats = ['video','audio','image','document','archive','stream'];
+  const cats = ['video','audio','image','document','archive','stream','model_3d'];
   for (const cat of cats) {
     const el = $(`count-${cat}`);
     if (el) {
@@ -550,6 +553,31 @@ function setupEventListeners() {
   $('btn-bulk-download').addEventListener('click', bulkDownload);
   $('btn-bulk-copy').addEventListener('click', bulkCopyUrls);
   $('btn-bulk-cancel').addEventListener('click', clearSelection);
+
+  // Check for extension updates
+  try {
+    chrome.runtime.sendMessage({ type: MSG.CHECK_FOR_UPDATES }, (res) => {
+      if (res && res.hasUpdate) {
+        const banner = $('update-banner');
+        const verEl = $('update-ver');
+        const actBtn = $('btn-update-action');
+        if (banner) banner.style.display = 'flex';
+        if (verEl) verEl.textContent = `v${res.latestVersion} Ready`;
+        if (actBtn) {
+          actBtn.addEventListener('click', () => {
+            if (res.zipUrl) {
+              chrome.runtime.sendMessage({
+                type: MSG.APPLY_UPDATE,
+                payload: { zipUrl: res.zipUrl, version: res.latestVersion }
+              });
+            } else if (res.releaseUrl) {
+              chrome.tabs.create({ url: res.releaseUrl });
+            }
+          });
+        }
+      }
+    });
+  } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────────

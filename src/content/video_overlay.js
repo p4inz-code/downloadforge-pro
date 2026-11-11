@@ -424,4 +424,75 @@ export function initVideoOverlay() {
     childList: true,
     subtree: true,
   });
+
+  // Attach 3D Viewer Overlays
+  init3DOverlay();
+}
+
+export function init3DOverlay() {
+  const tracked3D = new WeakSet();
+
+  function attachOverlayTo3D(el) {
+    if (!el || tracked3D.has(el)) return;
+    tracked3D.add(el);
+
+    const parent = el.parentElement;
+    if (!parent) return;
+
+    const parentStyle = window.getComputedStyle(parent);
+    if (parentStyle.position === 'static') {
+      parent.style.position = 'relative';
+    }
+
+    parent.addEventListener('mouseenter', () => parent.classList.add('df-video-container-hover'));
+    parent.addEventListener('mouseleave', () => parent.classList.remove('df-video-container-hover'));
+
+    const overlay = document.createElement('div');
+    overlay.className = 'df-video-overlay-wrap df-3d-overlay-wrap';
+
+    const pill = document.createElement('button');
+    pill.className = 'df-pill-btn df-3d-pill-btn';
+    pill.title = 'Rip & Download 3D Model with DownloadForge Pro';
+    pill.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+        <line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+      <span>3D Rip</span>
+    `;
+
+    pill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const src = el.getAttribute('src') || el.src || el.getAttribute('url');
+      if (src) {
+        const filename = src.split('/').pop().split('?')[0] || 'model.glb';
+        chrome.runtime.sendMessage({
+          type: MSG.DOWNLOAD_ITEM,
+          payload: { url: src, filename }
+        });
+      } else {
+        const found = detectedMediaList.find((m) => m.category === 'model_3d');
+        if (found) {
+          chrome.runtime.sendMessage({
+            type: MSG.DOWNLOAD_ITEM,
+            payload: { url: found.url, filename: found.title ? `${found.title}.glb` : 'model.glb' }
+          });
+        }
+      }
+    });
+
+    overlay.appendChild(pill);
+    parent.appendChild(overlay);
+  }
+
+  function scan3D() {
+    try {
+      document.querySelectorAll('model-viewer, spline-viewer').forEach(attachOverlayTo3D);
+    } catch (e) {}
+  }
+
+  scan3D();
+  setInterval(scan3D, 2500);
 }

@@ -23,10 +23,58 @@ const $ = id => document.getElementById(id);
 
 // ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  await initTheme();
+  initUpdateNotifier();
   setupNavigation();
   await loadView('history');
   $('diag-version').textContent = APP.VERSION;
 });
+
+async function initTheme() {
+  const settings = await StorageService.getSettings();
+  let theme = settings.theme || 'dark';
+  applyTheme(theme);
+
+  const toggleBtn = $('btnThemeToggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', async () => {
+      theme = theme === 'dark' ? 'light' : 'dark';
+      applyTheme(theme);
+      await StorageService.updateSettings({ theme });
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const label = $('themeLabel');
+  if (label) label.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+}
+
+function initUpdateNotifier() {
+  try {
+    chrome.runtime.sendMessage({ type: MSG.CHECK_FOR_UPDATES }, (res) => {
+      if (res && res.hasUpdate) {
+        const updateBox = $('sidebarUpdateBox');
+        const updateBtn = $('btnSidebarUpdate');
+        if (updateBox) updateBox.style.display = 'block';
+        if (updateBtn) {
+          updateBtn.textContent = `Get v${res.latestVersion}`;
+          updateBtn.addEventListener('click', () => {
+            if (res.zipUrl) {
+              chrome.runtime.sendMessage({
+                type: MSG.APPLY_UPDATE,
+                payload: { zipUrl: res.zipUrl, version: res.latestVersion }
+              });
+            } else if (res.releaseUrl) {
+              window.open(res.releaseUrl, '_blank');
+            }
+          });
+        }
+      }
+    });
+  } catch (e) {}
+}
 
 // ─────────────────────────────────────────────────────────────
 // Navigation

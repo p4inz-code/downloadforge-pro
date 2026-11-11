@@ -49,6 +49,7 @@ export function scanDOM(options = {}) {
     collectImgElements,
     collectSourceElements,
     collectEmbedObjects,
+    collect3DViewerElements,
     collectMetaTags,
     collectLinkTags,
   ];
@@ -283,6 +284,49 @@ function collectEmbedObjects(doc) {
     if (!EXT_MAP[ext] && !mimeType) continue;
 
     items.push(buildResource({ url, category, ext, filename: extractFilename(url), mimeType, source: SOURCE.DOM_EMBED, status: STATUS.DOWNLOADABLE }));
+  }
+
+  return items;
+}
+
+/**
+ * Collect 3D Web Viewers (<model-viewer>, <spline-viewer>).
+ */
+function collect3DViewerElements(doc) {
+  const items = [];
+  const viewers = doc.querySelectorAll('model-viewer, spline-viewer');
+
+  for (const el of viewers) {
+    const src = el.getAttribute('src') || el.src || el.getAttribute('url');
+    const url = resolveUrl(src, doc);
+    if (url && isValidUrl(url)) {
+      const ext = extractExtension(url) || 'glb';
+      items.push(buildResource({
+        url,
+        category: CATEGORY.MODEL_3D,
+        ext,
+        filename: extractFilename(url) || `model_${Date.now()}.${ext}`,
+        mimeType: ext === 'glb' ? 'model/gltf-binary' : (ext === 'gltf' ? 'model/gltf+json' : null),
+        source: SOURCE.DOM_EMBED,
+        title: el.getAttribute('alt') || extractFilename(url) || '3D Model',
+        status: STATUS.DOWNLOADABLE,
+      }));
+    }
+
+    const iosSrc = el.getAttribute('ios-src');
+    const iosUrl = resolveUrl(iosSrc, doc);
+    if (iosUrl && isValidUrl(iosUrl)) {
+      items.push(buildResource({
+        url: iosUrl,
+        category: CATEGORY.MODEL_3D,
+        ext: 'usdz',
+        filename: extractFilename(iosUrl) || `model_${Date.now()}.usdz`,
+        mimeType: 'model/vnd.usdz+zip',
+        source: SOURCE.DOM_EMBED,
+        title: (el.getAttribute('alt') || '3D Model') + ' (USDZ)',
+        status: STATUS.DOWNLOADABLE,
+      }));
+    }
   }
 
   return items;

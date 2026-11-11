@@ -88,6 +88,15 @@
   fill: #ff7b72;
 }
 
+.df-3d-pill-btn {
+  border-color: rgba(6, 182, 212, 0.4);
+}
+
+.df-3d-pill-btn:hover {
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
 .df-quality-tag {
   background: rgba(91, 155, 255, 0.14);
   border: 1px solid rgba(91, 155, 255, 0.3);

@@ -14,10 +14,10 @@ export function inferCategory(url, mimeType, ext) {
   if (mimeType) {
     const base = mimeType.split(';')[0].trim().toLowerCase();
     if (MIME_MAP[base]) return MIME_MAP[base];
-    // Broad MIME prefix fallback
     if (base.startsWith('video/'))       return CATEGORY.VIDEO;
     if (base.startsWith('audio/'))       return CATEGORY.AUDIO;
     if (base.startsWith('image/'))       return CATEGORY.IMAGE;
+    if (base.startsWith('model/'))       return CATEGORY.MODEL_3D;
     if (base.startsWith('application/')) return CATEGORY.DOCUMENT;
   }
 
@@ -28,6 +28,7 @@ export function inferCategory(url, mimeType, ext) {
   if (url) {
     const lower = url.toLowerCase();
     if (lower.includes('.m3u8') || lower.includes('.m3u') || lower.includes('.mpd')) return CATEGORY.STREAM;
+    if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
     if (lower.includes('/video/') || lower.includes('video=')) return CATEGORY.VIDEO;
     if (lower.includes('/audio/') || lower.includes('audio=')) return CATEGORY.AUDIO;
   }

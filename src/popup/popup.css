@@ -12,19 +12,20 @@
   --bg:         #0c0d12;
   --bg2:        #141720;
   --bg3:        #1c202d;
-  --border:     #242938;
-  --border2:    #32394d;
+  --border:     #282e40;
+  --border2:    #3a435c;
   --accent:     #6366f1;
   --accent2:    #818cf8;
   --accent-dim: rgba(99, 102, 241, 0.14);
-  --text:       #f1f3f9;
-  --text2:      #949db5;
-  --text3:      #586178;
+  --text:       #f9fafb;
+  --text2:      #cbd5e1;
+  --text3:      #94a3b8;
   --green:      #10b981;
   --blue:       #3b82f6;
   --red:        #ef4444;
   --yellow:     #f59e0b;
   --purple:     #8b5cf6;
+  --cyan:       #06b6d4;
   --radius:     8px;
   --radius-sm:  5px;
   --mono:       'JetBrains Mono', 'Fira Code', monospace;
@@ -42,6 +43,54 @@ html, body {
   line-height: 1.5;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── Update Banner ───────────────────────────────────────── */
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.12);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.update-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.update-tag {
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+.update-ver {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.btn-update-action {
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.btn-update-action:hover {
+  opacity: 0.88;
 }
 
 /* ── Header ──────────────────────────────────────────────── */

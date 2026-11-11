@@ -8,6 +8,8 @@
     ARCHIVE: "archive",
     STREAM: "stream",
     // HLS / m3u8 — non-DRM only
+    MODEL_3D: "model_3d",
+    // 3D Meshes, GLTF/GLB, Splats
     OTHER: "other",
     UNKNOWN: "unknown"
   };
@@ -70,7 +72,17 @@
     // Streams (non-DRM, authorized only)
     m3u8: CATEGORY.STREAM,
     m3u: CATEGORY.STREAM,
-    mpd: CATEGORY.STREAM
+    mpd: CATEGORY.STREAM,
+    // 3D Models & Spatial Point Clouds
+    glb: CATEGORY.MODEL_3D,
+    gltf: CATEGORY.MODEL_3D,
+    obj: CATEGORY.MODEL_3D,
+    mtl: CATEGORY.MODEL_3D,
+    fbx: CATEGORY.MODEL_3D,
+    stl: CATEGORY.MODEL_3D,
+    usdz: CATEGORY.MODEL_3D,
+    splat: CATEGORY.MODEL_3D,
+    ply: CATEGORY.MODEL_3D
   };
   var MIME_MAP = {
     "video/mp4": CATEGORY.VIDEO,
@@ -112,12 +124,19 @@
     "application/gzip": CATEGORY.ARCHIVE,
     "application/x-mpegURL": CATEGORY.STREAM,
     "application/vnd.apple.mpegurl": CATEGORY.STREAM,
-    "application/dash+xml": CATEGORY.STREAM
+    "application/dash+xml": CATEGORY.STREAM,
+    "model/gltf-binary": CATEGORY.MODEL_3D,
+    "model/gltf+json": CATEGORY.MODEL_3D,
+    "model/obj": CATEGORY.MODEL_3D,
+    "model/stl": CATEGORY.MODEL_3D,
+    "model/vnd.usdz+zip": CATEGORY.MODEL_3D,
+    "application/octet-stream-splat": CATEGORY.MODEL_3D
   };
   var CATEGORY_META = {
     [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
     [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
     [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
+    [CATEGORY.MODEL_3D]: { label: "3D Models", icon: "box", color: "#06b6d4" },
     [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
     [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
     [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },
@@ -171,7 +190,11 @@
     RESOURCES_READY: "RESOURCES_READY",
     SCAN_PROGRESS: "SCAN_PROGRESS",
     DOWNLOAD_STARTED: "DOWNLOAD_STARTED",
-    DOWNLOAD_FAILED: "DOWNLOAD_FAILED"
+    DOWNLOAD_FAILED: "DOWNLOAD_FAILED",
+    // Update System
+    CHECK_FOR_UPDATES: "CHECK_FOR_UPDATES",
+    UPDATE_AVAILABLE: "UPDATE_AVAILABLE",
+    APPLY_UPDATE: "APPLY_UPDATE"
   };
   var STORAGE = {
     SETTINGS: "df_settings",
@@ -180,7 +203,8 @@
     SCAN_CACHE: "df_scan_cache",
     FAVORITES: "df_favorites",
     COMPANION_CONFIG: "df_companion",
-    LAST_FILTER: "df_last_filter"
+    LAST_FILTER: "df_last_filter",
+    UPDATE_INFO: "df_update_info"
   };
   var DEFAULT_SETTINGS = {
     theme: "dark",
@@ -281,12 +305,14 @@
       if (base.startsWith("video/")) return CATEGORY.VIDEO;
       if (base.startsWith("audio/")) return CATEGORY.AUDIO;
       if (base.startsWith("image/")) return CATEGORY.IMAGE;
+      if (base.startsWith("model/")) return CATEGORY.MODEL_3D;
       if (base.startsWith("application/")) return CATEGORY.DOCUMENT;
     }
     if (ext && EXT_MAP[ext]) return EXT_MAP[ext];
     if (url) {
       const lower = url.toLowerCase();
       if (lower.includes(".m3u8") || lower.includes(".m3u") || lower.includes(".mpd")) return CATEGORY.STREAM;
+      if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
       if (lower.includes("/video/") || lower.includes("video=")) return CATEGORY.VIDEO;
       if (lower.includes("/audio/") || lower.includes("audio=")) return CATEGORY.AUDIO;
     }
@@ -305,6 +331,7 @@
       collectImgElements,
       collectSourceElements,
       collectEmbedObjects,
+      collect3DViewerElements,
       collectMetaTags,
       collectLinkTags
     ];
@@ -467,6 +494,42 @@
       const category = inferCategory(url, mimeType, ext);
       if (!EXT_MAP[ext] && !mimeType) continue;
       items.push(buildResource({ url, category, ext, filename: extractFilename(url), mimeType, source: SOURCE.DOM_EMBED, status: STATUS.DOWNLOADABLE }));
+    }
+    return items;
+  }
+  function collect3DViewerElements(doc) {
+    const items = [];
+    const viewers = doc.querySelectorAll("model-viewer, spline-viewer");
+    for (const el of viewers) {
+      const src = el.getAttribute("src") || el.src || el.getAttribute("url");
+      const url = resolveUrl(src, doc);
+      if (url && isValidUrl(url)) {
+        const ext = extractExtension(url) || "glb";
+        items.push(buildResource({
+          url,
+          category: CATEGORY.MODEL_3D,
+          ext,
+          filename: extractFilename(url) || `model_${Date.now()}.${ext}`,
+          mimeType: ext === "glb" ? "model/gltf-binary" : ext === "gltf" ? "model/gltf+json" : null,
+          source: SOURCE.DOM_EMBED,
+          title: el.getAttribute("alt") || extractFilename(url) || "3D Model",
+          status: STATUS.DOWNLOADABLE
+        }));
+      }
+      const iosSrc = el.getAttribute("ios-src");
+      const iosUrl = resolveUrl(iosSrc, doc);
+      if (iosUrl && isValidUrl(iosUrl)) {
+        items.push(buildResource({
+          url: iosUrl,
+          category: CATEGORY.MODEL_3D,
+          ext: "usdz",
+          filename: extractFilename(iosUrl) || `model_${Date.now()}.usdz`,
+          mimeType: "model/vnd.usdz+zip",
+          source: SOURCE.DOM_EMBED,
+          title: (el.getAttribute("alt") || "3D Model") + " (USDZ)",
+          status: STATUS.DOWNLOADABLE
+        }));
+      }
     }
     return items;
   }
@@ -944,6 +1007,65 @@
       childList: true,
       subtree: true
     });
+    init3DOverlay();
+  }
+  function init3DOverlay() {
+    const tracked3D = /* @__PURE__ */ new WeakSet();
+    function attachOverlayTo3D(el) {
+      if (!el || tracked3D.has(el)) return;
+      tracked3D.add(el);
+      const parent = el.parentElement;
+      if (!parent) return;
+      const parentStyle = window.getComputedStyle(parent);
+      if (parentStyle.position === "static") {
+        parent.style.position = "relative";
+      }
+      parent.addEventListener("mouseenter", () => parent.classList.add("df-video-container-hover"));
+      parent.addEventListener("mouseleave", () => parent.classList.remove("df-video-container-hover"));
+      const overlay = document.createElement("div");
+      overlay.className = "df-video-overlay-wrap df-3d-overlay-wrap";
+      const pill = document.createElement("button");
+      pill.className = "df-pill-btn df-3d-pill-btn";
+      pill.title = "Rip & Download 3D Model with DownloadForge Pro";
+      pill.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+        <line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+      <span>3D Rip</span>
+    `;
+      pill.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const src = el.getAttribute("src") || el.src || el.getAttribute("url");
+        if (src) {
+          const filename = src.split("/").pop().split("?")[0] || "model.glb";
+          chrome.runtime.sendMessage({
+            type: MSG.DOWNLOAD_ITEM,
+            payload: { url: src, filename }
+          });
+        } else {
+          const found = detectedMediaList.find((m) => m.category === "model_3d");
+          if (found) {
+            chrome.runtime.sendMessage({
+              type: MSG.DOWNLOAD_ITEM,
+              payload: { url: found.url, filename: found.title ? `${found.title}.glb` : "model.glb" }
+            });
+          }
+        }
+      });
+      overlay.appendChild(pill);
+      parent.appendChild(overlay);
+    }
+    function scan3D() {
+      try {
+        document.querySelectorAll("model-viewer, spline-viewer").forEach(attachOverlayTo3D);
+      } catch (e) {
+      }
+    }
+    scan3D();
+    setInterval(scan3D, 2500);
   }
 
   // src/storage/storage.js
