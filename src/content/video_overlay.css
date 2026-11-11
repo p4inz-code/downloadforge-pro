@@ -221,3 +221,48 @@
   color: #eceef1;
   border-color: #626976;
 }
+
+.df-rec-chrono-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(91, 155, 255, 0.12);
+  border: 1px solid rgba(91, 155, 255, 0.35);
+  color: #7fb0ff;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font: 500 11px/1 "IBM Plex Mono", ui-monospace, monospace;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.df-rec-chrono-btn:hover {
+  background: rgba(91, 155, 255, 0.22);
+  border-color: #5b9bff;
+  color: #ffffff;
+}
+
+.df-rec-chrono-btn.active {
+  background: #2f6fe0;
+  border-color: #5b9bff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(91, 155, 255, 0.4);
+}
+
+.df-buffer-bar {
+  width: 90px;
+  height: 6px;
+  background: #2a2d33;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.df-buffer-fill {
+  height: 100%;
+  width: 0%;
+  background: #4cc38a;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+

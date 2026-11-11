@@ -13,7 +13,7 @@
 // ============================================================
 
 import { scanDOM }         from './dom_scanner.js';
-import { initVideoOverlay, registerDetectedMedia } from './video_overlay.js';
+import { initVideoOverlay, registerDetectedMedia, onBufferChunkIntercepted } from './video_overlay.js';
 import { MSG, CATEGORY, SOURCE, STATUS } from '../shared/constants.js';
 import { StorageService }  from '../storage/storage.js';
 
@@ -65,6 +65,11 @@ function setupSnifferListener() {
       return;
     }
     if (event.data.token !== sessionToken) {
+      return;
+    }
+
+    if (event.data.type === 'BUFFER_CHUNK_APPENDED' && event.data.data) {
+      onBufferChunkIntercepted(event.data.data);
       return;
     }
 

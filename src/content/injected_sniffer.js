@@ -125,20 +125,35 @@
   };
 
   // ── 3. Intercept SourceBuffer.appendBuffer for Buffer Capture ──
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'DF_RECORD_MODE_TOGGLE') {
+      window.__df_record_mode_active = !!e.data.active;
+    }
+  });
+
   if (window.SourceBuffer && SourceBuffer.prototype.appendBuffer) {
     const originalAppendBuffer = SourceBuffer.prototype.appendBuffer;
     SourceBuffer.prototype.appendBuffer = function(buffer) {
       if (window.__df_record_mode_active) {
         try {
-          window.postMessage({
-            source: 'DOWNLOADFORGE_SNIFFER',
-            token: sessionToken,
-            type: 'BUFFER_CHUNK_APPENDED',
-            data: {
-              byteLength: buffer.byteLength,
-              mimeType: this._df_mime || 'video/mp4'
-            }
-          }, '*');
+          let copy = null;
+          if (buffer instanceof ArrayBuffer) {
+            copy = buffer.slice(0);
+          } else if (buffer && buffer.buffer) {
+            copy = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+          }
+          if (copy && copy.byteLength > 0) {
+            window.postMessage({
+              source: 'DOWNLOADFORGE_SNIFFER',
+              token: sessionToken,
+              type: 'BUFFER_CHUNK_APPENDED',
+              data: {
+                chunk: copy,
+                byteLength: copy.byteLength,
+                mimeType: this._df_mime || 'video/mp4'
+              }
+            }, '*', [copy]);
+          }
         } catch (e) {}
       }
       return originalAppendBuffer.apply(this, arguments);

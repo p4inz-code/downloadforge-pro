@@ -600,6 +600,16 @@
       if (detectedMediaList.length > 50) detectedMediaList.pop();
     }
   }
+  var interceptedMseChunks = [];
+  var onMseChunkCallback = null;
+  function onBufferChunkIntercepted(chunkData) {
+    if (chunkData && chunkData.chunk) {
+      interceptedMseChunks.push(chunkData.chunk);
+      if (onMseChunkCallback) {
+        onMseChunkCallback(chunkData);
+      }
+    }
+  }
   function initVideoOverlay() {
     const trackedVideos = /* @__PURE__ */ new WeakSet();
     function attachOverlayToVideo(video) {
@@ -744,8 +754,21 @@
       const isMp4 = mimeType.includes("mp4");
       let chunks = [];
       let recordedBytes = 0;
+      let rawMseBytes = 0;
       let secondsElapsed = 0;
       let timerInterval = null;
+      let chronoInterval = null;
+      let isChronoActive = false;
+      const originalMuted = video.muted;
+      window.postMessage({ type: "DF_RECORD_MODE_TOGGLE", active: true }, "*");
+      interceptedMseChunks = [];
+      onMseChunkCallback = (chunkData) => {
+        rawMseBytes += chunkData.byteLength || 0;
+        if (sizeEl) {
+          const totalMB = ((recordedBytes + rawMseBytes) / (1024 * 1024)).toFixed(1);
+          sizeEl.textContent = `${totalMB} MB${interceptedMseChunks.length > 0 ? " (Lossless)" : ""}`;
+        }
+      };
       const recorder = new MediaRecorder(stream, { mimeType });
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -759,6 +782,10 @@
       <div class="df-rec-badge"><span class="df-rec-dot"></span>REC</div>
       <div class="df-rec-timer" id="dfRecTimer">00:00</div>
       <div class="df-rec-size" id="dfRecSize">0.0 MB</div>
+      <div class="df-buffer-bar" title="Buffer Timeline"><div class="df-buffer-fill" id="dfBufferFill"></div></div>
+      <button class="df-rec-chrono-btn" id="dfRecChrono" title="Auto-Seek Turbo Harvesting without audio stutter">
+        <span>Turbo Jump</span>
+      </button>
       <div class="df-rec-speeds">
         <button class="df-spd-btn active" data-spd="1">1x</button>
         <button class="df-spd-btn" data-spd="2">2x</button>
@@ -766,7 +793,7 @@
         <button class="df-spd-btn" data-spd="8">8x</button>
         <button class="df-spd-btn" data-spd="16">16x</button>
       </div>
-      <button class="df-rec-btn df-rec-save" id="dfRecSave">Stop &amp; Save ${isMp4 ? "MP4" : "Video"}</button>
+      <button class="df-rec-btn df-rec-save" id="dfRecSave">Stop &amp; Save MP4</button>
       <button class="df-rec-btn df-rec-cancel" id="dfRecCancel">Cancel</button>
     `;
       container.appendChild(hud);
@@ -775,6 +802,44 @@
       const saveBtn = hud.querySelector("#dfRecSave");
       const cancelBtn = hud.querySelector("#dfRecCancel");
       const speedBtns = hud.querySelectorAll(".df-spd-btn");
+      const chronoBtn = hud.querySelector("#dfRecChrono");
+      const bufferFill = hud.querySelector("#dfBufferFill");
+      function updateBufferBar() {
+        if (!video || !video.duration || video.buffered.length === 0) return;
+        const lastEnd = video.buffered.end(video.buffered.length - 1);
+        const pct = Math.min(100, lastEnd / video.duration * 100);
+        if (bufferFill) bufferFill.style.width = `${pct}%`;
+      }
+      chronoBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        isChronoActive = !isChronoActive;
+        if (isChronoActive) {
+          chronoBtn.classList.add("active");
+          chronoBtn.querySelector("span").textContent = "Pacing...";
+          video.muted = true;
+          chronoInterval = setInterval(() => {
+            if (!video || !video.duration) return;
+            updateBufferBar();
+            const bLen = video.buffered.length;
+            const furthest = bLen > 0 ? video.buffered.end(bLen - 1) : video.currentTime;
+            if (furthest < video.duration - 2) {
+              video.currentTime = furthest + 0.3;
+            } else {
+              clearInterval(chronoInterval);
+              isChronoActive = false;
+              chronoBtn.classList.remove("active");
+              chronoBtn.querySelector("span").textContent = "100% Cached";
+              video.currentTime = 0;
+              video.muted = originalMuted;
+            }
+          }, 600);
+        } else {
+          clearInterval(chronoInterval);
+          chronoBtn.classList.remove("active");
+          chronoBtn.querySelector("span").textContent = "Turbo Jump";
+          video.muted = originalMuted;
+        }
+      });
       speedBtns.forEach((btn) => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -794,20 +859,28 @@
         const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
         const secs = String(secondsElapsed % 60).padStart(2, "0");
         if (timerEl) timerEl.textContent = `${mins}:${secs}`;
-        if (sizeEl) sizeEl.textContent = `${(recordedBytes / (1024 * 1024)).toFixed(1)} MB`;
+        updateBufferBar();
       }, 1e3);
       function cleanup() {
         clearInterval(timerInterval);
+        if (chronoInterval) clearInterval(chronoInterval);
         video.playbackRate = 1;
+        video.muted = originalMuted;
+        window.postMessage({ type: "DF_RECORD_MODE_TOGGLE", active: false }, "*");
+        interceptedMseChunks = [];
+        onMseChunkCallback = null;
         if (hud.parentElement) hud.remove();
       }
       saveBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         saveBtn.disabled = true;
         saveBtn.textContent = "Finalizing...";
-        recorder.onstop = () => {
-          const ext = isMp4 ? "mp4" : "webm";
-          const blob = new Blob(chunks, { type: mimeType });
+        if (isChronoActive) {
+          clearInterval(chronoInterval);
+          video.muted = originalMuted;
+        }
+        window.postMessage({ type: "DF_RECORD_MODE_TOGGLE", active: false }, "*");
+        const finishDownload = (blob, ext) => {
           const blobUrl = URL.createObjectURL(blob);
           const filename = `${title}.${ext}`;
           const a = document.createElement("a");
@@ -819,7 +892,17 @@
           setTimeout(() => URL.revokeObjectURL(blobUrl), 1e4);
           cleanup();
         };
-        recorder.stop();
+        if (interceptedMseChunks.length > 0) {
+          const lossLessBlob = new Blob(interceptedMseChunks, { type: "video/mp4" });
+          finishDownload(lossLessBlob, "mp4");
+        } else {
+          recorder.onstop = () => {
+            const ext = isMp4 ? "mp4" : "webm";
+            const blob = new Blob(chunks, { type: mimeType });
+            finishDownload(blob, ext);
+          };
+          recorder.stop();
+        }
       });
       cancelBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -986,6 +1069,10 @@
         return;
       }
       if (event.data.token !== sessionToken) {
+        return;
+      }
+      if (event.data.type === "BUFFER_CHUNK_APPENDED" && event.data.data) {
+        onBufferChunkIntercepted(event.data.data);
         return;
       }
       if (event.data.type === "MEDIA_DETECTED" && event.data.data) {
