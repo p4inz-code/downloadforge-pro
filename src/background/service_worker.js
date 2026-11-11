@@ -443,9 +443,17 @@ async function handleDownload(payload, sendResponse) {
             }
           }
 
+          // Trigger WebGL Ripper in active tab so user gets a standard OBJ file directly from GPU
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs[0] && tabs[0].id) {
+              chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
+            }
+          } catch (e) {}
+
           // Safety guard: Never download raw metadata JSON and label it as .glb
           if (!resolved && downloadUrl.includes('/i/models/')) {
-            throw new Error('Sketchfab requires authentication for ZIP archives. Use the floating 3D Rip badge on the model viewer to extract the rendered 3D mesh.');
+            throw new Error('Sketchfab requires authentication for ZIP archives. In-page WebGL Ripper has been triggered to extract the rendered 3D mesh.');
           }
         } catch (e) {
           log.warn('Sketchfab archive resolution note:', e.message);
@@ -459,6 +467,7 @@ async function handleDownload(payload, sendResponse) {
     // CGTrader direct download resolution
     if (url.includes('cgtrader.com/')) {
       if (url.includes('/3d-models/') && !url.match(/\.(glb|gltf|zip|obj|stl|fbx|blend)(\?|$)/i)) {
+        let cgtResolved = false;
         try {
           const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
@@ -467,11 +476,47 @@ async function handleDownload(payload, sendResponse) {
             if (dlMatch) {
               downloadUrl = new URL(dlMatch[1], 'https://www.cgtrader.com').href;
               targetFilename = (filename || 'cgtrader_model').replace(/\.[^/.]+$/, '') + '.zip';
+              cgtResolved = true;
             }
           }
         } catch (e) {
           log.warn('CGTrader download resolution note:', e.message);
         }
+
+        // Trigger active tab WebGL Ripper to extract mesh directly from GPU
+        try {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs && tabs[0] && tabs[0].id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
+          }
+        } catch (e) {}
+
+        // Never download raw HTML page as a 3D model file
+        if (!cgtResolved) {
+          sendResponse({
+            ok: true,
+            message: 'In-page WebGL Ripper engaged on CGTrader viewer to extract 3D mesh directly to Wavefront OBJ.'
+          });
+          return;
+        }
+      }
+    }
+
+    // Universal Safety Guard: Never download raw web page URLs as 3D model files
+    if (url.startsWith('http') && !downloadUrl.match(/\.(glb|gltf|zip|obj|stl|fbx|blend|3mf|step|stp|iges|binz|osgjs|splat|ply|usdz|splinecode)(\?|$)/i)) {
+      if (url.includes('/3d-models/') || url.includes('/3d-model/') || url.includes('/models/')) {
+        try {
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tabs && tabs[0] && tabs[0].id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
+          }
+        } catch (e) {}
+
+        sendResponse({
+          ok: true,
+          message: 'In-page WebGL Ripper engaged to extract 3D mesh geometry directly from the GPU buffer.'
+        });
+        return;
       }
     }
 

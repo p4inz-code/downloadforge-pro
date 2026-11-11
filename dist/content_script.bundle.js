@@ -1396,19 +1396,32 @@
         if (!item.url.startsWith("http://") && !item.url.startsWith("https://") && !item.url.startsWith("blob:")) {
           return;
         }
-        const cleanTitle = (item.title || "video_stream").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 100);
+        let ext = item.url.split("?")[0].split("#")[0].split(".").pop().toLowerCase();
+        if (ext.length > 8 || ext.includes("/")) ext = "";
+        const category = item.category || inferCategory(item.url, item.mimeType, ext);
+        if (!ext) {
+          if (category === CATEGORY.MODEL_3D) ext = "glb";
+          else if (category === CATEGORY.STREAM) ext = "m3u8";
+          else if (category === CATEGORY.AUDIO) ext = "m4a";
+          else if (category === CATEGORY.IMAGE) ext = "jpg";
+          else ext = "mp4";
+        }
+        const cleanTitle = (item.title || "media_asset").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 100);
+        const filename = cleanTitle.toLowerCase().endsWith("." + ext) ? cleanTitle : `${cleanTitle}.${ext}`;
         const resource = {
           id: `sniff_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           url: item.url,
-          category: item.category === "stream" ? CATEGORY.STREAM : CATEGORY.VIDEO,
-          ext: item.url.split("?")[0].split(".").pop().toLowerCase() || "m3u8",
-          filename: cleanTitle + (item.url.includes("m3u8") ? ".m3u8" : ".mp4"),
-          mimeType: item.mimeType || (item.url.includes("m3u8") ? "application/x-mpegURL" : "video/mp4"),
+          category,
+          ext,
+          filename,
+          mimeType: item.mimeType || (category === CATEGORY.STREAM ? "application/x-mpegURL" : category === CATEGORY.MODEL_3D ? "model/gltf-binary" : "video/mp4"),
           source: SOURCE.NETWORK,
-          status: item.url.includes("m3u8") ? STATUS.STREAM : STATUS.DOWNLOADABLE,
+          status: category === CATEGORY.STREAM ? STATUS.STREAM : STATUS.DOWNLOADABLE,
           pageUrl: window.location.href,
           domain: window.location.hostname,
-          detectedAt: Date.now()
+          detectedAt: Date.now(),
+          preview: item.preview || null,
+          title: cleanTitle
         };
         try {
           await chrome.runtime.sendMessage({
@@ -1433,6 +1446,11 @@
           sendResponse({ ok: false, error: err.message });
         });
         return true;
+      }
+      if (message.type === "DF_TRIGGER_WEBGL_RIP") {
+        window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+        sendResponse({ ok: true });
+        return false;
       }
     });
   }

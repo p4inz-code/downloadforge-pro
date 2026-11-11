@@ -312,31 +312,58 @@
 
     function captureBuffer(target, data) {
       if (!data) return;
+      const isArrayBuf = data instanceof ArrayBuffer;
+      const isView = ArrayBuffer.isView(data);
+      if (!isArrayBuf && !isView) return;
+
+      const rawBuffer = isArrayBuf ? data : data.buffer;
+      const byteOffset = isArrayBuf ? 0 : data.byteOffset;
+      const byteLength = isArrayBuf ? data.byteLength : data.byteLength;
+      if (!rawBuffer || byteLength < 6) return;
+
       // Target 0x8892 is gl.ARRAY_BUFFER (vertices/normals/uvs)
-      // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
-      if (target === 0x8892 && (data instanceof Float32Array || (data.buffer && data.buffer instanceof ArrayBuffer))) {
-        const floatView = data instanceof Float32Array ? data : new Float32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-        if (floatView.length >= 9) {
+      if (target === 0x8892) {
+        let floatView = null;
+        if (data instanceof Float32Array) {
+          floatView = new Float32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        } else if (data instanceof Int16Array) {
+          // Dequantize 16-bit signed normalized vertex positions
+          const i16 = new Int16Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+          floatView = new Float32Array(i16.length);
+          for (let i = 0; i < i16.length; i++) {
+            floatView[i] = i16[i] / 32767.0;
+          }
+        } else if (byteLength % 4 === 0 && byteLength >= 36) {
+          floatView = new Float32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        }
+
+        if (floatView && floatView.length >= 9) {
           capturedGeometries.push({
             type: 'positions',
-            data: new Float32Array(floatView),
+            data: floatView,
             length: floatView.length,
             time: Date.now()
           });
           if (capturedGeometries.length > 300) capturedGeometries.shift();
         }
-      } else if (target === 0x8893 && (data instanceof Uint16Array || data instanceof Uint32Array || (data.buffer && data.buffer instanceof ArrayBuffer))) {
-        const isUint32 = data instanceof Uint32Array || (data.byteLength % 4 === 0 && data.byteLength > 0);
-        const idxView = data instanceof Uint16Array || data instanceof Uint32Array
-          ? data
-          : (isUint32
-            ? new Uint32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength))
-            : new Uint16Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)));
+      }
+      // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
+      else if (target === 0x8893) {
+        let idxView = null;
+        if (data instanceof Uint16Array) {
+          idxView = new Uint16Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        } else if (data instanceof Uint32Array) {
+          idxView = new Uint32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        } else if (byteLength % 4 === 0 && byteLength >= 12) {
+          idxView = new Uint32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        } else if (byteLength % 2 === 0 && byteLength >= 6) {
+          idxView = new Uint16Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        }
 
-        if (idxView.length >= 3) {
+        if (idxView && idxView.length >= 3) {
           capturedGeometries.push({
             type: 'indices',
-            data: idxView instanceof Uint16Array ? new Uint16Array(idxView) : new Uint32Array(idxView),
+            data: idxView,
             length: idxView.length,
             time: Date.now()
           });
