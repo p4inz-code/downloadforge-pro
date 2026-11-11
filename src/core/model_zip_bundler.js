@@ -137,6 +137,23 @@ export function computeCrc32(buf) {
 }
 
 /**
+ * Convert a Uint8Array into a data: URI safely in Service Workers without DOM or blob URLs.
+ * @param {Uint8Array} bytes
+ * @param {string} mimeType
+ * @returns {string}
+ */
+export function uint8ArrayToDataUrl(bytes, mimeType = 'application/zip') {
+  if (!bytes) return '';
+  let binary = '';
+  const len = bytes.byteLength;
+  const chunkSize = 0x8000;
+  for (let i = 0; i < len; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunkSize, len)));
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+/**
  * Build a standard ZIP archive from an array of files.
  * @param {Array<{ name: string, data: Uint8Array|string }>} files
  * @returns {Uint8Array}

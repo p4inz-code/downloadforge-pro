@@ -72,55 +72,63 @@
   // ── 1. Intercept Fetch ─────────────────────────────────────
   const originalFetch = window.fetch;
   if (originalFetch) {
-    window.fetch = async function(...args) {
-      const request = args[0];
-      let url = '';
-      if (typeof request === 'string') {
-        url = request;
-      } else if (request && request.url) {
-        url = request.url;
-      }
-
-      if (url && MEDIA_REGEX.test(url)) {
-        notifyDetected({
-          url,
-          category: url.includes('m3u8') ? 'stream' : 'video',
-          initiator: 'fetch'
-        });
-      } else if (url && MODEL_3D_REGEX.test(url)) {
-        notifyDetected({
-          url,
-          category: 'model_3d',
-          title: extractFilename(url) || '3D Model',
-          initiator: 'fetch-3d'
-        });
-      }
-
+    window.fetch = function(...args) {
       try {
-        const response = await originalFetch.apply(this, args);
-        if (response && response.headers) {
-          const contentType = response.headers.get('content-type') || '';
-          if (MIME_REGEX.test(contentType)) {
-            notifyDetected({
-              url: response.url || url,
-              mimeType: contentType,
-              category: contentType.includes('mpegurl') ? 'stream' : 'video',
-              initiator: 'fetch-response'
-            });
-          } else if (MODEL_3D_MIME_REGEX.test(contentType)) {
-            notifyDetected({
-              url: response.url || url,
-              mimeType: contentType,
-              category: 'model_3d',
-              title: extractFilename(response.url || url) || '3D Model',
-              initiator: 'fetch-response-3d'
-            });
+        const request = args[0];
+        let url = '';
+        if (typeof request === 'string') {
+          url = request;
+        } else if (request instanceof URL) {
+          url = request.href;
+        } else if (request && request.url) {
+          url = request.url;
+        }
+
+        if (url && MEDIA_REGEX.test(url)) {
+          notifyDetected({
+            url,
+            category: url.includes('m3u8') ? 'stream' : 'video',
+            initiator: 'fetch'
+          });
+        } else if (url && MODEL_3D_REGEX.test(url)) {
+          notifyDetected({
+            url,
+            category: 'model_3d',
+            title: extractFilename(url) || '3D Model',
+            initiator: 'fetch-3d'
+          });
+        }
+      } catch (sniffErr) {
+        // Silently ignore sniffing parsing issues
+      }
+
+      return originalFetch.apply(this, args).then((response) => {
+        try {
+          if (response && response.headers) {
+            const contentType = response.headers.get('content-type') || '';
+            const reqUrl = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+            if (MIME_REGEX.test(contentType)) {
+              notifyDetected({
+                url: response.url || reqUrl,
+                mimeType: contentType,
+                category: contentType.includes('mpegurl') ? 'stream' : 'video',
+                initiator: 'fetch-response'
+              });
+            } else if (MODEL_3D_MIME_REGEX.test(contentType)) {
+              notifyDetected({
+                url: response.url || reqUrl,
+                mimeType: contentType,
+                category: 'model_3d',
+                title: extractFilename(response.url || reqUrl) || '3D Model',
+                initiator: 'fetch-response-3d'
+              });
+            }
           }
+        } catch (respErr) {
+          // Silently ignore response inspection issues
         }
         return response;
-      } catch (err) {
-        throw err;
-      }
+      });
     };
   }
 

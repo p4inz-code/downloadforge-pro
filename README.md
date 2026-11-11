@@ -1,4 +1,4 @@
-# DownloadForge Pro (v1.2.1)
+# DownloadForge Pro (v1.2.2)
 **Pure In-Browser High-Performance Streaming Media, Audio Studio & 3D Spatial Asset Ingestion Engine**  
 *Engineered by Atharva Patil (p4inz) | P4inz Interactive Labs*  
 *Architecture: Chrome Extension Manifest V3 (Zero Background OS Daemons / Zero Native Messaging Dependencies)*
@@ -15,7 +15,7 @@ The entire pipeline executes in the client browser sandbox without external prox
 
 ## Competitive Architecture Matrix
 
-| Architectural Feature | DownloadForge Pro (v1.2.1) | FetchV Downloader | Stream Recorder | Online 3D Rippers |
+| Architectural Feature | DownloadForge Pro (v1.2.2) | FetchV Downloader | Stream Recorder | Online 3D Rippers |
 | :--- | :--- | :--- | :--- | :--- |
 | **Detection Reliability** | **4-Tier Fallback Cascade** (Network, DOM, Engine Config, Hardware MSE) | Single-tier XHR/fetch interceptor | Audio/Video element polling | Single-format URL regex |
 | **Audio Extraction & Transcoding** | **Native Web Audio PCM Engine** (WAV, MP3, M4A, Gain Boost +12dB) | Unsupported | Low-bitrate recording | Unsupported |
@@ -121,7 +121,7 @@ Network exceptions during video and 3D ingestion are parsed and mapped to struct
 ## Installation & Setup
 
 ### Option 1: Unpacked Developer Mode (Chrome / Edge / Brave / Opera)
-1. Download `downloadforge-pro-v1.2.1.zip` from the [Latest Release](https://github.com/p4inz-code/downloadforge-pro/releases/latest).
+1. Download `downloadforge-pro-v1.2.2.zip` from the [Latest Release](https://github.com/p4inz-code/downloadforge-pro/releases/latest).
 2. Extract the archive to a local folder.
 3. Open `chrome://extensions` in your browser.
 4. Enable **Developer mode** (toggle in the top-right corner).

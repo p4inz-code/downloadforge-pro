@@ -17,7 +17,7 @@ import { StorageService } from '../storage/storage.js';
 import { Logger } from '../utils/logger.js';
 import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
 import { checkForGitHubUpdate, downloadUpdatePackage } from '../core/updater.js';
-import { bundleSketchfabModelPackage, bundleGenericModelPackage } from '../core/model_zip_bundler.js';
+import { bundleSketchfabModelPackage, bundleGenericModelPackage, uint8ArrayToDataUrl } from '../core/model_zip_bundler.js';
 
 const log = new Logger('ServiceWorker');
 
@@ -415,13 +415,8 @@ async function handleDownload(payload, sendResponse) {
             downloadUrl = bundle.officialUrl;
             targetFilename = bundle.filename;
           } else if (bundle.zipBytes) {
-            const blob = new Blob([bundle.zipBytes], { type: 'application/zip' });
-            const blobUrl = URL.createObjectURL(blob);
-            downloadUrl = blobUrl;
+            downloadUrl = uint8ArrayToDataUrl(bundle.zipBytes, 'application/zip');
             targetFilename = bundle.filename;
-            setTimeout(() => {
-              try { URL.revokeObjectURL(blobUrl); } catch (e) {}
-            }, 120000);
           }
         } catch (e) {
           log.warn('Sketchfab bundle resolution note:', e.message);
@@ -459,11 +454,8 @@ async function handleDownload(payload, sendResponse) {
           } catch (e) {}
 
           const zipBytes = bundleGenericModelPackage(filename || 'cgtrader_model', capturedObj);
-          const blob = new Blob([zipBytes], { type: 'application/zip' });
-          const blobUrl = URL.createObjectURL(blob);
-          downloadUrl = blobUrl;
+          downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
           targetFilename = `${(filename || 'cgtrader_model').replace(/\.[^/.]+$/, '')}_3D_Package.zip`;
-          setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 120000);
         }
       }
     }
@@ -481,11 +473,8 @@ async function handleDownload(payload, sendResponse) {
         } catch (e) {}
 
         const zipBytes = bundleGenericModelPackage(filename || '3d_model', capturedObj);
-        const blob = new Blob([zipBytes], { type: 'application/zip' });
-        const blobUrl = URL.createObjectURL(blob);
-        downloadUrl = blobUrl;
+        downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
         targetFilename = `${(filename || '3d_model').replace(/\.[^/.]+$/, '')}_3D_Package.zip`;
-        setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 120000);
       }
     }
 

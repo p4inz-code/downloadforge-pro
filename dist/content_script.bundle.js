@@ -1187,9 +1187,11 @@
     }
     window.addEventListener("message", (e) => {
       if (e.data && e.data.type === "DF_WEBGL_RIP_SUCCESS") {
-        show3DToast(`DownloadForge 3D Rip: Exported ${e.data.title || "model"} to Wavefront OBJ`);
+        show3DToast(`DownloadForge: 3D Mesh & Geometry extracted successfully`);
       } else if (e.data && e.data.type === "DF_WEBGL_RIP_FAIL") {
-        show3DToast(e.data.reason || "No 3D buffer captured yet", true);
+        if (!window.location.href.includes("sketchfab.com") && !window.location.href.includes("cgtrader.com")) {
+          show3DToast(e.data.reason || "No 3D buffer captured yet", true);
+        }
       }
     });
     function attachOverlayTo3D(el) {
@@ -1219,15 +1221,23 @@
       pill.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        show3DToast("DownloadForge 3D Ripper: Extracting GPU WebGL geometry to OBJ...");
-        window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
-        let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url");
-        let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
         const loc = window.location.href;
         const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) || (el.getAttribute("data-model-id") ? [null, el.getAttribute("data-model-id")] : null) || el.src && el.src.match(/models\/([0-9a-f]{32})/i);
+        let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url");
+        let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
         if (sfMatch && sfMatch[1]) {
           targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
           targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
+          show3DToast("DownloadForge: Packaging Sketchfab 3D Model, Textures & Materials into ZIP...");
+        } else {
+          show3DToast("DownloadForge 3D Ripper: Extracting GPU WebGL geometry to 3D package...");
+          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+          document.querySelectorAll("iframe").forEach((ifr) => {
+            try {
+              ifr.contentWindow.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+            } catch (err) {
+            }
+          });
         }
         if (targetUrl && !targetUrl.startsWith("blob:")) {
           const ext = targetUrl.split(".").pop().split("?")[0] || "glb";
