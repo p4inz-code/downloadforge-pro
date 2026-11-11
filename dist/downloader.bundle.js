@@ -5,14 +5,6 @@
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __esm = (fn, res, err) => function __init() {
-    if (err) throw err[0];
-    try {
-      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-    } catch (e) {
-      throw err = [e], e;
-    }
-  };
   var __commonJS = (cb, mod) => function __require() {
     try {
       return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -7962,204 +7954,198 @@
     }
   });
 
+  // src/core/hls_engine.js
+  var import_mux = __toESM(require_mux(), 1);
+
   // src/shared/constants.js
-  var CATEGORY, EXT_MAP, MIME_MAP, CATEGORY_META, DEFAULT_SETTINGS, LIMITS;
-  var init_constants = __esm({
-    "src/shared/constants.js"() {
-      CATEGORY = {
-        VIDEO: "video",
-        AUDIO: "audio",
-        IMAGE: "image",
-        DOCUMENT: "document",
-        ARCHIVE: "archive",
-        STREAM: "stream",
-        // HLS / m3u8 — non-DRM only
-        OTHER: "other",
-        UNKNOWN: "unknown"
-      };
-      EXT_MAP = {
-        // Video
-        mp4: CATEGORY.VIDEO,
-        webm: CATEGORY.VIDEO,
-        mov: CATEGORY.VIDEO,
-        mkv: CATEGORY.VIDEO,
-        avi: CATEGORY.VIDEO,
-        flv: CATEGORY.VIDEO,
-        m4v: CATEGORY.VIDEO,
-        ogv: CATEGORY.VIDEO,
-        "3gp": CATEGORY.VIDEO,
-        // Audio
-        mp3: CATEGORY.AUDIO,
-        wav: CATEGORY.AUDIO,
-        ogg: CATEGORY.AUDIO,
-        m4a: CATEGORY.AUDIO,
-        aac: CATEGORY.AUDIO,
-        flac: CATEGORY.AUDIO,
-        opus: CATEGORY.AUDIO,
-        weba: CATEGORY.AUDIO,
-        // Images
-        jpg: CATEGORY.IMAGE,
-        jpeg: CATEGORY.IMAGE,
-        png: CATEGORY.IMAGE,
-        webp: CATEGORY.IMAGE,
-        gif: CATEGORY.IMAGE,
-        bmp: CATEGORY.IMAGE,
-        svg: CATEGORY.IMAGE,
-        ico: CATEGORY.IMAGE,
-        avif: CATEGORY.IMAGE,
-        tiff: CATEGORY.IMAGE,
-        tif: CATEGORY.IMAGE,
-        // Documents
-        pdf: CATEGORY.DOCUMENT,
-        doc: CATEGORY.DOCUMENT,
-        docx: CATEGORY.DOCUMENT,
-        xls: CATEGORY.DOCUMENT,
-        xlsx: CATEGORY.DOCUMENT,
-        ppt: CATEGORY.DOCUMENT,
-        pptx: CATEGORY.DOCUMENT,
-        txt: CATEGORY.DOCUMENT,
-        csv: CATEGORY.DOCUMENT,
-        json: CATEGORY.DOCUMENT,
-        xml: CATEGORY.DOCUMENT,
-        md: CATEGORY.DOCUMENT,
-        epub: CATEGORY.DOCUMENT,
-        rtf: CATEGORY.DOCUMENT,
-        // Archives
-        zip: CATEGORY.ARCHIVE,
-        rar: CATEGORY.ARCHIVE,
-        "7z": CATEGORY.ARCHIVE,
-        tar: CATEGORY.ARCHIVE,
-        gz: CATEGORY.ARCHIVE,
-        bz2: CATEGORY.ARCHIVE,
-        xz: CATEGORY.ARCHIVE,
-        zst: CATEGORY.ARCHIVE,
-        // Streams (non-DRM, authorized only)
-        m3u8: CATEGORY.STREAM,
-        m3u: CATEGORY.STREAM,
-        mpd: CATEGORY.STREAM
-      };
-      MIME_MAP = {
-        "video/mp4": CATEGORY.VIDEO,
-        "video/webm": CATEGORY.VIDEO,
-        "video/quicktime": CATEGORY.VIDEO,
-        "video/x-msvideo": CATEGORY.VIDEO,
-        "video/ogg": CATEGORY.VIDEO,
-        "video/3gpp": CATEGORY.VIDEO,
-        "audio/mpeg": CATEGORY.AUDIO,
-        "audio/wav": CATEGORY.AUDIO,
-        "audio/ogg": CATEGORY.AUDIO,
-        "audio/mp4": CATEGORY.AUDIO,
-        "audio/aac": CATEGORY.AUDIO,
-        "audio/flac": CATEGORY.AUDIO,
-        "audio/webm": CATEGORY.AUDIO,
-        "image/jpeg": CATEGORY.IMAGE,
-        "image/png": CATEGORY.IMAGE,
-        "image/webp": CATEGORY.IMAGE,
-        "image/gif": CATEGORY.IMAGE,
-        "image/svg+xml": CATEGORY.IMAGE,
-        "image/bmp": CATEGORY.IMAGE,
-        "image/avif": CATEGORY.IMAGE,
-        "application/pdf": CATEGORY.DOCUMENT,
-        "application/msword": CATEGORY.DOCUMENT,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": CATEGORY.DOCUMENT,
-        "application/vnd.ms-excel": CATEGORY.DOCUMENT,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": CATEGORY.DOCUMENT,
-        "application/vnd.ms-powerpoint": CATEGORY.DOCUMENT,
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation": CATEGORY.DOCUMENT,
-        "text/plain": CATEGORY.DOCUMENT,
-        "text/csv": CATEGORY.DOCUMENT,
-        "application/json": CATEGORY.DOCUMENT,
-        "application/xml": CATEGORY.DOCUMENT,
-        "text/xml": CATEGORY.DOCUMENT,
-        "application/zip": CATEGORY.ARCHIVE,
-        "application/x-rar-compressed": CATEGORY.ARCHIVE,
-        "application/x-7z-compressed": CATEGORY.ARCHIVE,
-        "application/x-tar": CATEGORY.ARCHIVE,
-        "application/gzip": CATEGORY.ARCHIVE,
-        "application/x-mpegURL": CATEGORY.STREAM,
-        "application/vnd.apple.mpegurl": CATEGORY.STREAM,
-        "application/dash+xml": CATEGORY.STREAM
-      };
-      CATEGORY_META = {
-        [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
-        [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
-        [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
-        [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
-        [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
-        [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },
-        [CATEGORY.OTHER]: { label: "Other", icon: "link", color: "#6b7280" },
-        [CATEGORY.UNKNOWN]: { label: "Unknown", icon: "help", color: "#374151" }
-      };
-      DEFAULT_SETTINGS = {
-        theme: "dark",
-        // 'dark' | 'light'
-        autoScan: true,
-        // scan on page load
-        showBadge: true,
-        // badge count on icon
-        badgeCategories: [CATEGORY.VIDEO, CATEGORY.AUDIO, CATEGORY.DOCUMENT],
-        minFileSizeBytes: 1024,
-        // ignore < 1KB assets
-        deduplicateUrls: true,
-        showImages: true,
-        showDocuments: true,
-        showArchives: true,
-        showStreams: true,
-        enableVideoOverlay: true,
-        // floating in-video download pill
-        concurrencyMode: "turbo",
-        // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
-        directDiskStream: true,
-        // zero-RAM direct streaming via File System Access API
-        companionEnabled: false,
-        companionHost: "com.P4inz Interactive Labs.downloadforge",
-        debugMode: false,
-        defaultSaveAs: false,
-        // trigger save-as dialog
-        historyMaxItems: 500
-      };
-      LIMITS = {
-        MAX_RESOURCES_PER_SCAN: 500,
-        MAX_HISTORY_ITEMS: 500,
-        MAX_BATCH_DOWNLOAD: 50,
-        // safety cap for bulk download
-        SCAN_TIMEOUT_MS: 8e3,
-        FETCH_TIMEOUT_MS: 5e3,
-        CACHE_TTL_MS: 5 * 60 * 1e3
-        // 5 min
-      };
-    }
-  });
+  var CATEGORY = {
+    VIDEO: "video",
+    AUDIO: "audio",
+    IMAGE: "image",
+    DOCUMENT: "document",
+    ARCHIVE: "archive",
+    STREAM: "stream",
+    // HLS / m3u8 — non-DRM only
+    OTHER: "other",
+    UNKNOWN: "unknown"
+  };
+  var EXT_MAP = {
+    // Video
+    mp4: CATEGORY.VIDEO,
+    webm: CATEGORY.VIDEO,
+    mov: CATEGORY.VIDEO,
+    mkv: CATEGORY.VIDEO,
+    avi: CATEGORY.VIDEO,
+    flv: CATEGORY.VIDEO,
+    m4v: CATEGORY.VIDEO,
+    ogv: CATEGORY.VIDEO,
+    "3gp": CATEGORY.VIDEO,
+    // Audio
+    mp3: CATEGORY.AUDIO,
+    wav: CATEGORY.AUDIO,
+    ogg: CATEGORY.AUDIO,
+    m4a: CATEGORY.AUDIO,
+    aac: CATEGORY.AUDIO,
+    flac: CATEGORY.AUDIO,
+    opus: CATEGORY.AUDIO,
+    weba: CATEGORY.AUDIO,
+    // Images
+    jpg: CATEGORY.IMAGE,
+    jpeg: CATEGORY.IMAGE,
+    png: CATEGORY.IMAGE,
+    webp: CATEGORY.IMAGE,
+    gif: CATEGORY.IMAGE,
+    bmp: CATEGORY.IMAGE,
+    svg: CATEGORY.IMAGE,
+    ico: CATEGORY.IMAGE,
+    avif: CATEGORY.IMAGE,
+    tiff: CATEGORY.IMAGE,
+    tif: CATEGORY.IMAGE,
+    // Documents
+    pdf: CATEGORY.DOCUMENT,
+    doc: CATEGORY.DOCUMENT,
+    docx: CATEGORY.DOCUMENT,
+    xls: CATEGORY.DOCUMENT,
+    xlsx: CATEGORY.DOCUMENT,
+    ppt: CATEGORY.DOCUMENT,
+    pptx: CATEGORY.DOCUMENT,
+    txt: CATEGORY.DOCUMENT,
+    csv: CATEGORY.DOCUMENT,
+    json: CATEGORY.DOCUMENT,
+    xml: CATEGORY.DOCUMENT,
+    md: CATEGORY.DOCUMENT,
+    epub: CATEGORY.DOCUMENT,
+    rtf: CATEGORY.DOCUMENT,
+    // Archives
+    zip: CATEGORY.ARCHIVE,
+    rar: CATEGORY.ARCHIVE,
+    "7z": CATEGORY.ARCHIVE,
+    tar: CATEGORY.ARCHIVE,
+    gz: CATEGORY.ARCHIVE,
+    bz2: CATEGORY.ARCHIVE,
+    xz: CATEGORY.ARCHIVE,
+    zst: CATEGORY.ARCHIVE,
+    // Streams (non-DRM, authorized only)
+    m3u8: CATEGORY.STREAM,
+    m3u: CATEGORY.STREAM,
+    mpd: CATEGORY.STREAM
+  };
+  var MIME_MAP = {
+    "video/mp4": CATEGORY.VIDEO,
+    "video/webm": CATEGORY.VIDEO,
+    "video/quicktime": CATEGORY.VIDEO,
+    "video/x-msvideo": CATEGORY.VIDEO,
+    "video/ogg": CATEGORY.VIDEO,
+    "video/3gpp": CATEGORY.VIDEO,
+    "audio/mpeg": CATEGORY.AUDIO,
+    "audio/wav": CATEGORY.AUDIO,
+    "audio/ogg": CATEGORY.AUDIO,
+    "audio/mp4": CATEGORY.AUDIO,
+    "audio/aac": CATEGORY.AUDIO,
+    "audio/flac": CATEGORY.AUDIO,
+    "audio/webm": CATEGORY.AUDIO,
+    "image/jpeg": CATEGORY.IMAGE,
+    "image/png": CATEGORY.IMAGE,
+    "image/webp": CATEGORY.IMAGE,
+    "image/gif": CATEGORY.IMAGE,
+    "image/svg+xml": CATEGORY.IMAGE,
+    "image/bmp": CATEGORY.IMAGE,
+    "image/avif": CATEGORY.IMAGE,
+    "application/pdf": CATEGORY.DOCUMENT,
+    "application/msword": CATEGORY.DOCUMENT,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": CATEGORY.DOCUMENT,
+    "application/vnd.ms-excel": CATEGORY.DOCUMENT,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": CATEGORY.DOCUMENT,
+    "application/vnd.ms-powerpoint": CATEGORY.DOCUMENT,
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": CATEGORY.DOCUMENT,
+    "text/plain": CATEGORY.DOCUMENT,
+    "text/csv": CATEGORY.DOCUMENT,
+    "application/json": CATEGORY.DOCUMENT,
+    "application/xml": CATEGORY.DOCUMENT,
+    "text/xml": CATEGORY.DOCUMENT,
+    "application/zip": CATEGORY.ARCHIVE,
+    "application/x-rar-compressed": CATEGORY.ARCHIVE,
+    "application/x-7z-compressed": CATEGORY.ARCHIVE,
+    "application/x-tar": CATEGORY.ARCHIVE,
+    "application/gzip": CATEGORY.ARCHIVE,
+    "application/x-mpegURL": CATEGORY.STREAM,
+    "application/vnd.apple.mpegurl": CATEGORY.STREAM,
+    "application/dash+xml": CATEGORY.STREAM
+  };
+  var CATEGORY_META = {
+    [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
+    [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
+    [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
+    [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
+    [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
+    [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },
+    [CATEGORY.OTHER]: { label: "Other", icon: "link", color: "#6b7280" },
+    [CATEGORY.UNKNOWN]: { label: "Unknown", icon: "help", color: "#374151" }
+  };
+  var DEFAULT_SETTINGS = {
+    theme: "dark",
+    // 'dark' | 'light'
+    autoScan: true,
+    // scan on page load
+    showBadge: true,
+    // badge count on icon
+    badgeCategories: [CATEGORY.VIDEO, CATEGORY.AUDIO, CATEGORY.DOCUMENT],
+    minFileSizeBytes: 1024,
+    // ignore < 1KB assets
+    deduplicateUrls: true,
+    showImages: true,
+    showDocuments: true,
+    showArchives: true,
+    showStreams: true,
+    enableVideoOverlay: true,
+    // floating in-video download pill
+    concurrencyMode: "turbo",
+    // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
+    directDiskStream: true,
+    // zero-RAM direct streaming via File System Access API
+    companionEnabled: false,
+    companionHost: "com.P4inz Interactive Labs.downloadforge",
+    debugMode: false,
+    defaultSaveAs: false,
+    // trigger save-as dialog
+    historyMaxItems: 500
+  };
+  var LIMITS = {
+    MAX_RESOURCES_PER_SCAN: 500,
+    MAX_HISTORY_ITEMS: 500,
+    MAX_BATCH_DOWNLOAD: 50,
+    // safety cap for bulk download
+    SCAN_TIMEOUT_MS: 8e3,
+    FETCH_TIMEOUT_MS: 5e3,
+    CACHE_TTL_MS: 5 * 60 * 1e3
+    // 5 min
+  };
 
   // src/utils/logger.js
-  var Logger;
-  var init_logger = __esm({
-    "src/utils/logger.js"() {
-      Logger = class {
-        constructor(prefix = "DownloadForge") {
-          this.prefix = `[DF:${prefix}]`;
-        }
-        info(...args) {
-          console.info(this.prefix, ...args);
-        }
-        warn(...args) {
-          console.warn(this.prefix, ...args);
-        }
-        error(...args) {
-          console.error(this.prefix, ...args);
-        }
-        debug(...args) {
-          if (typeof window !== "undefined" && window.__dfDebug) {
-            console.debug(this.prefix, ...args);
-          } else if (typeof globalThis !== "undefined" && globalThis.__dfDebug) {
-            console.debug(this.prefix, ...args);
-          }
-        }
-      };
+  var Logger = class {
+    constructor(prefix = "DownloadForge") {
+      this.prefix = `[DF:${prefix}]`;
     }
-  });
+    info(...args) {
+      console.info(this.prefix, ...args);
+    }
+    warn(...args) {
+      console.warn(this.prefix, ...args);
+    }
+    error(...args) {
+      console.error(this.prefix, ...args);
+    }
+    debug(...args) {
+      if (typeof window !== "undefined" && window.__dfDebug) {
+        console.debug(this.prefix, ...args);
+      } else if (typeof globalThis !== "undefined" && globalThis.__dfDebug) {
+        console.debug(this.prefix, ...args);
+      }
+    }
+  };
 
   // src/core/hls_parser.js
+  var log = new Logger("HLSParser");
   async function parseHLSManifest(url) {
     const result = {
       url,
@@ -8170,6 +8156,8 @@
       // master playlist variants
       audioTracks: [],
       // master playlist separate audio tracks
+      subtitles: [],
+      // subtitle tracks (.vtt)
       segments: [],
       // media playlist segments
       duration: null,
@@ -8234,6 +8222,14 @@
             groupId: attrs2["GROUP-ID"] || "default",
             name: attrs2.NAME || "Audio",
             language: attrs2.LANGUAGE || "und",
+            default: attrs2.DEFAULT === "YES",
+            url: resolveUrl(attrs2.URI, baseUrl)
+          });
+        } else if (attrs2.TYPE === "SUBTITLES" && attrs2.URI) {
+          result.subtitles.push({
+            groupId: attrs2["GROUP-ID"] || "subtitles",
+            name: attrs2.NAME || "Subtitle",
+            language: attrs2.LANGUAGE || "en",
             default: attrs2.DEFAULT === "YES",
             url: resolveUrl(attrs2.URI, baseUrl)
           });
@@ -8310,6 +8306,7 @@
           result.segments.push({
             url: segUrl,
             duration: segDuration,
+            startTime: totalDuration,
             key: currentKey ? { ...currentKey } : null,
             initMap: initMap ? { ...initMap } : null,
             byteRange: currentByteRange ? { ...currentByteRange } : null,
@@ -8341,389 +8338,709 @@
       return null;
     }
   }
-  var log;
-  var init_hls_parser = __esm({
-    "src/core/hls_parser.js"() {
-      init_constants();
-      init_logger();
-      log = new Logger("HLSParser");
+
+  // src/core/dash_parser.js
+  function parseISODuration(str) {
+    if (!str) return 0;
+    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?/i;
+    const match = str.match(regex);
+    if (!match) return 0;
+    const hours = parseFloat(match[1] || 0);
+    const minutes = parseFloat(match[2] || 0);
+    const seconds = parseFloat(match[3] || 0);
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  function resolveUrl2(relative, base) {
+    try {
+      return new URL(relative, base).href;
+    } catch (e) {
+      return relative;
     }
-  });
+  }
+  function formatTemplate(template, tokens) {
+    let result = template;
+    if (tokens.RepresentationID !== void 0) {
+      result = result.replace(/\$RepresentationID\$/g, tokens.RepresentationID);
+    }
+    if (tokens.Bandwidth !== void 0) {
+      result = result.replace(/\$Bandwidth\$/g, tokens.Bandwidth);
+    }
+    result = result.replace(/\$Number(?:%0(\d+)d)?\$/g, (_, pad) => {
+      const numStr = String(tokens.Number !== void 0 ? tokens.Number : 1);
+      const padLen = pad ? parseInt(pad, 10) : 0;
+      return numStr.padStart(padLen, "0");
+    });
+    if (tokens.Time !== void 0) {
+      result = result.replace(/\$Time\$/g, String(tokens.Time));
+    }
+    return result;
+  }
+  async function parseDASHManifest(mpdUrl) {
+    try {
+      const res = await fetch(mpdUrl, { cache: "no-store" });
+      if (!res.ok) {
+        return { error: `HTTP ${res.status} fetching MPD manifest` };
+      }
+      const xmlText = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, "application/xml");
+      const parserError = doc.querySelector("parsererror");
+      if (parserError) {
+        return { error: "Failed to parse MPD XML document" };
+      }
+      const mpdEl = doc.querySelector("MPD");
+      if (!mpdEl) {
+        return { error: "Invalid DASH manifest: Missing root <MPD> element" };
+      }
+      const totalDurationSec = parseISODuration(mpdEl.getAttribute("mediaPresentationDuration"));
+      const isLive = (mpdEl.getAttribute("type") || "").toLowerCase() === "dynamic";
+      let mpdBaseUrl = mpdUrl;
+      const rootBaseEl = mpdEl.querySelector(":scope > BaseURL");
+      if (rootBaseEl && rootBaseEl.textContent.trim()) {
+        mpdBaseUrl = resolveUrl2(rootBaseEl.textContent.trim(), mpdUrl);
+      }
+      const videoTracks = [];
+      const audioTracks = [];
+      const periodEls = doc.querySelectorAll("Period");
+      const targetPeriod = periodEls[0] || mpdEl;
+      const adaptSetEls = targetPeriod.querySelectorAll("AdaptationSet");
+      adaptSetEls.forEach((adaptSet) => {
+        let mimeType = (adaptSet.getAttribute("mimeType") || "").toLowerCase();
+        let contentType = (adaptSet.getAttribute("contentType") || "").toLowerCase();
+        const adaptTemplate = adaptSet.querySelector(":scope > SegmentTemplate");
+        const repEls = adaptSet.querySelectorAll("Representation");
+        repEls.forEach((rep) => {
+          const repId = rep.getAttribute("id") || "";
+          const repBandwidth = parseInt(rep.getAttribute("bandwidth") || "0", 10);
+          const repWidth = parseInt(rep.getAttribute("width") || "0", 10);
+          const repHeight = parseInt(rep.getAttribute("height") || "0", 10);
+          const repMime = (rep.getAttribute("mimeType") || mimeType).toLowerCase();
+          const repCodecs = rep.getAttribute("codecs") || adaptSet.getAttribute("codecs") || "";
+          const isVideo = contentType === "video" || repMime.includes("video") || repWidth > 0 || repHeight > 0;
+          const isAudio = contentType === "audio" || repMime.includes("audio");
+          const segTemplate = rep.querySelector("SegmentTemplate") || adaptTemplate;
+          const segListEl = rep.querySelector("SegmentList") || adaptSet.querySelector("SegmentList");
+          const repBaseEl = rep.querySelector("BaseURL") || adaptSet.querySelector("BaseURL");
+          const trackBaseUrl = repBaseEl && repBaseEl.textContent.trim() ? resolveUrl2(repBaseEl.textContent.trim(), mpdBaseUrl) : mpdBaseUrl;
+          let segments = [];
+          let initUrl = null;
+          if (segTemplate) {
+            const initTemplate = segTemplate.getAttribute("initialization");
+            if (initTemplate) {
+              initUrl = resolveUrl2(
+                formatTemplate(initTemplate, { RepresentationID: repId, Bandwidth: repBandwidth }),
+                trackBaseUrl
+              );
+            }
+            const mediaTemplate = segTemplate.getAttribute("media") || "";
+            const timescale = parseFloat(segTemplate.getAttribute("timescale") || "1");
+            const startNumber = parseInt(segTemplate.getAttribute("startNumber") || "1", 10);
+            const duration = parseFloat(segTemplate.getAttribute("duration") || "0");
+            const timelineEl = segTemplate.querySelector("SegmentTimeline");
+            if (timelineEl) {
+              const sEls = timelineEl.querySelectorAll("S");
+              let currentTime = 0;
+              let currentNumber = startNumber;
+              sEls.forEach((s) => {
+                if (s.getAttribute("t")) {
+                  currentTime = parseFloat(s.getAttribute("t"));
+                }
+                const d = parseFloat(s.getAttribute("d"));
+                const r = parseInt(s.getAttribute("r") || "0", 10);
+                const count = r >= 0 ? r + 1 : 1;
+                for (let i = 0; i < count; i++) {
+                  const segUrl = resolveUrl2(
+                    formatTemplate(mediaTemplate, {
+                      RepresentationID: repId,
+                      Number: currentNumber,
+                      Time: currentTime,
+                      Bandwidth: repBandwidth
+                    }),
+                    trackBaseUrl
+                  );
+                  segments.push({
+                    url: segUrl,
+                    duration: d / timescale,
+                    sequence: currentNumber
+                  });
+                  currentTime += d;
+                  currentNumber++;
+                }
+              });
+            } else if (duration > 0 && totalDurationSec > 0) {
+              const segDurationSec = duration / timescale;
+              const totalSegs = Math.ceil(totalDurationSec / segDurationSec);
+              for (let i = 0; i < totalSegs; i++) {
+                const num = startNumber + i;
+                const segUrl = resolveUrl2(
+                  formatTemplate(mediaTemplate, {
+                    RepresentationID: repId,
+                    Number: num,
+                    Time: i * duration,
+                    Bandwidth: repBandwidth
+                  }),
+                  trackBaseUrl
+                );
+                segments.push({
+                  url: segUrl,
+                  duration: segDurationSec,
+                  sequence: num
+                });
+              }
+            }
+          } else if (segListEl) {
+            const initEl = segListEl.querySelector("Initialization");
+            if (initEl && initEl.getAttribute("sourceURL")) {
+              initUrl = resolveUrl2(initEl.getAttribute("sourceURL"), trackBaseUrl);
+            }
+            const segUrls = segListEl.querySelectorAll("SegmentURL");
+            segUrls.forEach((su, idx) => {
+              const media = su.getAttribute("media");
+              if (media) {
+                segments.push({
+                  url: resolveUrl2(media, trackBaseUrl),
+                  duration: 0,
+                  sequence: idx + 1
+                });
+              }
+            });
+          }
+          const trackInfo = {
+            id: repId,
+            bandwidth: repBandwidth,
+            width: repWidth,
+            height: repHeight,
+            resolution: repWidth && repHeight ? `${repWidth}x${repHeight}` : isAudio ? "Audio Track" : "Unknown",
+            label: repWidth && repHeight ? `${repHeight}p (${Math.round(repBandwidth / 1e3)} kbps)` : isAudio ? `Audio (${Math.round(repBandwidth / 1e3)} kbps)` : repId,
+            codecs: repCodecs,
+            initUrl,
+            segments,
+            isAudio,
+            isVideo
+          };
+          if (isVideo) {
+            videoTracks.push(trackInfo);
+          } else if (isAudio) {
+            audioTracks.push(trackInfo);
+          }
+        });
+      });
+      videoTracks.sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
+      audioTracks.sort((a, b) => (b.bandwidth || 0) - (a.bandwidth || 0));
+      return {
+        type: "dash",
+        isLive,
+        totalDurationSec,
+        videoTracks,
+        audioTracks,
+        variants: videoTracks.map((v) => ({
+          url: mpdUrl,
+          bandwidth: v.bandwidth,
+          resolution: v.resolution,
+          label: v.label,
+          trackId: v.id,
+          initUrl: v.initUrl,
+          segments: v.segments
+        })),
+        defaultAudioTrack: audioTracks[0] || null
+      };
+    } catch (err) {
+      return { error: `DASH parser exception: ${err.message}` };
+    }
+  }
 
   // src/core/hls_engine.js
-  var import_mux, CONCURRENCY_PROFILES, HLSEngine;
-  var init_hls_engine = __esm({
-    "src/core/hls_engine.js"() {
-      import_mux = __toESM(require_mux());
-      init_hls_parser();
-      CONCURRENCY_PROFILES = {
-        SAFE: 1,
-        GENTLE: 2,
-        BALANCED: 4,
-        TURBO: 8,
-        MAXIMUM: 16,
-        ULTRA: 32
-      };
-      HLSEngine = class {
-        constructor(options = {}) {
-          this.concurrency = options.concurrency || CONCURRENCY_PROFILES.TURBO;
-          this.maxRetries = options.maxRetries || 3;
-          this.timeoutMs = options.timeoutMs || 15e3;
-          this.skipFailedSegments = options.skipFailedSegments !== false;
-          this.referer = options.referer || null;
-          this.audioOnly = options.audioOnly || false;
-          this.onProgress = options.onProgress || (() => {
-          });
-          this.onStatus = options.onStatus || (() => {
-          });
-          this.aborted = false;
-          this.paused = false;
-          this.keyCache = /* @__PURE__ */ new Map();
-        }
-        abort() {
-          this.aborted = true;
-        }
-        /**
-         * Main entry point to download an HLS stream and produce an MP4 file.
-         * Can stream directly to disk if writableStream is provided.
-         *
-         * @param {string} manifestUrl
-         * @param {object} options
-         * @param {object} [options.selectedVariant]
-         * @param {FileSystemWritableFileStream} [options.writableStream]
-         * @returns {Promise<{ blob?: Blob, directStream: boolean }>}
-         */
-        async downloadAndMux(manifestUrl, options = {}) {
-          const { selectedVariant = null, writableStream = null } = options;
-          this.aborted = false;
-          this.onStatus("Fetching playlist manifest...");
-          const parseResult = await parseHLSManifest(manifestUrl);
-          if (parseResult.error) {
-            throw new Error(`Playlist parse error: ${parseResult.error}`);
-          }
-          let mediaUrl = manifestUrl;
-          let targetPlaylist = parseResult;
-          if (parseResult.type === "master") {
-            const variant = selectedVariant || parseResult.variants[0];
-            if (!variant) throw new Error("No valid video variants found in master playlist");
-            mediaUrl = variant.url;
-            this.onStatus(`Loading video track: ${variant.label || variant.resolution || "best"}...`);
-            targetPlaylist = await parseHLSManifest(mediaUrl);
-            if (targetPlaylist.error) throw new Error(targetPlaylist.error);
-          }
-          const segments = targetPlaylist.segments;
-          if (!segments || segments.length === 0) {
-            throw new Error("Playlist contains zero media segments");
-          }
-          let audioSegments = [];
-          if (parseResult.type === "master" && parseResult.audioTracks?.length > 0) {
-            const matchTrack = parseResult.audioTracks.find((t) => t.default) || parseResult.audioTracks[0];
-            if (matchTrack?.url) {
-              try {
-                this.onStatus(`Found paired audio track (${matchTrack.name || matchTrack.language}). Fetching...`);
-                const audioResult = await parseHLSManifest(matchTrack.url);
-                if (audioResult.segments?.length > 0) {
-                  audioSegments = audioResult.segments;
-                }
-              } catch (e) {
-                console.debug("Failed to load separate audio track:", e);
-              }
-            }
-          }
-          this.onStatus(`Found ${segments.length} video segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ""}. Initializing engine...`);
-          const transmuxer = new import_mux.default.mp4.Transmuxer({
-            keepOriginalTimestamps: false
-          });
-          const inMemoryInit = [];
-          const inMemoryMedia = [];
-          let writeChain = Promise.resolve();
-          const queueStreamWrite = (u8) => {
-            if (writableStream) {
-              writeChain = writeChain.then(() => writableStream.write(u8));
-            }
-          };
-          transmuxer.on("data", (segment) => {
-            if (segment.initSegment) {
-              const u8 = new Uint8Array(segment.initSegment);
-              if (writableStream) {
-                queueStreamWrite(u8);
-              } else {
-                inMemoryInit.push(u8);
-              }
-            }
-            if (segment.data) {
-              const u8 = new Uint8Array(segment.data);
-              if (writableStream) {
-                queueStreamWrite(u8);
-              } else {
-                inMemoryMedia.push(u8);
-              }
-            }
-          });
-          if (segments[0].initMap?.url) {
-            this.onStatus("Downloading stream initialization map...");
-            const initBuffer = await this.fetchBufferWithRetry(segments[0].initMap.url);
-            const u8 = new Uint8Array(initBuffer);
-            if (writableStream) {
-              queueStreamWrite(u8);
-            } else {
-              inMemoryInit.push(u8);
-            }
-          }
-          const total = segments.length;
-          let completedCount = 0;
-          let totalBytes = 0;
-          const startTime = performance.now();
-          const downloadedBuffers = new Array(total);
-          let nextToPumpIndex = 0;
-          const pumpNextSegments = () => {
-            while (nextToPumpIndex < total && downloadedBuffers[nextToPumpIndex] !== void 0) {
-              const buf = downloadedBuffers[nextToPumpIndex];
-              if (buf) {
-                transmuxer.push(buf);
-                if (writableStream) {
-                  downloadedBuffers[nextToPumpIndex] = null;
-                }
-              }
-              nextToPumpIndex++;
-            }
-          };
-          let currentIndex = 0;
-          const worker = async () => {
-            while (currentIndex < total && !this.aborted) {
-              const index = currentIndex++;
-              const seg = segments[index];
-              try {
-                let segData = await this.fetchBufferWithRetry(seg.url, seg.byteRange);
-                if (seg.key && seg.key.method === "AES-128") {
-                  segData = await this.decryptSegment(segData, seg.key, seg.sequence);
-                }
-                downloadedBuffers[index] = new Uint8Array(segData);
-                completedCount++;
-                totalBytes += segData.byteLength;
-                pumpNextSegments();
-                const elapsedSec = (performance.now() - startTime) / 1e3;
-                const speedBps = elapsedSec > 0 ? totalBytes / elapsedSec : 0;
-                const percent = Math.round(completedCount / total * 100);
-                const etaSec = speedBps > 0 ? Math.round((total - completedCount) * (totalBytes / completedCount) / speedBps) : 0;
-                this.onProgress({
-                  completed: completedCount,
-                  total,
-                  percent,
-                  speedMBs: (speedBps / (1024 * 1024)).toFixed(2),
-                  etaSec,
-                  index
-                });
-              } catch (err) {
-                if (this.aborted) throw new Error("Download cancelled by user");
-                console.warn(`[DownloadForge] Failed segment ${index}:`, err.message);
-                if (this.skipFailedSegments) {
-                  downloadedBuffers[index] = new Uint8Array(0);
-                  completedCount++;
-                  pumpNextSegments();
-                  this.onProgress({
-                    completed: completedCount,
-                    total,
-                    percent: Math.round(completedCount / total * 100),
-                    speedMBs: "0.00",
-                    etaSec: 0,
-                    index,
-                    failed: true
-                  });
-                } else {
-                  throw new Error(`Segment ${index} failed: ${err.message}`);
-                }
-              }
-            }
-          };
-          const workers = [];
-          for (let i = 0; i < Math.min(this.concurrency, total); i++) {
-            workers.push(worker());
-          }
-          await Promise.all(workers);
-          if (this.aborted) {
-            if (writableStream) await writableStream.abort().catch(() => {
-            });
-            throw new Error("Download cancelled");
-          }
-          pumpNextSegments();
-          if (audioSegments.length > 0 && !this.aborted) {
-            this.onStatus("Multiplexing synchronized audio track into MP4...");
-            for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
-              const aSeg = audioSegments[i];
-              try {
-                let aBuf = await this.fetchBufferWithRetry(aSeg.url, aSeg.byteRange);
-                if (aSeg.key && aSeg.key.method === "AES-128") {
-                  aBuf = await this.decryptSegment(aBuf, aSeg.key, aSeg.sequence);
-                }
-                transmuxer.push(new Uint8Array(aBuf));
-              } catch (e) {
-                console.debug(`Audio segment ${i} fetch error:`, e);
-              }
-            }
-          }
-          transmuxer.flush();
-          if (writableStream) {
-            this.onStatus("Finalizing direct disk stream...");
-            await writeChain;
-            await writableStream.close();
-            return { directStream: true };
-          }
-          this.onStatus("Assembling MP4 file in memory...");
-          let finalBlob;
-          if (inMemoryInit.length > 0 && inMemoryMedia.length > 0) {
-            finalBlob = new Blob([...inMemoryInit, ...inMemoryMedia], { type: "video/mp4" });
-          } else {
-            const remaining = downloadedBuffers.filter(Boolean);
-            finalBlob = new Blob(remaining, { type: "video/mp4" });
-          }
-          this.onStatus("Download complete!");
-          return { blob: finalBlob, directStream: false };
-        }
-        /**
-         * Decrypt standard RFC 8216 AES-128 HLS segment via native WebCrypto.
-         */
-        async decryptSegment(encryptedBuffer, keyInfo, sequenceNumber) {
-          const rawKey = await this.getKeyBytes(keyInfo.uri);
-          const ivBuffer = new Uint8Array(16);
-          if (keyInfo.iv) {
-            const hex = keyInfo.iv.startsWith("0x") ? keyInfo.iv.slice(2) : keyInfo.iv;
-            for (let i = 0; i < 16; i++) {
-              ivBuffer[i] = parseInt(hex.substr(i * 2, 2), 16) || 0;
-            }
-          } else {
-            const view = new DataView(ivBuffer.buffer);
-            view.setUint32(12, sequenceNumber, false);
-          }
-          const cryptoKey = await crypto.subtle.importKey(
-            "raw",
-            rawKey,
-            { name: "AES-CBC" },
-            false,
-            ["decrypt"]
-          );
-          return await crypto.subtle.decrypt(
-            { name: "AES-CBC", iv: ivBuffer },
-            cryptoKey,
-            encryptedBuffer
-          );
-        }
-        async getKeyBytes(keyUri) {
-          if (this.keyCache.has(keyUri)) {
-            return this.keyCache.get(keyUri);
-          }
-          const res = await fetch(keyUri);
-          if (!res.ok) throw new Error(`HTTP error ${res.status} fetching key`);
-          const keyBuf = await res.arrayBuffer();
-          this.keyCache.set(keyUri, keyBuf);
-          return keyBuf;
-        }
-        async fetchBufferWithRetry(url, byteRange = null, attempt = 1) {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), this.timeoutMs || 15e3);
-          try {
-            const headers = {};
-            if (this.referer) {
-              headers["Referer"] = this.referer;
-            }
-            if (byteRange && byteRange.length > 0) {
-              const end = byteRange.offset + byteRange.length - 1;
-              headers["Range"] = `bytes=${byteRange.offset}-${end}`;
-            }
-            const res = await fetch(url, {
-              cache: "no-store",
-              headers,
-              signal: controller.signal
-            });
-            clearTimeout(timeout);
-            if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
-            return await res.arrayBuffer();
-          } catch (err) {
-            clearTimeout(timeout);
-            if (attempt < this.maxRetries && !this.aborted) {
-              const backoff = Math.min(800 * attempt, 3e3);
-              await new Promise((r) => setTimeout(r, backoff));
-              return this.fetchBufferWithRetry(url, byteRange, attempt + 1);
-            }
-            throw err;
-          }
-        }
-      };
+  var CONCURRENCY_PROFILES = {
+    SAFE: 1,
+    GENTLE: 2,
+    BALANCED: 4,
+    TURBO: 8,
+    MAXIMUM: 16,
+    ULTRA: 32
+  };
+  var HLSEngine = class {
+    constructor(options = {}) {
+      this.concurrency = options.concurrency || CONCURRENCY_PROFILES.TURBO;
+      this.maxRetries = options.maxRetries || 3;
+      this.timeoutMs = options.timeoutMs || 15e3;
+      this.skipFailedSegments = options.skipFailedSegments !== false;
+      this.referer = options.referer || null;
+      this.audioOnly = options.audioOnly || false;
+      this.useWorker = options.useWorker !== false;
+      this.onProgress = options.onProgress || (() => {
+      });
+      this.onStatus = options.onStatus || (() => {
+      });
+      this.aborted = false;
+      this.paused = false;
+      this.activeWorker = null;
+      this.keyCache = /* @__PURE__ */ new Map();
     }
-  });
-
-  // src/downloader/downloader_bundle.js
-  var require_downloader_bundle = __commonJS({
-    "src/downloader/downloader_bundle.js"() {
-      init_hls_engine();
-      init_hls_parser();
-      var currentEngine = null;
-      var currentBlob = null;
-      var currentBlobUrl = null;
-      var currentManifest = null;
-      var targetFilename = "downloaded_video.mp4";
-      var isRecordMode = false;
-      var streamTitle = document.getElementById("streamTitle");
-      var streamDomain = document.getElementById("streamDomain");
-      var streamUrlInput = document.getElementById("streamUrlInput");
-      var btnLoadStream = document.getElementById("btnLoadStream");
-      var variantRow = document.getElementById("variantRow");
-      var variantSelect = document.getElementById("variantSelect");
-      var concurrencySelect = document.getElementById("concurrencySelect");
-      var retrySelect = document.getElementById("retrySelect");
-      var timeoutSelect = document.getElementById("timeoutSelect");
-      var formatSelect = document.getElementById("formatSelect");
-      var customReferer = document.getElementById("customReferer");
-      var chkDirectDisk = document.getElementById("chkDirectDisk");
-      var chkSkipBroken = document.getElementById("chkSkipBroken");
-      var statPercent = document.getElementById("statPercent");
-      var statSegments = document.getElementById("statSegments");
-      var statSpeed = document.getElementById("statSpeed");
-      var statEta = document.getElementById("statEta");
-      var progressBarFill = document.getElementById("progressBarFill");
-      var statusMessage = document.getElementById("statusMessage");
-      var segmentGrid = document.getElementById("segmentGrid");
-      var btnStart = document.getElementById("btnStart");
-      var btnCancel = document.getElementById("btnCancel");
-      var btnSave = document.getElementById("btnSave");
-      var previewCard = document.getElementById("previewCard");
-      var previewPlayer = document.getElementById("previewPlayer");
-      var engineStatus = document.getElementById("engineStatus");
-      function initFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const streamUrl = params.get("url");
-        const filename = params.get("filename") || params.get("title");
-        const mode = params.get("mode");
-        const referer = params.get("referer");
-        if (referer && customReferer) {
-          customReferer.value = referer;
+    abort() {
+      this.aborted = true;
+      if (this.activeWorker) {
+        try {
+          this.activeWorker.postMessage({ type: "ABORT" });
+          this.activeWorker.terminate();
+        } catch (e) {
         }
-        if (filename) {
-          targetFilename = filename.endsWith(".mp4") ? filename : `${filename}.mp4`;
-          streamTitle.textContent = filename;
+        this.activeWorker = null;
+      }
+    }
+    /**
+     * Main entry point to download an HLS stream and produce an MP4 file.
+     * Can stream directly to disk if writableStream is provided.
+     *
+     * @param {string} manifestUrl
+     * @param {object} options
+     * @param {object} [options.selectedVariant]
+     * @param {FileSystemWritableFileStream} [options.writableStream]
+     * @returns {Promise<{ blob?: Blob, directStream: boolean }>}
+     */
+    async downloadAndMux(manifestUrl, options = {}) {
+      const { selectedVariant = null, writableStream = null, timeRange = null, manifest = null } = options;
+      this.aborted = false;
+      this.onStatus("Fetching playlist manifest...");
+      const isDash = manifestUrl.includes(".mpd") || manifest?.type === "dash";
+      let streamType = isDash ? "dash" : "hls";
+      let segments = [];
+      let audioSegments = [];
+      let initUrl = null;
+      if (isDash) {
+        this.onStatus("Parsing MPEG-DASH MPD manifest...");
+        const dashResult = manifest && manifest.type === "dash" ? manifest : await parseDASHManifest(manifestUrl);
+        if (dashResult.error) throw new Error(dashResult.error);
+        const track = selectedVariant || dashResult.variants[0];
+        if (!track || !track.segments) throw new Error("No valid MPEG-DASH representation found");
+        segments = track.segments;
+        initUrl = track.initUrl || null;
+        if (dashResult.defaultAudioTrack && dashResult.defaultAudioTrack.segments) {
+          audioSegments = dashResult.defaultAudioTrack.segments;
         }
-        if (mode === "record") {
-          initRecordMode(filename);
-          return;
+      } else {
+        const parseResult = manifest && manifest.type ? manifest : await parseHLSManifest(manifestUrl);
+        if (parseResult.error) {
+          throw new Error(`Playlist parse error: ${parseResult.error}`);
         }
-        if (streamUrl) {
-          streamUrlInput.value = streamUrl;
-          try {
-            streamDomain.textContent = new URL(streamUrl).hostname;
-          } catch (e) {
+        let mediaUrl = manifestUrl;
+        let targetPlaylist = parseResult;
+        if (parseResult.type === "master") {
+          const variant = selectedVariant || parseResult.variants[0];
+          if (!variant) throw new Error("No valid video variants found in master playlist");
+          mediaUrl = variant.url;
+          this.onStatus(`Loading video track: ${variant.label || variant.resolution || "best"}...`);
+          targetPlaylist = await parseHLSManifest(mediaUrl);
+          if (targetPlaylist.error) throw new Error(targetPlaylist.error);
+        }
+        segments = targetPlaylist.segments;
+        if (!segments || segments.length === 0) {
+          throw new Error("Playlist contains zero media segments");
+        }
+        if (parseResult.type === "master" && parseResult.audioTracks?.length > 0) {
+          const matchTrack = parseResult.audioTracks.find((t) => t.default) || parseResult.audioTracks[0];
+          if (matchTrack?.url) {
+            try {
+              this.onStatus(`Found paired audio track (${matchTrack.name || matchTrack.language}). Fetching...`);
+              const audioResult = await parseHLSManifest(matchTrack.url);
+              if (audioResult.segments?.length > 0) {
+                audioSegments = audioResult.segments;
+              }
+            } catch (e) {
+              console.debug("Failed to load separate audio track:", e);
+            }
           }
-          analyzeStream(streamUrl);
         }
       }
-      function initRecordMode(title) {
-        isRecordMode = true;
-        engineStatus.textContent = "Record Mode";
-        streamTitle.textContent = `Live Buffer Recorder: ${title || "Active Video"}`;
-        streamUrlInput.value = "In-page recorder active. Play the video in the source tab to buffer chunks.";
-        streamUrlInput.disabled = true;
-        btnLoadStream.disabled = true;
-        statusMessage.textContent = "Stream Studio is ready. To record directly inside the webpage with 1x-16x speedup, use the floating in-video overlay.";
-        btnStart.innerHTML = `
+      if (timeRange && (timeRange.startSec > 0 || timeRange.endSec && timeRange.endSec < Infinity)) {
+        const { startSec = 0, endSec = Infinity } = timeRange;
+        const filtered = segments.filter((seg) => {
+          const segStart = seg.startTime !== void 0 ? seg.startTime : 0;
+          const segEnd = segStart + (seg.duration || 0);
+          return segEnd >= startSec && segStart <= endSec;
+        });
+        if (filtered.length > 0) {
+          segments = filtered;
+          this.onStatus(`Time slice applied: ${segments.length} segments selected (${startSec}s -> ${endSec}s).`);
+        }
+      }
+      this.onStatus(`Found ${segments.length} media segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ""}. Initializing engine...`);
+      if (this.useWorker && typeof Worker !== "undefined") {
+        try {
+          this.onStatus("Spawning dedicated offscreen Web Worker...");
+          return await this.runWithWorker({
+            streamType,
+            segments,
+            initUrl,
+            audioSegments,
+            concurrency: this.concurrency,
+            maxRetries: this.maxRetries,
+            timeoutMs: this.timeoutMs,
+            skipFailedSegments: this.skipFailedSegments,
+            referer: this.referer
+          }, writableStream);
+        } catch (workerErr) {
+          console.warn("[DownloadForge] Web Worker execution fallback to in-thread:", workerErr.message);
+        }
+      }
+      const transmuxer = new import_mux.default.mp4.Transmuxer({
+        keepOriginalTimestamps: false
+      });
+      const inMemoryInit = [];
+      const inMemoryMedia = [];
+      let writeChain = Promise.resolve();
+      const queueStreamWrite = (u8) => {
+        if (writableStream) {
+          writeChain = writeChain.then(() => writableStream.write(u8));
+        }
+      };
+      transmuxer.on("data", (segment) => {
+        if (segment.initSegment) {
+          const u8 = new Uint8Array(segment.initSegment);
+          if (writableStream) {
+            queueStreamWrite(u8);
+          } else {
+            inMemoryInit.push(u8);
+          }
+        }
+        if (segment.data) {
+          const u8 = new Uint8Array(segment.data);
+          if (writableStream) {
+            queueStreamWrite(u8);
+          } else {
+            inMemoryMedia.push(u8);
+          }
+        }
+      });
+      if (segments[0].initMap?.url) {
+        this.onStatus("Downloading stream initialization map...");
+        const initBuffer = await this.fetchBufferWithRetry(segments[0].initMap.url);
+        const u8 = new Uint8Array(initBuffer);
+        if (writableStream) {
+          queueStreamWrite(u8);
+        } else {
+          inMemoryInit.push(u8);
+        }
+      }
+      const total = segments.length;
+      let completedCount = 0;
+      let totalBytes = 0;
+      const startTime = performance.now();
+      const downloadedBuffers = new Array(total);
+      let nextToPumpIndex = 0;
+      const pumpNextSegments = () => {
+        while (nextToPumpIndex < total && downloadedBuffers[nextToPumpIndex] !== void 0) {
+          const buf = downloadedBuffers[nextToPumpIndex];
+          if (buf) {
+            transmuxer.push(buf);
+            if (writableStream) {
+              downloadedBuffers[nextToPumpIndex] = null;
+            }
+          }
+          nextToPumpIndex++;
+        }
+      };
+      let currentIndex = 0;
+      const worker = async () => {
+        while (currentIndex < total && !this.aborted) {
+          const index = currentIndex++;
+          const seg = segments[index];
+          try {
+            let segData = await this.fetchBufferWithRetry(seg.url, seg.byteRange);
+            if (seg.key && seg.key.method === "AES-128") {
+              segData = await this.decryptSegment(segData, seg.key, seg.sequence);
+            }
+            downloadedBuffers[index] = new Uint8Array(segData);
+            completedCount++;
+            totalBytes += segData.byteLength;
+            pumpNextSegments();
+            const elapsedSec = (performance.now() - startTime) / 1e3;
+            const speedBps = elapsedSec > 0 ? totalBytes / elapsedSec : 0;
+            const percent = Math.round(completedCount / total * 100);
+            const etaSec = speedBps > 0 ? Math.round((total - completedCount) * (totalBytes / completedCount) / speedBps) : 0;
+            this.onProgress({
+              completed: completedCount,
+              total,
+              percent,
+              speedMBs: (speedBps / (1024 * 1024)).toFixed(2),
+              etaSec,
+              index
+            });
+          } catch (err) {
+            if (this.aborted) throw new Error("Download cancelled by user");
+            console.warn(`[DownloadForge] Failed segment ${index}:`, err.message);
+            if (this.skipFailedSegments) {
+              downloadedBuffers[index] = new Uint8Array(0);
+              completedCount++;
+              pumpNextSegments();
+              this.onProgress({
+                completed: completedCount,
+                total,
+                percent: Math.round(completedCount / total * 100),
+                speedMBs: "0.00",
+                etaSec: 0,
+                index,
+                failed: true
+              });
+            } else {
+              throw new Error(`Segment ${index} failed: ${err.message}`);
+            }
+          }
+        }
+      };
+      const workers = [];
+      for (let i = 0; i < Math.min(this.concurrency, total); i++) {
+        workers.push(worker());
+      }
+      await Promise.all(workers);
+      if (this.aborted) {
+        if (writableStream) await writableStream.abort().catch(() => {
+        });
+        throw new Error("Download cancelled");
+      }
+      pumpNextSegments();
+      if (audioSegments.length > 0 && !this.aborted) {
+        this.onStatus("Multiplexing synchronized audio track into MP4...");
+        for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
+          const aSeg = audioSegments[i];
+          try {
+            let aBuf = await this.fetchBufferWithRetry(aSeg.url, aSeg.byteRange);
+            if (aSeg.key && aSeg.key.method === "AES-128") {
+              aBuf = await this.decryptSegment(aBuf, aSeg.key, aSeg.sequence);
+            }
+            transmuxer.push(new Uint8Array(aBuf));
+          } catch (e) {
+            console.debug(`Audio segment ${i} fetch error:`, e);
+          }
+        }
+      }
+      transmuxer.flush();
+      if (writableStream) {
+        this.onStatus("Finalizing direct disk stream...");
+        await writeChain;
+        await writableStream.close();
+        return { directStream: true };
+      }
+      this.onStatus("Assembling MP4 file in memory...");
+      let finalBlob;
+      if (inMemoryInit.length > 0 && inMemoryMedia.length > 0) {
+        finalBlob = new Blob([...inMemoryInit, ...inMemoryMedia], { type: "video/mp4" });
+      } else {
+        const remaining = downloadedBuffers.filter(Boolean);
+        finalBlob = new Blob(remaining, { type: "video/mp4" });
+      }
+      this.onStatus("Download complete!");
+      return { blob: finalBlob, directStream: false };
+    }
+    /**
+     * Decrypt standard RFC 8216 AES-128 HLS segment via native WebCrypto.
+     */
+    async decryptSegment(encryptedBuffer, keyInfo, sequenceNumber) {
+      const rawKey = await this.getKeyBytes(keyInfo.uri);
+      const ivBuffer = new Uint8Array(16);
+      if (keyInfo.iv) {
+        const hex = keyInfo.iv.startsWith("0x") ? keyInfo.iv.slice(2) : keyInfo.iv;
+        for (let i = 0; i < 16; i++) {
+          ivBuffer[i] = parseInt(hex.substr(i * 2, 2), 16) || 0;
+        }
+      } else {
+        const view = new DataView(ivBuffer.buffer);
+        view.setUint32(12, sequenceNumber, false);
+      }
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw",
+        rawKey,
+        { name: "AES-CBC" },
+        false,
+        ["decrypt"]
+      );
+      return await crypto.subtle.decrypt(
+        { name: "AES-CBC", iv: ivBuffer },
+        cryptoKey,
+        encryptedBuffer
+      );
+    }
+    async getKeyBytes(keyUri) {
+      if (this.keyCache.has(keyUri)) {
+        return this.keyCache.get(keyUri);
+      }
+      const res = await fetch(keyUri);
+      if (!res.ok) throw new Error(`HTTP error ${res.status} fetching key`);
+      const keyBuf = await res.arrayBuffer();
+      this.keyCache.set(keyUri, keyBuf);
+      return keyBuf;
+    }
+    async fetchBufferWithRetry(url, byteRange = null, attempt = 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs || 15e3);
+      try {
+        const headers = {};
+        if (this.referer) {
+          headers["Referer"] = this.referer;
+        }
+        if (byteRange && byteRange.length > 0) {
+          const end = byteRange.offset + byteRange.length - 1;
+          headers["Range"] = `bytes=${byteRange.offset}-${end}`;
+        }
+        const res = await fetch(url, {
+          cache: "no-store",
+          headers,
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
+        return await res.arrayBuffer();
+      } catch (err) {
+        clearTimeout(timeout);
+        if (attempt < this.maxRetries && !this.aborted) {
+          const backoff = Math.min(800 * attempt, 3e3);
+          await new Promise((r) => setTimeout(r, backoff));
+          return this.fetchBufferWithRetry(url, byteRange, attempt + 1);
+        }
+        throw err;
+      }
+    }
+    /**
+     * Offloads ingestion and transmuxing to dedicated Web Worker.
+     */
+    async runWithWorker(config, writableStream) {
+      return new Promise((resolve, reject) => {
+        let workerUrl;
+        try {
+          workerUrl = chrome?.runtime?.getURL ? chrome.runtime.getURL("dist/stream_worker.bundle.js") : "dist/stream_worker.bundle.js";
+        } catch (e) {
+          return reject(new Error("Extension context unavailable for worker"));
+        }
+        let worker;
+        try {
+          worker = new Worker(workerUrl);
+        } catch (err) {
+          return reject(err);
+        }
+        this.activeWorker = worker;
+        let writeChain = Promise.resolve();
+        const collectedBuffers = [];
+        worker.onmessage = async (e) => {
+          const { type, chunk, message, error, ...rest } = e.data || {};
+          if (type === "STATUS") {
+            this.onStatus(message);
+          } else if (type === "PROGRESS") {
+            this.onProgress(rest);
+          } else if (type === "CHUNK") {
+            if (writableStream) {
+              writeChain = writeChain.then(() => writableStream.write(chunk));
+            } else {
+              collectedBuffers.push(chunk);
+            }
+          } else if (type === "COMPLETE") {
+            worker.terminate();
+            this.activeWorker = null;
+            if (writableStream) {
+              this.onStatus("Finalizing direct disk stream...");
+              await writeChain;
+              await writableStream.close();
+              resolve({ directStream: true });
+            } else {
+              const finalBlob = new Blob(collectedBuffers, { type: "video/mp4" });
+              resolve({ blob: finalBlob, directStream: false });
+            }
+          } else if (type === "ERROR") {
+            worker.terminate();
+            this.activeWorker = null;
+            reject(new Error(error || "Worker error"));
+          }
+        };
+        worker.onerror = (err) => {
+          worker.terminate();
+          this.activeWorker = null;
+          reject(err);
+        };
+        worker.postMessage({ type: "START", payload: config });
+      });
+    }
+  };
+
+  // src/downloader/downloader_bundle.js
+  var currentEngine = null;
+  var currentBlob = null;
+  var currentBlobUrl = null;
+  var currentManifest = null;
+  var targetFilename = "downloaded_video.mp4";
+  var isRecordMode = false;
+  var currentCliCmd = "ytdlp";
+  var streamTitle = document.getElementById("streamTitle");
+  var streamDomain = document.getElementById("streamDomain");
+  var streamUrlInput = document.getElementById("streamUrlInput");
+  var btnLoadStream = document.getElementById("btnLoadStream");
+  var variantRow = document.getElementById("variantRow");
+  var variantSelect = document.getElementById("variantSelect");
+  var subtitleRow = document.getElementById("subtitleRow");
+  var subtitleSelect = document.getElementById("subtitleSelect");
+  var btnDownloadSubs = document.getElementById("btnDownloadSubs");
+  var sliceStart = document.getElementById("sliceStart");
+  var sliceEnd = document.getElementById("sliceEnd");
+  var btnClearSlice = document.getElementById("btnClearSlice");
+  var concurrencySelect = document.getElementById("concurrencySelect");
+  var retrySelect = document.getElementById("retrySelect");
+  var timeoutSelect = document.getElementById("timeoutSelect");
+  var formatSelect = document.getElementById("formatSelect");
+  var customReferer = document.getElementById("customReferer");
+  var chkDirectDisk = document.getElementById("chkDirectDisk");
+  var chkSkipBroken = document.getElementById("chkSkipBroken");
+  var statPercent = document.getElementById("statPercent");
+  var statSegments = document.getElementById("statSegments");
+  var statSpeed = document.getElementById("statSpeed");
+  var statEta = document.getElementById("statEta");
+  var progressBarFill = document.getElementById("progressBarFill");
+  var statusMessage = document.getElementById("statusMessage");
+  var segmentGrid = document.getElementById("segmentGrid");
+  var btnStart = document.getElementById("btnStart");
+  var btnCancel = document.getElementById("btnCancel");
+  var btnSave = document.getElementById("btnSave");
+  var previewCard = document.getElementById("previewCard");
+  var previewPlayer = document.getElementById("previewPlayer");
+  var engineStatus = document.getElementById("engineStatus");
+  var btnExportCli = document.getElementById("btnExportCli");
+  var cliModal = document.getElementById("cliModal");
+  var btnCloseCliModal = document.getElementById("btnCloseCliModal");
+  var cliOutputText = document.getElementById("cliOutputText");
+  var btnCopyCli = document.getElementById("btnCopyCli");
+  var cliCopiedToast = document.getElementById("cliCopiedToast");
+  var modalTabs = document.querySelectorAll(".modal-tab");
+  function initFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const streamUrl = params.get("url");
+    const filename = params.get("filename") || params.get("title");
+    const mode = params.get("mode");
+    const referer = params.get("referer");
+    if (referer && customReferer) {
+      customReferer.value = referer;
+    }
+    if (filename) {
+      targetFilename = filename.endsWith(".mp4") ? filename : `${filename}.mp4`;
+      streamTitle.textContent = filename;
+    }
+    if (mode === "record") {
+      initRecordMode(filename);
+      return;
+    }
+    if (streamUrl) {
+      streamUrlInput.value = streamUrl;
+      try {
+        streamDomain.textContent = new URL(streamUrl).hostname;
+      } catch (e) {
+      }
+      analyzeStream(streamUrl);
+    }
+  }
+  function initRecordMode(title) {
+    isRecordMode = true;
+    engineStatus.textContent = "Record Mode";
+    streamTitle.textContent = `Live Buffer Recorder: ${title || "Active Video"}`;
+    streamUrlInput.value = "In-page recorder active. Play the video in the source tab to buffer chunks.";
+    streamUrlInput.disabled = true;
+    btnLoadStream.disabled = true;
+    statusMessage.textContent = "Stream Studio is ready. To record directly inside the webpage with 1x-16x speedup, use the floating in-video overlay.";
+    btnStart.innerHTML = `
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
       <polyline points="7 10 12 15 17 10"></polyline>
@@ -8731,215 +9048,404 @@
     </svg>
     <span>Save Active Buffer</span>
   `;
-      }
-      async function analyzeStream(url) {
-        statusMessage.textContent = "Analyzing stream playlist and available variants...";
-        engineStatus.textContent = "Inspecting";
-        try {
-          currentManifest = await parseHLSManifest(url);
-          if (currentManifest.error) {
-            if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url)) {
-              statusMessage.textContent = "Direct media file detected. Click Start to download directly.";
-              engineStatus.textContent = "Direct File";
-              btnStart.disabled = false;
-              return;
-            }
-            statusMessage.textContent = `Manifest Note: ${currentManifest.error}. Ready to attempt chunked fetch.`;
-            engineStatus.textContent = "Ready";
-            btnStart.disabled = false;
-            return;
-          }
-          if (currentManifest.type === "master" && currentManifest.variants.length > 0) {
-            variantSelect.innerHTML = "";
-            currentManifest.variants.forEach((v, idx) => {
-              const opt = document.createElement("option");
-              opt.value = idx;
-              const res = v.resolution ? `${v.resolution.width}x${v.resolution.height}` : "";
-              const bw = v.bandwidth ? `${Math.round(v.bandwidth / 1e3)} kbps` : "";
-              opt.textContent = `${v.label || res || "Track " + (idx + 1)} ${bw ? `(${bw})` : ""}`;
-              variantSelect.appendChild(opt);
-            });
-            variantRow.style.display = "flex";
-            statusMessage.textContent = `Master playlist loaded with ${currentManifest.variants.length} tracks. Ready to download.`;
-          } else {
-            variantRow.style.display = "none";
-            const segCount = currentManifest.segments ? currentManifest.segments.length : 0;
-            statusMessage.textContent = `Media playlist loaded with ${segCount} segments. Ready to download.`;
-            initSegmentGrid(segCount);
-          }
-          engineStatus.textContent = "Ready";
-          btnStart.disabled = false;
-        } catch (err) {
-          statusMessage.textContent = `Analysis note: ${err.message}`;
-          engineStatus.textContent = "Ready";
-          btnStart.disabled = false;
+  }
+  async function analyzeStream(url) {
+    statusMessage.textContent = "Analyzing stream playlist and available tracks...";
+    engineStatus.textContent = "Inspecting";
+    if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url)) {
+      statusMessage.textContent = "Direct media file detected. Click Start to download directly.";
+      engineStatus.textContent = "Direct File";
+      variantRow.style.display = "none";
+      if (subtitleRow) subtitleRow.style.display = "none";
+      btnStart.disabled = false;
+      return;
+    }
+    try {
+      const isMpd = url.includes(".mpd") || url.includes("/dash/");
+      let manifest = null;
+      if (isMpd) {
+        statusMessage.textContent = "Parsing MPEG-DASH MPD manifest...";
+        manifest = await parseDASHManifest(url);
+      } else {
+        manifest = await parseHLSManifest(url);
+        if (manifest.error && (manifest.error.includes("xml") || manifest.error.includes("MPD"))) {
+          manifest = await parseDASHManifest(url);
         }
       }
-      function initSegmentGrid(total) {
-        segmentGrid.innerHTML = "";
-        for (let i = 0; i < total; i++) {
-          const dot = document.createElement("div");
-          dot.className = "seg-dot";
-          dot.id = `seg_${i}`;
-          segmentGrid.appendChild(dot);
-        }
-        statSegments.textContent = `0 / ${total}`;
+      currentManifest = manifest;
+      if (currentManifest.error) {
+        statusMessage.textContent = `Manifest Note: ${currentManifest.error}. Ready to attempt chunked fetch.`;
+        engineStatus.textContent = "Ready";
+        btnStart.disabled = false;
+        return;
       }
-      async function startDownload() {
-        const url = streamUrlInput.value.trim();
-        if (!url) return;
-        if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url) && (!currentManifest || currentManifest.error)) {
-          statusMessage.textContent = "Starting direct media download...";
-          try {
-            if (chrome?.downloads?.download) {
-              chrome.downloads.download({
-                url,
-                filename: targetFilename,
-                saveAs: true
-              });
-            } else {
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = targetFilename;
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-            }
-            statusMessage.textContent = "Direct download started successfully!";
-            engineStatus.textContent = "Downloading";
-          } catch (e) {
-            statusMessage.textContent = `Download error: ${e.message}`;
-          }
-          return;
-        }
-        btnStart.style.display = "none";
-        btnCancel.style.display = "inline-flex";
-        btnSave.style.display = "none";
-        previewCard.style.display = "none";
-        engineStatus.textContent = "Downloading";
-        let selectedVariant = null;
-        if (currentManifest?.type === "master" && currentManifest.variants.length > 0) {
-          const selectedIndex = parseInt(variantSelect.value, 10) || 0;
-          selectedVariant = currentManifest.variants[selectedIndex];
-        }
-        const modeKey = concurrencySelect ? concurrencySelect.value : "turbo";
-        let concurrency = CONCURRENCY_PROFILES.TURBO;
-        if (modeKey === "ultra") concurrency = CONCURRENCY_PROFILES.ULTRA;
-        else if (modeKey === "maximum") concurrency = CONCURRENCY_PROFILES.MAXIMUM;
-        else if (modeKey === "balanced") concurrency = CONCURRENCY_PROFILES.BALANCED;
-        else if (modeKey === "gentle") concurrency = CONCURRENCY_PROFILES.GENTLE;
-        else if (modeKey === "safe") concurrency = CONCURRENCY_PROFILES.SAFE;
-        const maxRetries = retrySelect ? parseInt(retrySelect.value, 10) || 3 : 3;
-        const timeoutMs = timeoutSelect ? parseInt(timeoutSelect.value, 10) || 15e3 : 15e3;
-        const skipFailedSegments = chkSkipBroken ? chkSkipBroken.checked : true;
-        const referer = customReferer ? customReferer.value.trim() : null;
-        const audioOnly = formatSelect ? formatSelect.value === "audio" : false;
-        let writableStream = null;
-        const useDirectDisk = chkDirectDisk && chkDirectDisk.checked && window.showSaveFilePicker;
-        if (useDirectDisk && !audioOnly) {
-          try {
-            statusMessage.textContent = "Choose destination file on local disk...";
-            const fileHandle = await window.showSaveFilePicker({
-              suggestedName: targetFilename,
-              types: [{
-                description: "MP4 Video (*.mp4)",
-                accept: { "video/mp4": [".mp4"] }
-              }]
-            });
-            writableStream = await fileHandle.createWritable();
-            statusMessage.textContent = "Streaming segments directly to disk (0% RAM bloat)...";
-          } catch (e) {
-            statusMessage.textContent = "Download cancelled: No destination file selected";
-            btnStart.style.display = "inline-flex";
-            btnCancel.style.display = "none";
-            engineStatus.textContent = "Cancelled";
-            return;
-          }
-        }
-        currentEngine = new HLSEngine({
-          concurrency,
-          maxRetries,
-          timeoutMs,
-          skipFailedSegments,
-          referer,
-          audioOnly,
-          onStatus: (msg) => {
-            statusMessage.textContent = msg;
-          },
-          onProgress: (info) => {
-            statPercent.textContent = `${info.percent}%`;
-            statSegments.textContent = `${info.completed} / ${info.total}`;
-            statSpeed.textContent = `${info.speedMBs} MB/s`;
-            statEta.textContent = info.etaSec > 0 ? `${info.etaSec}s` : "--";
-            progressBarFill.style.width = `${info.percent}%`;
-            const dot = document.getElementById(`seg_${info.index}`);
-            if (dot) {
-              dot.className = info.failed ? "seg-dot failed" : "seg-dot done";
-            }
-          }
+      if (currentManifest.variants && currentManifest.variants.length > 0) {
+        variantSelect.innerHTML = "";
+        currentManifest.variants.forEach((v, idx) => {
+          const opt = document.createElement("option");
+          opt.value = idx;
+          const res = v.resolution ? `${v.resolution.width ? v.resolution.width + "x" + v.resolution.height : v.resolution}` : "";
+          const bw = v.bandwidth ? `${Math.round(v.bandwidth / 1e3)} kbps` : "";
+          opt.textContent = `${v.label || res || "Track " + (idx + 1)} ${bw ? `(${bw})` : ""}`;
+          variantSelect.appendChild(opt);
         });
-        try {
-          const result = await currentEngine.downloadAndMux(url, {
-            selectedVariant,
-            writableStream
+        variantRow.style.display = "flex";
+        const firstTrack = currentManifest.variants[0];
+        const segCount = firstTrack.segments ? firstTrack.segments.length : currentManifest.segments ? currentManifest.segments.length : 0;
+        statusMessage.textContent = `${currentManifest.type === "dash" ? "MPEG-DASH" : "HLS Master"} playlist loaded with ${currentManifest.variants.length} tracks. Ready to download.`;
+        if (segCount > 0) initSegmentGrid(segCount);
+      } else {
+        variantRow.style.display = "none";
+        const segCount = currentManifest.segments ? currentManifest.segments.length : 0;
+        statusMessage.textContent = `Media playlist loaded with ${segCount} segments. Ready to download.`;
+        initSegmentGrid(segCount);
+      }
+      if (subtitleRow && subtitleSelect) {
+        if (currentManifest.subtitles && currentManifest.subtitles.length > 0) {
+          subtitleSelect.innerHTML = "";
+          currentManifest.subtitles.forEach((s, idx) => {
+            const opt = document.createElement("option");
+            opt.value = idx;
+            opt.textContent = `${s.name || s.language || "Subtitle " + (idx + 1)} (${s.language || "und"})`;
+            subtitleSelect.appendChild(opt);
           });
-          engineStatus.textContent = "Complete";
-          btnCancel.style.display = "none";
-          if (result.directStream) {
-            statusMessage.textContent = `Saved directly to disk: ${targetFilename}`;
-            progressBarFill.style.width = "100%";
-            statPercent.textContent = "100%";
-          } else {
-            currentBlob = result.blob;
-            statusMessage.textContent = "Transmuxing complete! MP4 is ready.";
-            btnSave.style.display = "inline-flex";
-            if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
-            currentBlobUrl = URL.createObjectURL(currentBlob);
-            previewPlayer.src = currentBlobUrl;
-            previewCard.style.display = "block";
-          }
-        } catch (err) {
-          engineStatus.textContent = "Stopped";
-          statusMessage.textContent = `Download stopped: ${err.message}`;
-          btnStart.style.display = "inline-flex";
-          btnCancel.style.display = "none";
+          subtitleRow.style.display = "flex";
+        } else {
+          subtitleRow.style.display = "none";
         }
       }
-      function saveMp4() {
-        if (!currentBlobUrl) return;
-        try {
-          if (chrome?.downloads?.download) {
-            chrome.downloads.download({
-              url: currentBlobUrl,
-              filename: targetFilename,
-              saveAs: true
-            });
-            return;
+      engineStatus.textContent = "Ready";
+      btnStart.disabled = false;
+    } catch (err) {
+      statusMessage.textContent = `Analysis note: ${err.message}`;
+      engineStatus.textContent = "Ready";
+      btnStart.disabled = false;
+    }
+  }
+  function initSegmentGrid(total) {
+    segmentGrid.innerHTML = "";
+    for (let i = 0; i < total; i++) {
+      const dot = document.createElement("div");
+      dot.className = "seg-dot";
+      dot.id = `seg_${i}`;
+      segmentGrid.appendChild(dot);
+    }
+    statSegments.textContent = `0 / ${total}`;
+  }
+  async function downloadSubtitles() {
+    if (!currentManifest || !currentManifest.subtitles || currentManifest.subtitles.length === 0) return;
+    const idx = parseInt(subtitleSelect.value, 10) || 0;
+    const sub = currentManifest.subtitles[idx];
+    if (!sub || !sub.url) return;
+    statusMessage.textContent = `Fetching subtitles: ${sub.name || "track"}...`;
+    try {
+      const res = await fetch(sub.url);
+      const text = await res.text();
+      let vttContent = text;
+      if (text.includes("#EXTM3U")) {
+        const lines = text.split("\n");
+        const segmentUrls = [];
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith("#")) {
+            try {
+              segmentUrls.push(new URL(trimmed, sub.url).href);
+            } catch (e) {
+              segmentUrls.push(trimmed);
+            }
           }
-        } catch (e) {
         }
+        if (segmentUrls.length > 0) {
+          const chunks = [];
+          for (const sUrl of segmentUrls) {
+            const cRes = await fetch(sUrl);
+            const cText = await cRes.text();
+            chunks.push(cText);
+          }
+          vttContent = "WEBVTT\n\n" + chunks.map((c) => c.replace(/^WEBVTT[^\n]*\n+/g, "")).join("\n");
+        }
+      }
+      const blob = new Blob([vttContent], { type: "text/vtt" });
+      const blobUrl = URL.createObjectURL(blob);
+      const subFilename = targetFilename.replace(/\.[^.]+$/, "") + `_${sub.language || "sub"}.vtt`;
+      if (chrome?.downloads?.download) {
+        chrome.downloads.download({
+          url: blobUrl,
+          filename: subFilename,
+          saveAs: true
+        });
+      } else {
         const a = document.createElement("a");
-        a.href = currentBlobUrl;
-        a.download = targetFilename;
+        a.href = blobUrl;
+        a.download = subFilename;
         document.body.appendChild(a);
         a.click();
         a.remove();
       }
-      btnLoadStream.addEventListener("click", () => {
-        const url = streamUrlInput.value.trim();
-        if (url) analyzeStream(url);
+      statusMessage.textContent = `Subtitles downloaded: ${subFilename}`;
+    } catch (err) {
+      statusMessage.textContent = `Failed to download subtitles: ${err.message}`;
+    }
+  }
+  function parseTimeString(str) {
+    if (!str) return null;
+    const parts = str.trim().split(":").map((val) => parseFloat(val));
+    if (parts.some(isNaN)) return null;
+    if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    } else if (parts.length === 2) {
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 1) {
+      return parts[0];
+    }
+    return null;
+  }
+  async function startDownload() {
+    const url = streamUrlInput.value.trim();
+    if (!url) return;
+    if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url) && (!currentManifest || currentManifest.error)) {
+      statusMessage.textContent = "Starting direct media download...";
+      try {
+        if (chrome?.downloads?.download) {
+          chrome.downloads.download({
+            url,
+            filename: targetFilename,
+            saveAs: true
+          });
+        } else {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = targetFilename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }
+        statusMessage.textContent = "Direct download started successfully!";
+        engineStatus.textContent = "Downloading";
+      } catch (e) {
+        statusMessage.textContent = `Download error: ${e.message}`;
+      }
+      return;
+    }
+    btnStart.style.display = "none";
+    btnCancel.style.display = "inline-flex";
+    btnSave.style.display = "none";
+    previewCard.style.display = "none";
+    engineStatus.textContent = "Downloading";
+    let selectedVariant = null;
+    if (currentManifest?.variants && currentManifest.variants.length > 0) {
+      const selectedIndex = parseInt(variantSelect.value, 10) || 0;
+      selectedVariant = currentManifest.variants[selectedIndex];
+    }
+    const modeKey = concurrencySelect ? concurrencySelect.value : "turbo";
+    let concurrency = CONCURRENCY_PROFILES.TURBO;
+    if (modeKey === "ultra") concurrency = CONCURRENCY_PROFILES.ULTRA;
+    else if (modeKey === "maximum") concurrency = CONCURRENCY_PROFILES.MAXIMUM;
+    else if (modeKey === "balanced") concurrency = CONCURRENCY_PROFILES.BALANCED;
+    else if (modeKey === "gentle") concurrency = CONCURRENCY_PROFILES.GENTLE;
+    else if (modeKey === "safe") concurrency = CONCURRENCY_PROFILES.SAFE;
+    const maxRetries = retrySelect ? parseInt(retrySelect.value, 10) || 3 : 3;
+    const timeoutMs = timeoutSelect ? parseInt(timeoutSelect.value, 10) || 15e3 : 15e3;
+    const skipFailedSegments = chkSkipBroken ? chkSkipBroken.checked : true;
+    const referer = customReferer ? customReferer.value.trim() : null;
+    const audioOnly = formatSelect ? formatSelect.value === "audio" : false;
+    let timeRange = null;
+    if (sliceStart && sliceEnd) {
+      const sStart = parseTimeString(sliceStart.value);
+      const sEnd = parseTimeString(sliceEnd.value);
+      if (sStart !== null || sEnd !== null) {
+        timeRange = {
+          startSec: sStart !== null ? sStart : 0,
+          endSec: sEnd !== null ? sEnd : Infinity
+        };
+        statusMessage.textContent = `Time-Range Slicing enabled: ${timeRange.startSec}s to ${timeRange.endSec === Infinity ? "End" : timeRange.endSec + "s"}`;
+      }
+    }
+    let writableStream = null;
+    const useDirectDisk = chkDirectDisk && chkDirectDisk.checked && window.showSaveFilePicker;
+    if (useDirectDisk && !audioOnly) {
+      try {
+        statusMessage.textContent = "Choose destination file on local disk...";
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: targetFilename,
+          types: [{
+            description: "MP4 Video (*.mp4)",
+            accept: { "video/mp4": [".mp4"] }
+          }]
+        });
+        writableStream = await fileHandle.createWritable();
+        statusMessage.textContent = "Streaming segments directly to disk (0% RAM bloat)...";
+      } catch (e) {
+        statusMessage.textContent = "Download cancelled: No destination file selected";
+        btnStart.style.display = "inline-flex";
+        btnCancel.style.display = "none";
+        engineStatus.textContent = "Cancelled";
+        return;
+      }
+    }
+    currentEngine = new HLSEngine({
+      concurrency,
+      maxRetries,
+      timeoutMs,
+      skipFailedSegments,
+      referer,
+      audioOnly,
+      onStatus: (msg) => {
+        statusMessage.textContent = msg;
+      },
+      onProgress: (info) => {
+        statPercent.textContent = `${info.percent}%`;
+        statSegments.textContent = `${info.completed} / ${info.total}`;
+        statSpeed.textContent = `${info.speedMBs} MB/s`;
+        statEta.textContent = info.etaSec > 0 ? `${info.etaSec}s` : "--";
+        progressBarFill.style.width = `${info.percent}%`;
+        const dot = document.getElementById(`seg_${info.index}`);
+        if (dot) {
+          dot.className = info.failed ? "seg-dot failed" : "seg-dot done";
+        }
+      }
+    });
+    try {
+      const result = await currentEngine.downloadAndMux(url, {
+        selectedVariant,
+        manifest: currentManifest,
+        writableStream,
+        timeRange
       });
-      btnStart.addEventListener("click", startDownload);
-      btnCancel.addEventListener("click", () => {
-        if (currentEngine) {
-          currentEngine.abort();
+      engineStatus.textContent = "Complete";
+      btnCancel.style.display = "none";
+      if (result.directStream) {
+        statusMessage.textContent = `Saved directly to disk: ${targetFilename}`;
+        progressBarFill.style.width = "100%";
+        statPercent.textContent = "100%";
+      } else {
+        currentBlob = result.blob;
+        statusMessage.textContent = "Transmuxing complete! MP4 is ready.";
+        btnSave.style.display = "inline-flex";
+        if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = URL.createObjectURL(currentBlob);
+        previewPlayer.src = currentBlobUrl;
+        previewCard.style.display = "block";
+      }
+    } catch (err) {
+      engineStatus.textContent = "Stopped";
+      statusMessage.textContent = `Download stopped: ${err.message}`;
+      btnStart.style.display = "inline-flex";
+      btnCancel.style.display = "none";
+    }
+  }
+  function saveMp4() {
+    if (!currentBlobUrl) return;
+    try {
+      if (chrome?.downloads?.download) {
+        chrome.downloads.download({
+          url: currentBlobUrl,
+          filename: targetFilename,
+          saveAs: true
+        });
+        return;
+      }
+    } catch (e) {
+    }
+    const a = document.createElement("a");
+    a.href = currentBlobUrl;
+    a.download = targetFilename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function updateCliCommand() {
+    const url = streamUrlInput.value.trim();
+    const referer = customReferer ? customReferer.value.trim() : "";
+    const filename = targetFilename || "video.mp4";
+    let refArg = referer;
+    if (!refArg && url) {
+      try {
+        refArg = new URL(url).origin;
+      } catch (e) {
+      }
+    }
+    let cmd = "";
+    if (currentCliCmd === "ytdlp") {
+      cmd = `yt-dlp "${url}"` + (refArg ? ` --referer "${refArg}"` : "") + ` -o "${filename}"`;
+    } else if (currentCliCmd === "curl") {
+      cmd = `curl -L "${url}"` + (refArg ? ` -H "Referer: ${refArg}"` : "") + ` -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o "${filename}"`;
+    } else if (currentCliCmd === "aria2c") {
+      cmd = `aria2c -x 16 -s 16` + (refArg ? ` --header="Referer: ${refArg}"` : "") + ` -o "${filename}" "${url}"`;
+    }
+    if (cliOutputText) cliOutputText.value = cmd;
+  }
+  if (btnExportCli && cliModal) {
+    btnExportCli.addEventListener("click", () => {
+      updateCliCommand();
+      cliModal.style.display = "flex";
+    });
+    if (btnCloseCliModal) {
+      btnCloseCliModal.addEventListener("click", () => {
+        cliModal.style.display = "none";
+      });
+    }
+    cliModal.addEventListener("click", (e) => {
+      if (e.target === cliModal) {
+        cliModal.style.display = "none";
+      }
+    });
+    modalTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        modalTabs.forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentCliCmd = tab.getAttribute("data-cmd");
+        updateCliCommand();
+      });
+    });
+    if (btnCopyCli && cliOutputText) {
+      btnCopyCli.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(cliOutputText.value);
+          if (cliCopiedToast) {
+            cliCopiedToast.style.display = "inline-block";
+            setTimeout(() => {
+              cliCopiedToast.style.display = "none";
+            }, 2e3);
+          }
+        } catch (err) {
+          cliOutputText.select();
+          document.execCommand("copy");
         }
       });
-      btnSave.addEventListener("click", saveMp4);
-      document.addEventListener("DOMContentLoaded", initFromUrl);
+    }
+  }
+  if (sliceStart && sliceEnd && btnClearSlice) {
+    const checkSlicerState = () => {
+      if (sliceStart.value.trim() || sliceEnd.value.trim()) {
+        btnClearSlice.style.display = "inline-block";
+      } else {
+        btnClearSlice.style.display = "none";
+      }
+    };
+    sliceStart.addEventListener("input", checkSlicerState);
+    sliceEnd.addEventListener("input", checkSlicerState);
+    btnClearSlice.addEventListener("click", () => {
+      sliceStart.value = "";
+      sliceEnd.value = "";
+      btnClearSlice.style.display = "none";
+    });
+  }
+  btnLoadStream.addEventListener("click", () => {
+    const url = streamUrlInput.value.trim();
+    if (url) analyzeStream(url);
+  });
+  if (btnDownloadSubs) {
+    btnDownloadSubs.addEventListener("click", downloadSubtitles);
+  }
+  btnStart.addEventListener("click", startDownload);
+  btnCancel.addEventListener("click", () => {
+    if (currentEngine) {
+      currentEngine.abort();
     }
   });
-  require_downloader_bundle();
+  btnSave.addEventListener("click", saveMp4);
+  document.addEventListener("DOMContentLoaded", initFromUrl);
 })();
 /*! Bundled license information:
 

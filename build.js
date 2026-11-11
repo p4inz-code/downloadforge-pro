@@ -5,11 +5,16 @@
 // Esbuild pipeline to bundle:
 // 1. content_script.js -> dist/content_script.bundle.js (iife)
 // 2. downloader_bundle.js -> dist/downloader.bundle.js (iife, includes mux.js)
+// 3. stream_worker.js -> dist/stream_worker.bundle.js (iife, includes mux.js)
 // ============================================================
 
-const esbuild = require('esbuild');
-const fs = require('fs');
-const path = require('path');
+import esbuild from 'esbuild';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const distDir = path.join(__dirname, 'dist');
 if (!fs.existsSync(distDir)) {
@@ -44,9 +49,21 @@ async function build() {
     });
     console.log('[Build] [OK] dist/downloader.bundle.js built successfully');
 
+    // 3. Bundle offscreen stream worker
+    await esbuild.build({
+      entryPoints: [path.join(__dirname, 'src/core/worker/stream_worker.js')],
+      bundle: true,
+      outfile: path.join(distDir, 'stream_worker.bundle.js'),
+      format: 'iife',
+      platform: 'browser',
+      target: ['chrome100'],
+      minify: false,
+    });
+    console.log('[Build] [OK] dist/stream_worker.bundle.js built successfully');
+
     console.log('[Build] All bundles compiled cleanly!');
   } catch (err) {
-    console.error('[Build] Build failed:', err);
+    console.error('[Build Error]', err);
     process.exit(1);
   }
 }

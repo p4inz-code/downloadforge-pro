@@ -3,14 +3,14 @@
   "version": "1.0.2",
   "description": "**By P4inz Interactive Labs — Built by p4inz**",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "build": "node build.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/test_parsers.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Atharva Patil (p4inz)",
   "license": "ISC",
-  "type": "commonjs",
   "devDependencies": {
     "esbuild": "^0.28.2",
     "mux.js": "^6.3.0"

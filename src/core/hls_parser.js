@@ -29,6 +29,7 @@ export async function parseHLSManifest(url) {
     isProtected: false,
     variants: [],        // master playlist variants
     audioTracks: [],     // master playlist separate audio tracks
+    subtitles: [],       // subtitle tracks (.vtt)
     segments: [],        // media playlist segments
     duration: null,
     targetDuration: null,
@@ -115,6 +116,14 @@ function parseMasterPlaylist(lines, baseUrl, result) {
           default: attrs.DEFAULT === 'YES',
           url: resolveUrl(attrs.URI, baseUrl),
         });
+      } else if (attrs.TYPE === 'SUBTITLES' && attrs.URI) {
+        result.subtitles.push({
+          groupId: attrs['GROUP-ID'] || 'subtitles',
+          name: attrs.NAME || 'Subtitle',
+          language: attrs.LANGUAGE || 'en',
+          default: attrs.DEFAULT === 'YES',
+          url: resolveUrl(attrs.URI, baseUrl),
+        });
       }
       continue;
     }
@@ -196,6 +205,7 @@ function parseMediaPlaylist(lines, baseUrl, result) {
         result.segments.push({
           url: segUrl,
           duration: segDuration,
+          startTime: totalDuration,
           key: currentKey ? { ...currentKey } : null,
           initMap: initMap ? { ...initMap } : null,
           byteRange: currentByteRange ? { ...currentByteRange } : null,

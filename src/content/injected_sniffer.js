@@ -159,11 +159,38 @@
     }
   }
 
-  document.querySelectorAll('video').forEach(inspectVideoElement);
-  window.addEventListener('play', (e) => {
-    if (e.target && e.target.tagName === 'VIDEO') {
-      inspectVideoElement(e.target);
-    }
-  }, true);
+  // ── 5. Intercept Web Workers & SharedWorkers ──────────────
+  if (window.Worker) {
+    const OriginalWorker = window.Worker;
+    window.Worker = function(scriptURL, options) {
+      if (typeof scriptURL === 'string' && MEDIA_REGEX.test(scriptURL)) {
+        notifyDetected({
+          url: scriptURL,
+          category: 'stream',
+          initiator: 'worker'
+        });
+      }
+      return new OriginalWorker(scriptURL, options);
+    };
+    window.Worker.prototype = OriginalWorker.prototype;
+  }
+
+  // ── 6. Dynamic DOM MutationObserver for Video Elements ─────
+  try {
+    const domObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === 1) {
+            if (node.tagName === 'VIDEO') {
+              inspectVideoElement(node);
+            } else if (node.querySelectorAll) {
+              node.querySelectorAll('video').forEach(inspectVideoElement);
+            }
+          }
+        }
+      }
+    });
+    domObserver.observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
 
 })();

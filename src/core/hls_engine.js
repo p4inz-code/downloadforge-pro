@@ -14,6 +14,7 @@
 
 import muxjs from 'mux.js';
 import { parseHLSManifest } from './hls_parser.js';
+import { parseDASHManifest } from './dash_parser.js';
 
 export const CONCURRENCY_PROFILES = {
   SAFE: 1,
@@ -32,15 +33,24 @@ export class HLSEngine {
     this.skipFailedSegments = options.skipFailedSegments !== false;
     this.referer = options.referer || null;
     this.audioOnly = options.audioOnly || false;
+    this.useWorker = options.useWorker !== false;
     this.onProgress = options.onProgress || (() => {});
     this.onStatus = options.onStatus || (() => {});
     this.aborted = false;
     this.paused = false;
+    this.activeWorker = null;
     this.keyCache = new Map();
   }
 
   abort() {
     this.aborted = true;
+    if (this.activeWorker) {
+      try {
+        this.activeWorker.postMessage({ type: 'ABORT' });
+        this.activeWorker.terminate();
+      } catch (e) {}
+      this.activeWorker = null;
+    }
   }
 
   /**
@@ -54,52 +64,107 @@ export class HLSEngine {
    * @returns {Promise<{ blob?: Blob, directStream: boolean }>}
    */
   async downloadAndMux(manifestUrl, options = {}) {
-    const { selectedVariant = null, writableStream = null } = options;
+    const { selectedVariant = null, writableStream = null, timeRange = null, manifest = null } = options;
     this.aborted = false;
     this.onStatus('Fetching playlist manifest...');
 
-    const parseResult = await parseHLSManifest(manifestUrl);
-    if (parseResult.error) {
-      throw new Error(`Playlist parse error: ${parseResult.error}`);
-    }
-
-    let mediaUrl = manifestUrl;
-    let targetPlaylist = parseResult;
-
-    if (parseResult.type === 'master') {
-      const variant = selectedVariant || parseResult.variants[0];
-      if (!variant) throw new Error('No valid video variants found in master playlist');
-      mediaUrl = variant.url;
-      this.onStatus(`Loading video track: ${variant.label || variant.resolution || 'best'}...`);
-      targetPlaylist = await parseHLSManifest(mediaUrl);
-      if (targetPlaylist.error) throw new Error(targetPlaylist.error);
-    }
-
-    const segments = targetPlaylist.segments;
-    if (!segments || segments.length === 0) {
-      throw new Error('Playlist contains zero media segments');
-    }
-
-    // Dual-track separate audio stream detection
+    const isDash = manifestUrl.includes('.mpd') || manifest?.type === 'dash';
+    let streamType = isDash ? 'dash' : 'hls';
+    let segments = [];
     let audioSegments = [];
-    if (parseResult.type === 'master' && parseResult.audioTracks?.length > 0) {
-      const matchTrack = parseResult.audioTracks.find(t => t.default) || parseResult.audioTracks[0];
-      if (matchTrack?.url) {
-        try {
-          this.onStatus(`Found paired audio track (${matchTrack.name || matchTrack.language}). Fetching...`);
-          const audioResult = await parseHLSManifest(matchTrack.url);
-          if (audioResult.segments?.length > 0) {
-            audioSegments = audioResult.segments;
+    let initUrl = null;
+
+    if (isDash) {
+      this.onStatus('Parsing MPEG-DASH MPD manifest...');
+      const dashResult = manifest && manifest.type === 'dash' ? manifest : await parseDASHManifest(manifestUrl);
+      if (dashResult.error) throw new Error(dashResult.error);
+
+      const track = selectedVariant || dashResult.variants[0];
+      if (!track || !track.segments) throw new Error('No valid MPEG-DASH representation found');
+
+      segments = track.segments;
+      initUrl = track.initUrl || null;
+
+      if (dashResult.defaultAudioTrack && dashResult.defaultAudioTrack.segments) {
+        audioSegments = dashResult.defaultAudioTrack.segments;
+      }
+    } else {
+      const parseResult = manifest && manifest.type ? manifest : await parseHLSManifest(manifestUrl);
+      if (parseResult.error) {
+        throw new Error(`Playlist parse error: ${parseResult.error}`);
+      }
+
+      let mediaUrl = manifestUrl;
+      let targetPlaylist = parseResult;
+
+      if (parseResult.type === 'master') {
+        const variant = selectedVariant || parseResult.variants[0];
+        if (!variant) throw new Error('No valid video variants found in master playlist');
+        mediaUrl = variant.url;
+        this.onStatus(`Loading video track: ${variant.label || variant.resolution || 'best'}...`);
+        targetPlaylist = await parseHLSManifest(mediaUrl);
+        if (targetPlaylist.error) throw new Error(targetPlaylist.error);
+      }
+
+      segments = targetPlaylist.segments;
+      if (!segments || segments.length === 0) {
+        throw new Error('Playlist contains zero media segments');
+      }
+
+      // Dual-track separate audio stream detection
+      if (parseResult.type === 'master' && parseResult.audioTracks?.length > 0) {
+        const matchTrack = parseResult.audioTracks.find(t => t.default) || parseResult.audioTracks[0];
+        if (matchTrack?.url) {
+          try {
+            this.onStatus(`Found paired audio track (${matchTrack.name || matchTrack.language}). Fetching...`);
+            const audioResult = await parseHLSManifest(matchTrack.url);
+            if (audioResult.segments?.length > 0) {
+              audioSegments = audioResult.segments;
+            }
+          } catch (e) {
+            console.debug('Failed to load separate audio track:', e);
           }
-        } catch (e) {
-          console.debug('Failed to load separate audio track:', e);
         }
       }
     }
 
-    this.onStatus(`Found ${segments.length} video segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ''}. Initializing engine...`);
+    // Apply Time-Range Slice (if specified)
+    if (timeRange && (timeRange.startSec > 0 || (timeRange.endSec && timeRange.endSec < Infinity))) {
+      const { startSec = 0, endSec = Infinity } = timeRange;
+      const filtered = segments.filter(seg => {
+        const segStart = seg.startTime !== undefined ? seg.startTime : 0;
+        const segEnd = segStart + (seg.duration || 0);
+        return segEnd >= startSec && segStart <= endSec;
+      });
+      if (filtered.length > 0) {
+        segments = filtered;
+        this.onStatus(`Time slice applied: ${segments.length} segments selected (${startSec}s -> ${endSec}s).`);
+      }
+    }
 
-    // Prepare Transmuxer with DTS/PTS alignment
+    this.onStatus(`Found ${segments.length} media segments${audioSegments.length > 0 ? ` + ${audioSegments.length} audio segments` : ''}. Initializing engine...`);
+
+    // Attempt Offscreen Web Worker Execution (Zero UI Jank)
+    if (this.useWorker && typeof Worker !== 'undefined') {
+      try {
+        this.onStatus('Spawning dedicated offscreen Web Worker...');
+        return await this.runWithWorker({
+          streamType,
+          segments,
+          initUrl,
+          audioSegments,
+          concurrency: this.concurrency,
+          maxRetries: this.maxRetries,
+          timeoutMs: this.timeoutMs,
+          skipFailedSegments: this.skipFailedSegments,
+          referer: this.referer,
+        }, writableStream);
+      } catch (workerErr) {
+        console.warn('[DownloadForge] Web Worker execution fallback to in-thread:', workerErr.message);
+      }
+    }
+
+    // Prepare In-Thread Transmuxer with DTS/PTS alignment
     const transmuxer = new muxjs.mp4.Transmuxer({
       keepOriginalTimestamps: false,
     });
@@ -359,5 +424,71 @@ export class HLSEngine {
       }
       throw err;
     }
+  }
+
+  /**
+   * Offloads ingestion and transmuxing to dedicated Web Worker.
+   */
+  async runWithWorker(config, writableStream) {
+    return new Promise((resolve, reject) => {
+      let workerUrl;
+      try {
+        workerUrl = chrome?.runtime?.getURL ? chrome.runtime.getURL('dist/stream_worker.bundle.js') : 'dist/stream_worker.bundle.js';
+      } catch (e) {
+        return reject(new Error('Extension context unavailable for worker'));
+      }
+
+      let worker;
+      try {
+        worker = new Worker(workerUrl);
+      } catch (err) {
+        return reject(err);
+      }
+
+      this.activeWorker = worker;
+      let writeChain = Promise.resolve();
+      const collectedBuffers = [];
+
+      worker.onmessage = async (e) => {
+        const { type, chunk, message, error, ...rest } = e.data || {};
+
+        if (type === 'STATUS') {
+          this.onStatus(message);
+        } else if (type === 'PROGRESS') {
+          this.onProgress(rest);
+        } else if (type === 'CHUNK') {
+          if (writableStream) {
+            writeChain = writeChain.then(() => writableStream.write(chunk));
+          } else {
+            collectedBuffers.push(chunk);
+          }
+        } else if (type === 'COMPLETE') {
+          worker.terminate();
+          this.activeWorker = null;
+
+          if (writableStream) {
+            this.onStatus('Finalizing direct disk stream...');
+            await writeChain;
+            await writableStream.close();
+            resolve({ directStream: true });
+          } else {
+            const finalBlob = new Blob(collectedBuffers, { type: 'video/mp4' });
+            resolve({ blob: finalBlob, directStream: false });
+          }
+        } else if (type === 'ERROR') {
+          worker.terminate();
+          this.activeWorker = null;
+          reject(new Error(error || 'Worker error'));
+        }
+      };
+
+      worker.onerror = (err) => {
+        worker.terminate();
+        this.activeWorker = null;
+        reject(err);
+      };
+
+      worker.postMessage({ type: 'START', payload: config });
+    });
   }
 }

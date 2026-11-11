@@ -23,7 +23,7 @@
       </div>
       <div class="header-badges">
         <span class="badge status-badge" id="engineStatus">Ready</span>
-        <span class="badge tech-badge">WebCrypto AES-128</span>
+        <span class="badge tech-badge">Web Worker Offscreen</span>
         <span class="badge tech-badge">Direct-to-Disk</span>
       </div>
     </header>
@@ -41,16 +41,26 @@
         </div>
 
         <div class="input-row">
-          <input type="text" id="streamUrlInput" placeholder="Paste .m3u8, direct video URL or stream source..." autocomplete="off" spellcheck="false" />
+          <input type="text" id="streamUrlInput" placeholder="Paste .m3u8, .mpd (DASH), direct video URL or stream source..." autocomplete="off" spellcheck="false" />
           <button id="btnLoadStream" class="btn secondary">Analyze Stream</button>
         </div>
 
         <!-- Settings Grid (Matching FetchV Parity) -->
         <div class="config-grid">
           <div class="config-item" id="variantRow" style="display: none;">
-            <label for="variantSelect">Quality / Resolution Track:</label>
+            <label for="variantSelect">Quality / Track:</label>
             <div class="custom-select-wrap">
               <select id="variantSelect"></select>
+            </div>
+          </div>
+
+          <div class="config-item" id="subtitleRow" style="display: none;">
+            <label for="subtitleSelect">Subtitles / Captions:</label>
+            <div class="subtitle-actions">
+              <div class="custom-select-wrap">
+                <select id="subtitleSelect"></select>
+              </div>
+              <button id="btnDownloadSubs" class="btn secondary sm">Download VTT</button>
             </div>
           </div>
 
@@ -81,10 +91,10 @@
           </div>
 
           <div class="config-item">
-            <label for="timeoutSelect">Segment Request Timeout:</label>
+            <label for="timeoutSelect">Segment Timeout:</label>
             <div class="custom-select-wrap">
               <select id="timeoutSelect">
-                <option value="15000" selected>15 Seconds (Recommended)</option>
+                <option value="15000" selected>15 Seconds (Standard)</option>
                 <option value="10000">10 Seconds (Fast CDNs)</option>
                 <option value="30000">30 Seconds (Slow CDNs)</option>
                 <option value="5000">5 Seconds (Very Fast)</option>
@@ -103,8 +113,22 @@
           </div>
 
           <div class="config-item">
-            <label for="customReferer">Custom Referer / Origin Header:</label>
+            <label for="customReferer">Custom Referer Header:</label>
             <input type="text" id="customReferer" placeholder="Auto-detected from source tab..." />
+          </div>
+        </div>
+
+        <!-- Time-Range Slicer Row -->
+        <div class="slicer-box">
+          <div class="slicer-header">
+            <span class="slicer-label">Time-Range Slicer (Optional):</span>
+            <span class="slicer-help">Download specific start and end timestamps</span>
+          </div>
+          <div class="slicer-inputs">
+            <input type="text" id="sliceStart" placeholder="From (e.g. 00:01:30)" />
+            <span class="slicer-sep">&rarr;</span>
+            <input type="text" id="sliceEnd" placeholder="To (e.g. 00:05:00)" />
+            <button id="btnClearSlice" class="btn secondary sm" style="display: none;">Clear</button>
           </div>
         </div>
 
@@ -185,6 +209,13 @@
             </svg>
             <span>Save MP4 File</span>
           </button>
+          <button id="btnExportCli" class="btn secondary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg>
+            <span>Export CLI</span>
+          </button>
         </div>
       </section>
 
@@ -200,11 +231,31 @@
       </section>
     </main>
 
+    <!-- CLI Export Modal -->
+    <div class="modal-overlay" id="cliModal" style="display: none;">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Export Terminal Command</h3>
+          <button class="modal-close" id="btnCloseCliModal">&times;</button>
+        </div>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-cmd="ytdlp">yt-dlp</button>
+          <button class="modal-tab" data-cmd="curl">cURL</button>
+          <button class="modal-tab" data-cmd="aria2c">aria2c</button>
+        </div>
+        <textarea class="modal-code" id="cliOutputText" readonly spellcheck="false"></textarea>
+        <div class="modal-footer">
+          <button id="btnCopyCli" class="btn">Copy Command</button>
+          <span class="modal-toast" id="cliCopiedToast" style="display: none;">Copied to clipboard</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer class="studio-footer">
       <span>P4inz Interactive Labs · <a href="https://atharvapatil.tech" target="_blank">atharvapatil.tech</a></span>
       <span>•</span>
-      <span>Hardware AES-128 WebCrypto · Direct-to-Disk Zero-RAM Engine</span>
+      <span>Dual Protocol (HLS + MPEG-DASH) · Direct-to-Disk Streaming</span>
     </footer>
   </div>
 

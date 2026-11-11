@@ -1,257 +1,235 @@
 (() => {
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __esm = (fn, res, err) => function __init() {
-    if (err) throw err[0];
-    try {
-      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-    } catch (e) {
-      throw err = [e], e;
-    }
-  };
-  var __commonJS = (cb, mod) => function __require() {
-    try {
-      return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-    } catch (e) {
-      throw mod = 0, e;
-    }
-  };
-
   // src/shared/constants.js
-  var CATEGORY, EXT_MAP, MIME_MAP, CATEGORY_META, SOURCE, STATUS, MSG, STORAGE, DEFAULT_SETTINGS, LIMITS, IGNORED_DOMAINS;
-  var init_constants = __esm({
-    "src/shared/constants.js"() {
-      CATEGORY = {
-        VIDEO: "video",
-        AUDIO: "audio",
-        IMAGE: "image",
-        DOCUMENT: "document",
-        ARCHIVE: "archive",
-        STREAM: "stream",
-        // HLS / m3u8 — non-DRM only
-        OTHER: "other",
-        UNKNOWN: "unknown"
-      };
-      EXT_MAP = {
-        // Video
-        mp4: CATEGORY.VIDEO,
-        webm: CATEGORY.VIDEO,
-        mov: CATEGORY.VIDEO,
-        mkv: CATEGORY.VIDEO,
-        avi: CATEGORY.VIDEO,
-        flv: CATEGORY.VIDEO,
-        m4v: CATEGORY.VIDEO,
-        ogv: CATEGORY.VIDEO,
-        "3gp": CATEGORY.VIDEO,
-        // Audio
-        mp3: CATEGORY.AUDIO,
-        wav: CATEGORY.AUDIO,
-        ogg: CATEGORY.AUDIO,
-        m4a: CATEGORY.AUDIO,
-        aac: CATEGORY.AUDIO,
-        flac: CATEGORY.AUDIO,
-        opus: CATEGORY.AUDIO,
-        weba: CATEGORY.AUDIO,
-        // Images
-        jpg: CATEGORY.IMAGE,
-        jpeg: CATEGORY.IMAGE,
-        png: CATEGORY.IMAGE,
-        webp: CATEGORY.IMAGE,
-        gif: CATEGORY.IMAGE,
-        bmp: CATEGORY.IMAGE,
-        svg: CATEGORY.IMAGE,
-        ico: CATEGORY.IMAGE,
-        avif: CATEGORY.IMAGE,
-        tiff: CATEGORY.IMAGE,
-        tif: CATEGORY.IMAGE,
-        // Documents
-        pdf: CATEGORY.DOCUMENT,
-        doc: CATEGORY.DOCUMENT,
-        docx: CATEGORY.DOCUMENT,
-        xls: CATEGORY.DOCUMENT,
-        xlsx: CATEGORY.DOCUMENT,
-        ppt: CATEGORY.DOCUMENT,
-        pptx: CATEGORY.DOCUMENT,
-        txt: CATEGORY.DOCUMENT,
-        csv: CATEGORY.DOCUMENT,
-        json: CATEGORY.DOCUMENT,
-        xml: CATEGORY.DOCUMENT,
-        md: CATEGORY.DOCUMENT,
-        epub: CATEGORY.DOCUMENT,
-        rtf: CATEGORY.DOCUMENT,
-        // Archives
-        zip: CATEGORY.ARCHIVE,
-        rar: CATEGORY.ARCHIVE,
-        "7z": CATEGORY.ARCHIVE,
-        tar: CATEGORY.ARCHIVE,
-        gz: CATEGORY.ARCHIVE,
-        bz2: CATEGORY.ARCHIVE,
-        xz: CATEGORY.ARCHIVE,
-        zst: CATEGORY.ARCHIVE,
-        // Streams (non-DRM, authorized only)
-        m3u8: CATEGORY.STREAM,
-        m3u: CATEGORY.STREAM,
-        mpd: CATEGORY.STREAM
-      };
-      MIME_MAP = {
-        "video/mp4": CATEGORY.VIDEO,
-        "video/webm": CATEGORY.VIDEO,
-        "video/quicktime": CATEGORY.VIDEO,
-        "video/x-msvideo": CATEGORY.VIDEO,
-        "video/ogg": CATEGORY.VIDEO,
-        "video/3gpp": CATEGORY.VIDEO,
-        "audio/mpeg": CATEGORY.AUDIO,
-        "audio/wav": CATEGORY.AUDIO,
-        "audio/ogg": CATEGORY.AUDIO,
-        "audio/mp4": CATEGORY.AUDIO,
-        "audio/aac": CATEGORY.AUDIO,
-        "audio/flac": CATEGORY.AUDIO,
-        "audio/webm": CATEGORY.AUDIO,
-        "image/jpeg": CATEGORY.IMAGE,
-        "image/png": CATEGORY.IMAGE,
-        "image/webp": CATEGORY.IMAGE,
-        "image/gif": CATEGORY.IMAGE,
-        "image/svg+xml": CATEGORY.IMAGE,
-        "image/bmp": CATEGORY.IMAGE,
-        "image/avif": CATEGORY.IMAGE,
-        "application/pdf": CATEGORY.DOCUMENT,
-        "application/msword": CATEGORY.DOCUMENT,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": CATEGORY.DOCUMENT,
-        "application/vnd.ms-excel": CATEGORY.DOCUMENT,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": CATEGORY.DOCUMENT,
-        "application/vnd.ms-powerpoint": CATEGORY.DOCUMENT,
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation": CATEGORY.DOCUMENT,
-        "text/plain": CATEGORY.DOCUMENT,
-        "text/csv": CATEGORY.DOCUMENT,
-        "application/json": CATEGORY.DOCUMENT,
-        "application/xml": CATEGORY.DOCUMENT,
-        "text/xml": CATEGORY.DOCUMENT,
-        "application/zip": CATEGORY.ARCHIVE,
-        "application/x-rar-compressed": CATEGORY.ARCHIVE,
-        "application/x-7z-compressed": CATEGORY.ARCHIVE,
-        "application/x-tar": CATEGORY.ARCHIVE,
-        "application/gzip": CATEGORY.ARCHIVE,
-        "application/x-mpegURL": CATEGORY.STREAM,
-        "application/vnd.apple.mpegurl": CATEGORY.STREAM,
-        "application/dash+xml": CATEGORY.STREAM
-      };
-      CATEGORY_META = {
-        [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
-        [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
-        [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
-        [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
-        [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
-        [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },
-        [CATEGORY.OTHER]: { label: "Other", icon: "link", color: "#6b7280" },
-        [CATEGORY.UNKNOWN]: { label: "Unknown", icon: "help", color: "#374151" }
-      };
-      SOURCE = {
-        DOM_ANCHOR: "dom_anchor",
-        // <a href="...">
-        DOM_MEDIA: "dom_media",
-        // <video>, <audio>, <source>
-        DOM_LINK: "dom_link",
-        // <link rel="...">
-        DOM_IMG: "dom_img",
-        // <img src="...">
-        DOM_EMBED: "dom_embed",
-        // <embed>, <object>
-        NETWORK: "network",
-        // observed via webRequest (optional perm)
-        INFERRED: "inferred"
-        // text pattern match + verified
-      };
-      STATUS = {
-        DOWNLOADABLE: "downloadable",
-        REQUIRES_AUTH: "requires_auth",
-        // session-locked, may fail outside context
-        UNSUPPORTED: "unsupported",
-        DUPLICATE: "duplicate",
-        STREAM: "stream",
-        // HLS/DASH — needs companion for best results
-        PROTECTED: "protected",
-        // DRM detected — download blocked
-        UNKNOWN: "unknown"
-      };
-      MSG = {
-        // Content → SW
-        SCAN_RESULT: "SCAN_RESULT",
-        SCAN_ERROR: "SCAN_ERROR",
-        // SW → Content
-        START_SCAN: "START_SCAN",
-        RESCAN: "RESCAN",
-        // Popup / Content → SW
-        GET_RESOURCES: "GET_RESOURCES",
-        DOWNLOAD_ITEM: "DOWNLOAD_ITEM",
-        DOWNLOAD_BATCH: "DOWNLOAD_BATCH",
-        OPEN_DASHBOARD: "OPEN_DASHBOARD",
-        OPEN_DOWNLOADER: "OPEN_DOWNLOADER",
-        OPEN_TAB: "OPEN_TAB",
-        COPY_URL: "COPY_URL",
-        // SW → Popup
-        RESOURCES_READY: "RESOURCES_READY",
-        SCAN_PROGRESS: "SCAN_PROGRESS",
-        DOWNLOAD_STARTED: "DOWNLOAD_STARTED",
-        DOWNLOAD_FAILED: "DOWNLOAD_FAILED"
-      };
-      STORAGE = {
-        SETTINGS: "df_settings",
-        DOWNLOAD_HISTORY: "df_history",
-        DOMAIN_RULES: "df_domain_rules",
-        SCAN_CACHE: "df_scan_cache",
-        FAVORITES: "df_favorites",
-        COMPANION_CONFIG: "df_companion",
-        LAST_FILTER: "df_last_filter"
-      };
-      DEFAULT_SETTINGS = {
-        theme: "dark",
-        // 'dark' | 'light'
-        autoScan: true,
-        // scan on page load
-        showBadge: true,
-        // badge count on icon
-        badgeCategories: [CATEGORY.VIDEO, CATEGORY.AUDIO, CATEGORY.DOCUMENT],
-        minFileSizeBytes: 1024,
-        // ignore < 1KB assets
-        deduplicateUrls: true,
-        showImages: true,
-        showDocuments: true,
-        showArchives: true,
-        showStreams: true,
-        enableVideoOverlay: true,
-        // floating in-video download pill
-        concurrencyMode: "turbo",
-        // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
-        directDiskStream: true,
-        // zero-RAM direct streaming via File System Access API
-        companionEnabled: false,
-        companionHost: "com.P4inz Interactive Labs.downloadforge",
-        debugMode: false,
-        defaultSaveAs: false,
-        // trigger save-as dialog
-        historyMaxItems: 500
-      };
-      LIMITS = {
-        MAX_RESOURCES_PER_SCAN: 500,
-        MAX_HISTORY_ITEMS: 500,
-        MAX_BATCH_DOWNLOAD: 50,
-        // safety cap for bulk download
-        SCAN_TIMEOUT_MS: 8e3,
-        FETCH_TIMEOUT_MS: 5e3,
-        CACHE_TTL_MS: 5 * 60 * 1e3
-        // 5 min
-      };
-      IGNORED_DOMAINS = /* @__PURE__ */ new Set([
-        "google-analytics.com",
-        "analytics.google.com",
-        "googletagmanager.com",
-        "doubleclick.net",
-        "facebook.com/tr",
-        "connect.facebook.net",
-        "hotjar.com",
-        "mouseflow.com"
-      ]);
-    }
-  });
+  var CATEGORY = {
+    VIDEO: "video",
+    AUDIO: "audio",
+    IMAGE: "image",
+    DOCUMENT: "document",
+    ARCHIVE: "archive",
+    STREAM: "stream",
+    // HLS / m3u8 — non-DRM only
+    OTHER: "other",
+    UNKNOWN: "unknown"
+  };
+  var EXT_MAP = {
+    // Video
+    mp4: CATEGORY.VIDEO,
+    webm: CATEGORY.VIDEO,
+    mov: CATEGORY.VIDEO,
+    mkv: CATEGORY.VIDEO,
+    avi: CATEGORY.VIDEO,
+    flv: CATEGORY.VIDEO,
+    m4v: CATEGORY.VIDEO,
+    ogv: CATEGORY.VIDEO,
+    "3gp": CATEGORY.VIDEO,
+    // Audio
+    mp3: CATEGORY.AUDIO,
+    wav: CATEGORY.AUDIO,
+    ogg: CATEGORY.AUDIO,
+    m4a: CATEGORY.AUDIO,
+    aac: CATEGORY.AUDIO,
+    flac: CATEGORY.AUDIO,
+    opus: CATEGORY.AUDIO,
+    weba: CATEGORY.AUDIO,
+    // Images
+    jpg: CATEGORY.IMAGE,
+    jpeg: CATEGORY.IMAGE,
+    png: CATEGORY.IMAGE,
+    webp: CATEGORY.IMAGE,
+    gif: CATEGORY.IMAGE,
+    bmp: CATEGORY.IMAGE,
+    svg: CATEGORY.IMAGE,
+    ico: CATEGORY.IMAGE,
+    avif: CATEGORY.IMAGE,
+    tiff: CATEGORY.IMAGE,
+    tif: CATEGORY.IMAGE,
+    // Documents
+    pdf: CATEGORY.DOCUMENT,
+    doc: CATEGORY.DOCUMENT,
+    docx: CATEGORY.DOCUMENT,
+    xls: CATEGORY.DOCUMENT,
+    xlsx: CATEGORY.DOCUMENT,
+    ppt: CATEGORY.DOCUMENT,
+    pptx: CATEGORY.DOCUMENT,
+    txt: CATEGORY.DOCUMENT,
+    csv: CATEGORY.DOCUMENT,
+    json: CATEGORY.DOCUMENT,
+    xml: CATEGORY.DOCUMENT,
+    md: CATEGORY.DOCUMENT,
+    epub: CATEGORY.DOCUMENT,
+    rtf: CATEGORY.DOCUMENT,
+    // Archives
+    zip: CATEGORY.ARCHIVE,
+    rar: CATEGORY.ARCHIVE,
+    "7z": CATEGORY.ARCHIVE,
+    tar: CATEGORY.ARCHIVE,
+    gz: CATEGORY.ARCHIVE,
+    bz2: CATEGORY.ARCHIVE,
+    xz: CATEGORY.ARCHIVE,
+    zst: CATEGORY.ARCHIVE,
+    // Streams (non-DRM, authorized only)
+    m3u8: CATEGORY.STREAM,
+    m3u: CATEGORY.STREAM,
+    mpd: CATEGORY.STREAM
+  };
+  var MIME_MAP = {
+    "video/mp4": CATEGORY.VIDEO,
+    "video/webm": CATEGORY.VIDEO,
+    "video/quicktime": CATEGORY.VIDEO,
+    "video/x-msvideo": CATEGORY.VIDEO,
+    "video/ogg": CATEGORY.VIDEO,
+    "video/3gpp": CATEGORY.VIDEO,
+    "audio/mpeg": CATEGORY.AUDIO,
+    "audio/wav": CATEGORY.AUDIO,
+    "audio/ogg": CATEGORY.AUDIO,
+    "audio/mp4": CATEGORY.AUDIO,
+    "audio/aac": CATEGORY.AUDIO,
+    "audio/flac": CATEGORY.AUDIO,
+    "audio/webm": CATEGORY.AUDIO,
+    "image/jpeg": CATEGORY.IMAGE,
+    "image/png": CATEGORY.IMAGE,
+    "image/webp": CATEGORY.IMAGE,
+    "image/gif": CATEGORY.IMAGE,
+    "image/svg+xml": CATEGORY.IMAGE,
+    "image/bmp": CATEGORY.IMAGE,
+    "image/avif": CATEGORY.IMAGE,
+    "application/pdf": CATEGORY.DOCUMENT,
+    "application/msword": CATEGORY.DOCUMENT,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": CATEGORY.DOCUMENT,
+    "application/vnd.ms-excel": CATEGORY.DOCUMENT,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": CATEGORY.DOCUMENT,
+    "application/vnd.ms-powerpoint": CATEGORY.DOCUMENT,
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": CATEGORY.DOCUMENT,
+    "text/plain": CATEGORY.DOCUMENT,
+    "text/csv": CATEGORY.DOCUMENT,
+    "application/json": CATEGORY.DOCUMENT,
+    "application/xml": CATEGORY.DOCUMENT,
+    "text/xml": CATEGORY.DOCUMENT,
+    "application/zip": CATEGORY.ARCHIVE,
+    "application/x-rar-compressed": CATEGORY.ARCHIVE,
+    "application/x-7z-compressed": CATEGORY.ARCHIVE,
+    "application/x-tar": CATEGORY.ARCHIVE,
+    "application/gzip": CATEGORY.ARCHIVE,
+    "application/x-mpegURL": CATEGORY.STREAM,
+    "application/vnd.apple.mpegurl": CATEGORY.STREAM,
+    "application/dash+xml": CATEGORY.STREAM
+  };
+  var CATEGORY_META = {
+    [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
+    [CATEGORY.AUDIO]: { label: "Audio", icon: "music", color: "#a855f7" },
+    [CATEGORY.IMAGE]: { label: "Images", icon: "image", color: "#3b82f6" },
+    [CATEGORY.DOCUMENT]: { label: "Documents", icon: "file-text", color: "#22c55e" },
+    [CATEGORY.ARCHIVE]: { label: "Archives", icon: "archive", color: "#eab308" },
+    [CATEGORY.STREAM]: { label: "Streams", icon: "radio", color: "#ec4899" },
+    [CATEGORY.OTHER]: { label: "Other", icon: "link", color: "#6b7280" },
+    [CATEGORY.UNKNOWN]: { label: "Unknown", icon: "help", color: "#374151" }
+  };
+  var SOURCE = {
+    DOM_ANCHOR: "dom_anchor",
+    // <a href="...">
+    DOM_MEDIA: "dom_media",
+    // <video>, <audio>, <source>
+    DOM_LINK: "dom_link",
+    // <link rel="...">
+    DOM_IMG: "dom_img",
+    // <img src="...">
+    DOM_EMBED: "dom_embed",
+    // <embed>, <object>
+    NETWORK: "network",
+    // observed via webRequest (optional perm)
+    INFERRED: "inferred"
+    // text pattern match + verified
+  };
+  var STATUS = {
+    DOWNLOADABLE: "downloadable",
+    REQUIRES_AUTH: "requires_auth",
+    // session-locked, may fail outside context
+    UNSUPPORTED: "unsupported",
+    DUPLICATE: "duplicate",
+    STREAM: "stream",
+    // HLS/DASH — needs companion for best results
+    PROTECTED: "protected",
+    // DRM detected — download blocked
+    UNKNOWN: "unknown"
+  };
+  var MSG = {
+    // Content → SW
+    SCAN_RESULT: "SCAN_RESULT",
+    SCAN_ERROR: "SCAN_ERROR",
+    // SW → Content
+    START_SCAN: "START_SCAN",
+    RESCAN: "RESCAN",
+    // Popup / Content → SW
+    GET_RESOURCES: "GET_RESOURCES",
+    DOWNLOAD_ITEM: "DOWNLOAD_ITEM",
+    DOWNLOAD_BATCH: "DOWNLOAD_BATCH",
+    OPEN_DASHBOARD: "OPEN_DASHBOARD",
+    OPEN_DOWNLOADER: "OPEN_DOWNLOADER",
+    OPEN_TAB: "OPEN_TAB",
+    COPY_URL: "COPY_URL",
+    // SW → Popup
+    RESOURCES_READY: "RESOURCES_READY",
+    SCAN_PROGRESS: "SCAN_PROGRESS",
+    DOWNLOAD_STARTED: "DOWNLOAD_STARTED",
+    DOWNLOAD_FAILED: "DOWNLOAD_FAILED"
+  };
+  var STORAGE = {
+    SETTINGS: "df_settings",
+    DOWNLOAD_HISTORY: "df_history",
+    DOMAIN_RULES: "df_domain_rules",
+    SCAN_CACHE: "df_scan_cache",
+    FAVORITES: "df_favorites",
+    COMPANION_CONFIG: "df_companion",
+    LAST_FILTER: "df_last_filter"
+  };
+  var DEFAULT_SETTINGS = {
+    theme: "dark",
+    // 'dark' | 'light'
+    autoScan: true,
+    // scan on page load
+    showBadge: true,
+    // badge count on icon
+    badgeCategories: [CATEGORY.VIDEO, CATEGORY.AUDIO, CATEGORY.DOCUMENT],
+    minFileSizeBytes: 1024,
+    // ignore < 1KB assets
+    deduplicateUrls: true,
+    showImages: true,
+    showDocuments: true,
+    showArchives: true,
+    showStreams: true,
+    enableVideoOverlay: true,
+    // floating in-video download pill
+    concurrencyMode: "turbo",
+    // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
+    directDiskStream: true,
+    // zero-RAM direct streaming via File System Access API
+    companionEnabled: false,
+    companionHost: "com.P4inz Interactive Labs.downloadforge",
+    debugMode: false,
+    defaultSaveAs: false,
+    // trigger save-as dialog
+    historyMaxItems: 500
+  };
+  var LIMITS = {
+    MAX_RESOURCES_PER_SCAN: 500,
+    MAX_HISTORY_ITEMS: 500,
+    MAX_BATCH_DOWNLOAD: 50,
+    // safety cap for bulk download
+    SCAN_TIMEOUT_MS: 8e3,
+    FETCH_TIMEOUT_MS: 5e3,
+    CACHE_TTL_MS: 5 * 60 * 1e3
+    // 5 min
+  };
+  var IGNORED_DOMAINS = /* @__PURE__ */ new Set([
+    "google-analytics.com",
+    "analytics.google.com",
+    "googletagmanager.com",
+    "doubleclick.net",
+    "facebook.com/tr",
+    "connect.facebook.net",
+    "hotjar.com",
+    "mouseflow.com"
+  ]);
 
   // src/utils/url.js
   function extractExtension(url) {
@@ -294,10 +272,6 @@
       return url;
     }
   }
-  var init_url = __esm({
-    "src/utils/url.js"() {
-    }
-  });
 
   // src/core/classifier.js
   function inferCategory(url, mimeType, ext) {
@@ -318,11 +292,6 @@
     }
     return CATEGORY.UNKNOWN;
   }
-  var init_classifier = __esm({
-    "src/core/classifier.js"() {
-      init_constants();
-    }
-  });
 
   // src/content/dom_scanner.js
   function scanDOM(options = {}) {
@@ -550,6 +519,7 @@
     }
     return items;
   }
+  var _idCounter = 0;
   function buildResource({
     url,
     category = CATEGORY.UNKNOWN,
@@ -621,17 +591,9 @@
     if (!name) return null;
     return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 200) || null;
   }
-  var _idCounter;
-  var init_dom_scanner = __esm({
-    "src/content/dom_scanner.js"() {
-      init_constants();
-      init_url();
-      init_classifier();
-      _idCounter = 0;
-    }
-  });
 
   // src/content/video_overlay.js
+  var detectedMediaList = [];
   function registerDetectedMedia(item) {
     if (item && item.url) {
       detectedMediaList.unshift(item);
@@ -878,227 +840,205 @@
       subtree: true
     });
   }
-  var detectedMediaList;
-  var init_video_overlay = __esm({
-    "src/content/video_overlay.js"() {
-      init_constants();
-      detectedMediaList = [];
-    }
-  });
 
   // src/storage/storage.js
-  var StorageService;
-  var init_storage = __esm({
-    "src/storage/storage.js"() {
-      init_constants();
-      StorageService = {
-        // ── Settings ──────────────────────────────────────────────
-        async getSettings() {
-          const result = await chrome.storage.local.get(STORAGE.SETTINGS);
-          return { ...DEFAULT_SETTINGS, ...result[STORAGE.SETTINGS] ?? {} };
-        },
-        async saveSettings(partial) {
-          const current = await this.getSettings();
-          const updated = { ...current, ...partial };
-          await chrome.storage.local.set({ [STORAGE.SETTINGS]: updated });
-          return updated;
-        },
-        async initDefaults() {
-          const existing = await chrome.storage.local.get(STORAGE.SETTINGS);
-          if (!existing[STORAGE.SETTINGS]) {
-            await chrome.storage.local.set({ [STORAGE.SETTINGS]: DEFAULT_SETTINGS });
-          }
-        },
-        // ── Download History ──────────────────────────────────────
-        async getHistory() {
-          const result = await chrome.storage.local.get(STORAGE.DOWNLOAD_HISTORY);
-          return result[STORAGE.DOWNLOAD_HISTORY] ?? [];
-        },
-        async addToHistory(item) {
-          const history = await this.getHistory();
-          history.unshift(item);
-          const trimmed = history.slice(0, LIMITS.MAX_HISTORY_ITEMS);
-          await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: trimmed });
-        },
-        async addBatchToHistory(items) {
-          const history = await this.getHistory();
-          const newItems = items.filter((i) => i.ok).map((i) => ({
-            url: i.url,
-            downloadId: i.downloadId,
-            startedAt: Date.now(),
-            status: "started"
-          }));
-          const merged = [...newItems, ...history].slice(0, LIMITS.MAX_HISTORY_ITEMS);
-          await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: merged });
-        },
-        async updateHistoryItem(downloadId, updates) {
-          const history = await this.getHistory();
-          const idx = history.findIndex((h) => h.downloadId === downloadId);
-          if (idx !== -1) {
-            history[idx] = { ...history[idx], ...updates };
-            await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: history });
-          }
-        },
-        async clearHistory() {
-          await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: [] });
-        },
-        // ── Domain Rules ──────────────────────────────────────────
-        async getDomainRules() {
-          const result = await chrome.storage.local.get(STORAGE.DOMAIN_RULES);
-          return result[STORAGE.DOMAIN_RULES] ?? [];
-        },
-        async saveDomainRules(rules) {
-          await chrome.storage.local.set({ [STORAGE.DOMAIN_RULES]: rules });
-        },
-        // ── Last Filter ───────────────────────────────────────────
-        async getLastFilter() {
-          const result = await chrome.storage.local.get(STORAGE.LAST_FILTER);
-          return result[STORAGE.LAST_FILTER] ?? { category: "all", sort: "type", search: "" };
-        },
-        async saveLastFilter(filter) {
-          await chrome.storage.local.set({ [STORAGE.LAST_FILTER]: filter });
-        },
-        // ── Companion Config ──────────────────────────────────────
-        async getCompanionConfig() {
-          const result = await chrome.storage.local.get(STORAGE.COMPANION_CONFIG);
-          return result[STORAGE.COMPANION_CONFIG] ?? { enabled: false, savePath: "" };
-        },
-        async saveCompanionConfig(config) {
-          await chrome.storage.local.set({ [STORAGE.COMPANION_CONFIG]: config });
-        },
-        // ── Clear all ─────────────────────────────────────────────
-        async clearAll() {
-          await chrome.storage.local.clear();
-          await this.initDefaults();
-        }
-      };
+  var StorageService = {
+    // ── Settings ──────────────────────────────────────────────
+    async getSettings() {
+      const result = await chrome.storage.local.get(STORAGE.SETTINGS);
+      return { ...DEFAULT_SETTINGS, ...result[STORAGE.SETTINGS] ?? {} };
+    },
+    async saveSettings(partial) {
+      const current = await this.getSettings();
+      const updated = { ...current, ...partial };
+      await chrome.storage.local.set({ [STORAGE.SETTINGS]: updated });
+      return updated;
+    },
+    async initDefaults() {
+      const existing = await chrome.storage.local.get(STORAGE.SETTINGS);
+      if (!existing[STORAGE.SETTINGS]) {
+        await chrome.storage.local.set({ [STORAGE.SETTINGS]: DEFAULT_SETTINGS });
+      }
+    },
+    // ── Download History ──────────────────────────────────────
+    async getHistory() {
+      const result = await chrome.storage.local.get(STORAGE.DOWNLOAD_HISTORY);
+      return result[STORAGE.DOWNLOAD_HISTORY] ?? [];
+    },
+    async addToHistory(item) {
+      const history = await this.getHistory();
+      history.unshift(item);
+      const trimmed = history.slice(0, LIMITS.MAX_HISTORY_ITEMS);
+      await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: trimmed });
+    },
+    async addBatchToHistory(items) {
+      const history = await this.getHistory();
+      const newItems = items.filter((i) => i.ok).map((i) => ({
+        url: i.url,
+        downloadId: i.downloadId,
+        startedAt: Date.now(),
+        status: "started"
+      }));
+      const merged = [...newItems, ...history].slice(0, LIMITS.MAX_HISTORY_ITEMS);
+      await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: merged });
+    },
+    async updateHistoryItem(downloadId, updates) {
+      const history = await this.getHistory();
+      const idx = history.findIndex((h) => h.downloadId === downloadId);
+      if (idx !== -1) {
+        history[idx] = { ...history[idx], ...updates };
+        await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: history });
+      }
+    },
+    async clearHistory() {
+      await chrome.storage.local.set({ [STORAGE.DOWNLOAD_HISTORY]: [] });
+    },
+    // ── Domain Rules ──────────────────────────────────────────
+    async getDomainRules() {
+      const result = await chrome.storage.local.get(STORAGE.DOMAIN_RULES);
+      return result[STORAGE.DOMAIN_RULES] ?? [];
+    },
+    async saveDomainRules(rules) {
+      await chrome.storage.local.set({ [STORAGE.DOMAIN_RULES]: rules });
+    },
+    // ── Last Filter ───────────────────────────────────────────
+    async getLastFilter() {
+      const result = await chrome.storage.local.get(STORAGE.LAST_FILTER);
+      return result[STORAGE.LAST_FILTER] ?? { category: "all", sort: "type", search: "" };
+    },
+    async saveLastFilter(filter) {
+      await chrome.storage.local.set({ [STORAGE.LAST_FILTER]: filter });
+    },
+    // ── Companion Config ──────────────────────────────────────
+    async getCompanionConfig() {
+      const result = await chrome.storage.local.get(STORAGE.COMPANION_CONFIG);
+      return result[STORAGE.COMPANION_CONFIG] ?? { enabled: false, savePath: "" };
+    },
+    async saveCompanionConfig(config) {
+      await chrome.storage.local.set({ [STORAGE.COMPANION_CONFIG]: config });
+    },
+    // ── Clear all ─────────────────────────────────────────────
+    async clearAll() {
+      await chrome.storage.local.clear();
+      await this.initDefaults();
     }
-  });
+  };
 
   // src/content/content_script.js
-  var require_content_script = __commonJS({
-    "src/content/content_script.js"() {
-      init_dom_scanner();
-      init_video_overlay();
-      init_constants();
-      init_storage();
-      if (!window.__downloadForgeInjected) {
-        window.__downloadForgeInjected = true;
-        init();
+  if (!window.__downloadForgeInjected) {
+    window.__downloadForgeInjected = true;
+    init();
+  }
+  var sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  function injectMainWorldSniffer() {
+    try {
+      document.documentElement.dataset.dfSnifferToken = sessionToken;
+      const script = document.createElement("script");
+      script.src = chrome.runtime.getURL("src/content/injected_sniffer.js");
+      script.dataset.token = sessionToken;
+      script.onload = () => script.remove();
+      (document.head || document.documentElement).appendChild(script);
+    } catch (err) {
+      console.debug("[DownloadForge] Failed to inject sniffer:", err);
+    }
+  }
+  async function init() {
+    injectMainWorldSniffer();
+    setupSnifferListener();
+    setupMessageListener();
+    try {
+      const settings = await StorageService.getSettings();
+      if (settings.autoScan) {
+        await runScan(settings);
       }
-      var sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      function injectMainWorldSniffer() {
-        try {
-          document.documentElement.dataset.dfSnifferToken = sessionToken;
-          const script = document.createElement("script");
-          script.src = chrome.runtime.getURL("src/content/injected_sniffer.js");
-          script.dataset.token = sessionToken;
-          script.onload = () => script.remove();
-          (document.head || document.documentElement).appendChild(script);
-        } catch (err) {
-          console.debug("[DownloadForge] Failed to inject sniffer:", err);
+      if (settings.enableVideoOverlay !== false) {
+        initVideoOverlay();
+      }
+    } catch (err) {
+      reportError(`Init failed: ${err.message}`);
+    }
+  }
+  function setupSnifferListener() {
+    window.addEventListener("message", async (event) => {
+      if (event.source !== window || !event.data || event.data.source !== "DOWNLOADFORGE_SNIFFER") {
+        return;
+      }
+      if (event.data.token !== sessionToken) {
+        return;
+      }
+      if (event.data.type === "MEDIA_DETECTED" && event.data.data) {
+        const item = event.data.data;
+        if (!item.url || typeof item.url !== "string") return;
+        registerDetectedMedia(item);
+        if (!item.url.startsWith("http://") && !item.url.startsWith("https://") && !item.url.startsWith("blob:")) {
+          return;
         }
-      }
-      async function init() {
-        injectMainWorldSniffer();
-        setupSnifferListener();
-        setupMessageListener();
+        const cleanTitle = (item.title || "video_stream").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 100);
+        const resource = {
+          id: `sniff_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          url: item.url,
+          category: item.category === "stream" ? CATEGORY.STREAM : CATEGORY.VIDEO,
+          ext: item.url.split("?")[0].split(".").pop().toLowerCase() || "m3u8",
+          filename: cleanTitle + (item.url.includes("m3u8") ? ".m3u8" : ".mp4"),
+          mimeType: item.mimeType || (item.url.includes("m3u8") ? "application/x-mpegURL" : "video/mp4"),
+          source: SOURCE.NETWORK,
+          status: item.url.includes("m3u8") ? STATUS.STREAM : STATUS.DOWNLOADABLE,
+          pageUrl: window.location.href,
+          domain: window.location.hostname,
+          detectedAt: Date.now()
+        };
         try {
-          const settings = await StorageService.getSettings();
-          if (settings.autoScan) {
-            await runScan(settings);
-          }
-          if (settings.enableVideoOverlay !== false) {
-            initVideoOverlay();
-          }
-        } catch (err) {
-          reportError(`Init failed: ${err.message}`);
-        }
-      }
-      function setupSnifferListener() {
-        window.addEventListener("message", async (event) => {
-          if (event.source !== window || !event.data || event.data.source !== "DOWNLOADFORGE_SNIFFER") {
-            return;
-          }
-          if (event.data.token !== sessionToken) {
-            return;
-          }
-          if (event.data.type === "MEDIA_DETECTED" && event.data.data) {
-            const item = event.data.data;
-            if (!item.url || typeof item.url !== "string") return;
-            registerDetectedMedia(item);
-            if (!item.url.startsWith("http://") && !item.url.startsWith("https://") && !item.url.startsWith("blob:")) {
-              return;
-            }
-            const cleanTitle = (item.title || "video_stream").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 100);
-            const resource = {
-              id: `sniff_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              url: item.url,
-              category: item.category === "stream" ? CATEGORY.STREAM : CATEGORY.VIDEO,
-              ext: item.url.split("?")[0].split(".").pop().toLowerCase() || "m3u8",
-              filename: cleanTitle + (item.url.includes("m3u8") ? ".m3u8" : ".mp4"),
-              mimeType: item.mimeType || (item.url.includes("m3u8") ? "application/x-mpegURL" : "video/mp4"),
-              source: SOURCE.NETWORK,
-              status: item.url.includes("m3u8") ? STATUS.STREAM : STATUS.DOWNLOADABLE,
-              pageUrl: window.location.href,
-              domain: window.location.hostname,
-              detectedAt: Date.now()
-            };
-            try {
-              await chrome.runtime.sendMessage({
-                type: MSG.SCAN_RESULT,
-                payload: {
-                  resources: [resource],
-                  scanDurationMs: 0,
-                  pageUrl: window.location.href,
-                  incremental: true
-                }
-              });
-            } catch (e) {
-            }
-          }
-        });
-      }
-      function setupMessageListener() {
-        chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-          if (message.type === MSG.START_SCAN || message.type === MSG.RESCAN) {
-            StorageService.getSettings().then((settings) => runScan(settings)).then(() => sendResponse({ ok: true })).catch((err) => {
-              reportError(err.message);
-              sendResponse({ ok: false, error: err.message });
-            });
-            return true;
-          }
-        });
-      }
-      async function runScan(settings = {}) {
-        try {
-          const { resources, scanDurationMs } = scanDOM({
-            deduplicateUrls: settings.deduplicateUrls ?? true,
-            minFileSizeBytes: settings.minFileSizeBytes ?? 1024,
-            showImages: settings.showImages ?? true
-          });
           await chrome.runtime.sendMessage({
             type: MSG.SCAN_RESULT,
             payload: {
-              resources,
-              scanDurationMs,
-              pageUrl: window.location.href
+              resources: [resource],
+              scanDurationMs: 0,
+              pageUrl: window.location.href,
+              incremental: true
             }
           });
-        } catch (err) {
+        } catch (e) {
+        }
+      }
+    });
+  }
+  function setupMessageListener() {
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message.type === MSG.START_SCAN || message.type === MSG.RESCAN) {
+        StorageService.getSettings().then((settings) => runScan(settings)).then(() => sendResponse({ ok: true })).catch((err) => {
           reportError(err.message);
-        }
+          sendResponse({ ok: false, error: err.message });
+        });
+        return true;
       }
-      function reportError(error) {
-        try {
-          chrome.runtime.sendMessage({
-            type: MSG.SCAN_ERROR,
-            payload: { error, pageUrl: window.location.href }
-          });
-        } catch {
+    });
+  }
+  async function runScan(settings = {}) {
+    try {
+      const { resources, scanDurationMs } = scanDOM({
+        deduplicateUrls: settings.deduplicateUrls ?? true,
+        minFileSizeBytes: settings.minFileSizeBytes ?? 1024,
+        showImages: settings.showImages ?? true
+      });
+      await chrome.runtime.sendMessage({
+        type: MSG.SCAN_RESULT,
+        payload: {
+          resources,
+          scanDurationMs,
+          pageUrl: window.location.href
         }
-      }
+      });
+    } catch (err) {
+      reportError(err.message);
     }
-  });
-  require_content_script();
+  }
+  function reportError(error) {
+    try {
+      chrome.runtime.sendMessage({
+        type: MSG.SCAN_ERROR,
+        payload: { error, pageUrl: window.location.href }
+      });
+    } catch {
+    }
+  }
 })();

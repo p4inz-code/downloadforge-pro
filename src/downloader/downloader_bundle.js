@@ -3,12 +3,14 @@
 // P4inz Interactive Labs | p4inz
 //
 // Client Controller for DownloadForge Pro Stream Studio.
-// Integrates HLSEngine, Direct-to-Disk Streaming, Heatmap Visualizer,
-// and Advanced FetchV Parity Settings.
+// Integrates HLSEngine, MPEG-DASH Engine, Direct-to-Disk Streaming,
+// Heatmap Visualizer, Time-Range Slicing, Subtitles Extraction,
+// and CLI Command Export.
 // ============================================================
 
 import { HLSEngine, CONCURRENCY_PROFILES } from '../core/hls_engine.js';
 import { parseHLSManifest } from '../core/hls_parser.js';
+import { parseDASHManifest } from '../core/dash_parser.js';
 
 let currentEngine = null;
 let currentBlob = null;
@@ -16,6 +18,7 @@ let currentBlobUrl = null;
 let currentManifest = null;
 let targetFilename = 'downloaded_video.mp4';
 let isRecordMode = false;
+let currentCliCmd = 'ytdlp';
 
 // DOM Elements
 const streamTitle = document.getElementById('streamTitle');
@@ -24,6 +27,12 @@ const streamUrlInput = document.getElementById('streamUrlInput');
 const btnLoadStream = document.getElementById('btnLoadStream');
 const variantRow = document.getElementById('variantRow');
 const variantSelect = document.getElementById('variantSelect');
+const subtitleRow = document.getElementById('subtitleRow');
+const subtitleSelect = document.getElementById('subtitleSelect');
+const btnDownloadSubs = document.getElementById('btnDownloadSubs');
+const sliceStart = document.getElementById('sliceStart');
+const sliceEnd = document.getElementById('sliceEnd');
+const btnClearSlice = document.getElementById('btnClearSlice');
 const concurrencySelect = document.getElementById('concurrencySelect');
 const retrySelect = document.getElementById('retrySelect');
 const timeoutSelect = document.getElementById('timeoutSelect');
@@ -44,6 +53,15 @@ const btnSave = document.getElementById('btnSave');
 const previewCard = document.getElementById('previewCard');
 const previewPlayer = document.getElementById('previewPlayer');
 const engineStatus = document.getElementById('engineStatus');
+
+// CLI Modal Elements
+const btnExportCli = document.getElementById('btnExportCli');
+const cliModal = document.getElementById('cliModal');
+const btnCloseCliModal = document.getElementById('btnCloseCliModal');
+const cliOutputText = document.getElementById('cliOutputText');
+const btnCopyCli = document.getElementById('btnCopyCli');
+const cliCopiedToast = document.getElementById('cliCopiedToast');
+const modalTabs = document.querySelectorAll('.modal-tab');
 
 // ── 1. Init from URL Query Params ────────────────────────────
 function initFromUrl() {
@@ -95,45 +113,82 @@ function initRecordMode(title) {
   `;
 }
 
-// ── 3. Analyze Stream Manifest ───────────────────────────────
+// ── 3. Analyze Stream Manifest (Dual HLS + MPEG-DASH) ─────────
 async function analyzeStream(url) {
-  statusMessage.textContent = 'Analyzing stream playlist and available variants...';
+  statusMessage.textContent = 'Analyzing stream playlist and available tracks...';
   engineStatus.textContent = 'Inspecting';
 
+  // Check if direct static file
+  if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url)) {
+    statusMessage.textContent = 'Direct media file detected. Click Start to download directly.';
+    engineStatus.textContent = 'Direct File';
+    variantRow.style.display = 'none';
+    if (subtitleRow) subtitleRow.style.display = 'none';
+    btnStart.disabled = false;
+    return;
+  }
+
   try {
-    currentManifest = await parseHLSManifest(url);
+    const isMpd = url.includes('.mpd') || url.includes('/dash/');
+    let manifest = null;
+
+    if (isMpd) {
+      statusMessage.textContent = 'Parsing MPEG-DASH MPD manifest...';
+      manifest = await parseDASHManifest(url);
+    } else {
+      manifest = await parseHLSManifest(url);
+      if (manifest.error && (manifest.error.includes('xml') || manifest.error.includes('MPD'))) {
+        manifest = await parseDASHManifest(url);
+      }
+    }
+
+    currentManifest = manifest;
 
     if (currentManifest.error) {
-      // Check if it's a direct video link
-      if (/\.(mp4|webm|mkv|mov|mp3|m4a)(\?.*)?$/i.test(url)) {
-        statusMessage.textContent = 'Direct media file detected. Click Start to download directly.';
-        engineStatus.textContent = 'Direct File';
-        btnStart.disabled = false;
-        return;
-      }
       statusMessage.textContent = `Manifest Note: ${currentManifest.error}. Ready to attempt chunked fetch.`;
       engineStatus.textContent = 'Ready';
       btnStart.disabled = false;
       return;
     }
 
-    if (currentManifest.type === 'master' && currentManifest.variants.length > 0) {
+    // Populate Variants / Representations
+    if (currentManifest.variants && currentManifest.variants.length > 0) {
       variantSelect.innerHTML = '';
       currentManifest.variants.forEach((v, idx) => {
         const opt = document.createElement('option');
         opt.value = idx;
-        const res = v.resolution ? `${v.resolution.width}x${v.resolution.height}` : '';
+        const res = v.resolution ? `${v.resolution.width ? v.resolution.width + 'x' + v.resolution.height : v.resolution}` : '';
         const bw = v.bandwidth ? `${Math.round(v.bandwidth / 1000)} kbps` : '';
         opt.textContent = `${v.label || res || 'Track ' + (idx + 1)} ${bw ? `(${bw})` : ''}`;
         variantSelect.appendChild(opt);
       });
       variantRow.style.display = 'flex';
-      statusMessage.textContent = `Master playlist loaded with ${currentManifest.variants.length} tracks. Ready to download.`;
+
+      const firstTrack = currentManifest.variants[0];
+      const segCount = firstTrack.segments ? firstTrack.segments.length : (currentManifest.segments ? currentManifest.segments.length : 0);
+      statusMessage.textContent = `${currentManifest.type === 'dash' ? 'MPEG-DASH' : 'HLS Master'} playlist loaded with ${currentManifest.variants.length} tracks. Ready to download.`;
+      if (segCount > 0) initSegmentGrid(segCount);
     } else {
       variantRow.style.display = 'none';
       const segCount = currentManifest.segments ? currentManifest.segments.length : 0;
       statusMessage.textContent = `Media playlist loaded with ${segCount} segments. Ready to download.`;
       initSegmentGrid(segCount);
+    }
+
+    // Populate Subtitles (if present)
+    if (subtitleRow && subtitleSelect) {
+      if (currentManifest.subtitles && currentManifest.subtitles.length > 0) {
+        subtitleSelect.innerHTML = '';
+        currentManifest.subtitles.forEach((s, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx;
+          opt.textContent = `${s.name || s.language || 'Subtitle ' + (idx + 1)} (${s.language || 'und'})`;
+          subtitleSelect.appendChild(opt);
+        });
+        subtitleRow.style.display = 'flex';
+      } else {
+        subtitleRow.style.display = 'none';
+      }
     }
 
     engineStatus.textContent = 'Ready';
@@ -156,7 +211,85 @@ function initSegmentGrid(total) {
   statSegments.textContent = `0 / ${total}`;
 }
 
-// ── 4. Start Download & Transmuxing ───────────────────────────
+// ── 4. Subtitles Download Handler ─────────────────────────────
+async function downloadSubtitles() {
+  if (!currentManifest || !currentManifest.subtitles || currentManifest.subtitles.length === 0) return;
+  const idx = parseInt(subtitleSelect.value, 10) || 0;
+  const sub = currentManifest.subtitles[idx];
+  if (!sub || !sub.url) return;
+
+  statusMessage.textContent = `Fetching subtitles: ${sub.name || 'track'}...`;
+  try {
+    const res = await fetch(sub.url);
+    const text = await res.text();
+    let vttContent = text;
+
+    // Check if it's an m3u8 playlist containing WebVTT chunk urls
+    if (text.includes('#EXTM3U')) {
+      const lines = text.split('\n');
+      const segmentUrls = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          try {
+            segmentUrls.push(new URL(trimmed, sub.url).href);
+          } catch (e) {
+            segmentUrls.push(trimmed);
+          }
+        }
+      }
+
+      if (segmentUrls.length > 0) {
+        const chunks = [];
+        for (const sUrl of segmentUrls) {
+          const cRes = await fetch(sUrl);
+          const cText = await cRes.text();
+          chunks.push(cText);
+        }
+        vttContent = 'WEBVTT\n\n' + chunks.map(c => c.replace(/^WEBVTT[^\n]*\n+/g, '')).join('\n');
+      }
+    }
+
+    const blob = new Blob([vttContent], { type: 'text/vtt' });
+    const blobUrl = URL.createObjectURL(blob);
+    const subFilename = targetFilename.replace(/\.[^.]+$/, '') + `_${sub.language || 'sub'}.vtt`;
+
+    if (chrome?.downloads?.download) {
+      chrome.downloads.download({
+        url: blobUrl,
+        filename: subFilename,
+        saveAs: true,
+      });
+    } else {
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = subFilename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    statusMessage.textContent = `Subtitles downloaded: ${subFilename}`;
+  } catch (err) {
+    statusMessage.textContent = `Failed to download subtitles: ${err.message}`;
+  }
+}
+
+// ── 5. Time Parsing Helper ────────────────────────────────────
+function parseTimeString(str) {
+  if (!str) return null;
+  const parts = str.trim().split(':').map(val => parseFloat(val));
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    return parts[0];
+  }
+  return null;
+}
+
+// ── 6. Start Download & Transmuxing ───────────────────────────
 async function startDownload() {
   const url = streamUrlInput.value.trim();
   if (!url) return;
@@ -194,7 +327,7 @@ async function startDownload() {
   engineStatus.textContent = 'Downloading';
 
   let selectedVariant = null;
-  if (currentManifest?.type === 'master' && currentManifest.variants.length > 0) {
+  if (currentManifest?.variants && currentManifest.variants.length > 0) {
     const selectedIndex = parseInt(variantSelect.value, 10) || 0;
     selectedVariant = currentManifest.variants[selectedIndex];
   }
@@ -214,6 +347,20 @@ async function startDownload() {
   const skipFailedSegments = chkSkipBroken ? chkSkipBroken.checked : true;
   const referer = customReferer ? customReferer.value.trim() : null;
   const audioOnly = formatSelect ? formatSelect.value === 'audio' : false;
+
+  // Time-Range Slicing
+  let timeRange = null;
+  if (sliceStart && sliceEnd) {
+    const sStart = parseTimeString(sliceStart.value);
+    const sEnd = parseTimeString(sliceEnd.value);
+    if (sStart !== null || sEnd !== null) {
+      timeRange = {
+        startSec: sStart !== null ? sStart : 0,
+        endSec: sEnd !== null ? sEnd : Infinity,
+      };
+      statusMessage.textContent = `Time-Range Slicing enabled: ${timeRange.startSec}s to ${timeRange.endSec === Infinity ? 'End' : timeRange.endSec + 's'}`;
+    }
+  }
 
   // Direct-to-Disk writable stream setup
   let writableStream = null;
@@ -267,7 +414,9 @@ async function startDownload() {
   try {
     const result = await currentEngine.downloadAndMux(url, {
       selectedVariant,
+      manifest: currentManifest,
       writableStream,
+      timeRange,
     });
 
     engineStatus.textContent = 'Complete';
@@ -296,7 +445,7 @@ async function startDownload() {
   }
 }
 
-// ── 5. Save to Disk Fallback ──────────────────────────────────
+// ── 7. Save to Disk Fallback ──────────────────────────────────
 function saveMp4() {
   if (!currentBlobUrl) return;
 
@@ -319,11 +468,101 @@ function saveMp4() {
   a.remove();
 }
 
-// ── 6. Event Listeners ───────────────────────────────────────
+// ── 8. CLI Export Modal Logic ─────────────────────────────────
+function updateCliCommand() {
+  const url = streamUrlInput.value.trim();
+  const referer = customReferer ? customReferer.value.trim() : '';
+  const filename = targetFilename || 'video.mp4';
+  let refArg = referer;
+  if (!refArg && url) {
+    try {
+      refArg = new URL(url).origin;
+    } catch (e) {}
+  }
+
+  let cmd = '';
+  if (currentCliCmd === 'ytdlp') {
+    cmd = `yt-dlp "${url}"` + (refArg ? ` --referer "${refArg}"` : '') + ` -o "${filename}"`;
+  } else if (currentCliCmd === 'curl') {
+    cmd = `curl -L "${url}"` + (refArg ? ` -H "Referer: ${refArg}"` : '') + ` -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o "${filename}"`;
+  } else if (currentCliCmd === 'aria2c') {
+    cmd = `aria2c -x 16 -s 16` + (refArg ? ` --header="Referer: ${refArg}"` : '') + ` -o "${filename}" "${url}"`;
+  }
+  if (cliOutputText) cliOutputText.value = cmd;
+}
+
+if (btnExportCli && cliModal) {
+  btnExportCli.addEventListener('click', () => {
+    updateCliCommand();
+    cliModal.style.display = 'flex';
+  });
+
+  if (btnCloseCliModal) {
+    btnCloseCliModal.addEventListener('click', () => {
+      cliModal.style.display = 'none';
+    });
+  }
+
+  cliModal.addEventListener('click', (e) => {
+    if (e.target === cliModal) {
+      cliModal.style.display = 'none';
+    }
+  });
+
+  modalTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      modalTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentCliCmd = tab.getAttribute('data-cmd');
+      updateCliCommand();
+    });
+  });
+
+  if (btnCopyCli && cliOutputText) {
+    btnCopyCli.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(cliOutputText.value);
+        if (cliCopiedToast) {
+          cliCopiedToast.style.display = 'inline-block';
+          setTimeout(() => {
+            cliCopiedToast.style.display = 'none';
+          }, 2000);
+        }
+      } catch (err) {
+        cliOutputText.select();
+        document.execCommand('copy');
+      }
+    });
+  }
+}
+
+// ── 9. Slicer Input Listeners ─────────────────────────────────
+if (sliceStart && sliceEnd && btnClearSlice) {
+  const checkSlicerState = () => {
+    if (sliceStart.value.trim() || sliceEnd.value.trim()) {
+      btnClearSlice.style.display = 'inline-block';
+    } else {
+      btnClearSlice.style.display = 'none';
+    }
+  };
+  sliceStart.addEventListener('input', checkSlicerState);
+  sliceEnd.addEventListener('input', checkSlicerState);
+  btnClearSlice.addEventListener('click', () => {
+    sliceStart.value = '';
+    sliceEnd.value = '';
+    btnClearSlice.style.display = 'none';
+  });
+}
+
+// ── 10. Event Listeners ──────────────────────────────────────
 btnLoadStream.addEventListener('click', () => {
   const url = streamUrlInput.value.trim();
   if (url) analyzeStream(url);
 });
+
+if (btnDownloadSubs) {
+  btnDownloadSubs.addEventListener('click', downloadSubtitles);
+}
 
 btnStart.addEventListener('click', startDownload);
 
