@@ -17,6 +17,7 @@ import { StorageService } from '../storage/storage.js';
 import { Logger } from '../utils/logger.js';
 import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
 import { checkForGitHubUpdate, downloadUpdatePackage } from '../core/updater.js';
+import { bundleSketchfabModelPackage } from '../core/model_zip_bundler.js';
 
 const log = new Logger('ServiceWorker');
 
@@ -389,77 +390,41 @@ async function handleDownload(payload, sendResponse) {
     let downloadUrl = url;
     let targetFilename = filename || extractFilenameFromUrl(url);
 
-    // Sketchfab API auto-resolution to direct 3D archive (.zip / .glb / .binz)
+    // Sketchfab 3D Asset Package (Model + Textures + Materials ZIP)
     if (url.includes('sketchfab.com/i/models/') || url.includes('/models/')) {
       const sfMatch = url.match(/models\/([0-9a-f]{32})/i);
       if (sfMatch) {
         const uid = sfMatch[1];
         try {
-          // 1. Fetch metadata to extract actual model name and binary files
-          const metaRes = await fetch(`https://sketchfab.com/i/models/${uid}`);
-          let meta = null;
-          if (metaRes.ok) {
-            meta = await metaRes.json();
-          }
-
-          const modelName = ((meta && meta.name) || filename || 'sketchfab_model')
-            .replace(/[<>:"/\\|?*]/g, '_')
-            .trim()
-            .slice(0, 100);
-
-          let resolved = false;
-
-          // 2. Try official download endpoint for authenticated / free models
+          // Query active tab for any live in-page WebGL mesh extraction
+          let capturedObjMesh = null;
           try {
-            const dlRes = await fetch(`https://sketchfab.com/v3/models/${uid}/download`, {
-              credentials: 'include'
-            });
-            if (dlRes.ok) {
-              const dlData = await dlRes.json();
-              if (dlData.gltf && dlData.gltf.url) {
-                downloadUrl = dlData.gltf.url;
-                targetFilename = `${modelName}.zip`;
-                resolved = true;
-              } else if (dlData.glb && dlData.glb.url) {
-                downloadUrl = dlData.glb.url;
-                targetFilename = `${modelName}.glb`;
-                resolved = true;
-              } else if (dlData.usdz && dlData.usdz.url) {
-                downloadUrl = dlData.usdz.url;
-                targetFilename = `${modelName}.usdz`;
-                resolved = true;
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs[0] && tabs[0].id) {
+              const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
+              if (tabRes && tabRes.objData) {
+                capturedObjMesh = tabRes.objData;
+              } else {
+                chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
               }
             }
           } catch (e) {}
 
-          // 3. Fallback: If not authenticated, download the actual binary model stream (.binz / .osgjs)
-          if (!resolved && meta && Array.isArray(meta.files) && meta.files.length > 0) {
-            const osgjsUrl = meta.files[0].osgjsUrl;
-            if (osgjsUrl) {
-              downloadUrl = osgjsUrl;
-              const binExt = osgjsUrl.split('.').pop().split('?')[0] || 'binz';
-              targetFilename = `${modelName}.${binExt}`;
-              resolved = true;
-            }
-          }
-
-          // Trigger WebGL Ripper in active tab so user gets a standard OBJ file directly from GPU
-          try {
-            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tabs && tabs[0] && tabs[0].id) {
-              chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
-            }
-          } catch (e) {}
-
-          // Safety guard: Never download raw metadata JSON and label it as .glb
-          if (!resolved && downloadUrl.includes('/i/models/')) {
-            throw new Error('Sketchfab requires authentication for ZIP archives. In-page WebGL Ripper has been triggered to extract the rendered 3D mesh.');
+          const bundle = await bundleSketchfabModelPackage(uid, filename, capturedObjMesh);
+          if (bundle.officialUrl) {
+            downloadUrl = bundle.officialUrl;
+            targetFilename = bundle.filename;
+          } else if (bundle.zipBytes) {
+            const blob = new Blob([bundle.zipBytes], { type: 'application/zip' });
+            const blobUrl = URL.createObjectURL(blob);
+            downloadUrl = blobUrl;
+            targetFilename = bundle.filename;
+            setTimeout(() => {
+              try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+            }, 120000);
           }
         } catch (e) {
-          log.warn('Sketchfab archive resolution note:', e.message);
-          if (downloadUrl.includes('/i/models/')) {
-            throw e;
-          }
+          log.warn('Sketchfab bundle resolution note:', e.message);
         }
       }
     }

@@ -264,5 +264,29 @@ assert.strictEqual(wavView.getUint32(24, true), 44100, 'SampleRate must be 44100
 assert.strictEqual(wavView.getUint16(34, true), 16, 'BitsPerSample must be 16');
 console.log('  [PASS] In-Browser Audio Transcoder & RIFF WAV Encoder binary structure verified');
 
-console.log('[Test] All 9 core test suites passed successfully with zero errors!');
+// 10. In-Browser 3D Model & Textures ZIP Package Builder
+import { buildZipArchive, computeCrc32 } from '../src/core/model_zip_bundler.js';
+
+const testFiles = [
+  { name: 'model.obj', data: 'v 0.0 0.0 0.0\nv 1.0 0.0 0.0\nv 0.0 1.0 0.0\nf 1 2 3\n' },
+  { name: 'model.mtl', data: 'newmtl Material_0\nmap_Kd textures/diffuse.png\n' },
+  { name: 'textures/diffuse.png', data: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) },
+  { name: 'README.txt', data: 'DownloadForge 3D Asset Package\nCreated by P4inz Interactive Labs\n' }
+];
+
+const zipBytes = buildZipArchive(testFiles);
+assert.ok(zipBytes instanceof Uint8Array, 'ZIP must produce a Uint8Array');
+assert.ok(zipBytes.byteLength > 100, 'ZIP size must include headers and payload');
+
+// Verify ZIP signatures
+const zipView = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
+assert.strictEqual(zipView.getUint32(0, true), 0x04034B50, 'First record must have Local File Header signature 0x04034B50');
+
+// CRC32 check on known string
+const testCrc = computeCrc32(new TextEncoder().encode('123456789'));
+assert.strictEqual(testCrc, 0xCBF43926, 'CRC32 of "123456789" must match standard check 0xCBF43926');
+console.log('  [PASS] Pure in-browser ZIP archive bundler & CRC32 engine verified');
+
+console.log('[Test] All 10 core test suites passed successfully with zero errors!');
+
 

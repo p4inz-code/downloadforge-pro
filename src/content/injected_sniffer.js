@@ -397,6 +397,20 @@
     if (window.WebGL2RenderingContext) {
       hookContext(WebGL2RenderingContext.prototype);
     }
+
+    if (window.HTMLCanvasElement && !window.HTMLCanvasElement.prototype.__df_hooked) {
+      window.HTMLCanvasElement.prototype.__df_hooked = true;
+      const origGetContext = window.HTMLCanvasElement.prototype.getContext;
+      window.HTMLCanvasElement.prototype.getContext = function(type) {
+        const ctx = origGetContext.apply(this, arguments);
+        if (ctx && (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl')) {
+          try {
+            hookContext(Object.getPrototypeOf(ctx));
+          } catch (e) {}
+        }
+        return ctx;
+      };
+    }
   }
 
   hookWebGL();
@@ -426,6 +440,7 @@
           initiator: 'webgl-mesh-ripper'
         });
 
+        window.postMessage({ type: 'DF_WEBGL_RIP_DATA', objData, title }, '*');
         window.postMessage({ type: 'DF_WEBGL_RIP_SUCCESS', title }, '*');
       } else {
         window.postMessage({ type: 'DF_WEBGL_RIP_FAIL', reason: 'No WebGL buffer data captured yet. Interact with the 3D model viewer to stream geometry.' }, '*');

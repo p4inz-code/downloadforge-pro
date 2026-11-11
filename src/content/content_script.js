@@ -40,21 +40,31 @@ function injectMainWorldSniffer() {
 }
 
 // ─────────────────────────────────────────────────────────────
+let lastCapturedObj = null;
+
 async function init() {
   injectMainWorldSniffer();
   setupSnifferListener();
   setupMessageListener();
 
-  try {
-    const settings = await StorageService.getSettings();
-    if (settings.autoScan) {
-      await runScan(settings);
+  const onReady = async () => {
+    try {
+      const settings = await StorageService.getSettings();
+      if (settings.autoScan) {
+        await runScan(settings);
+      }
+      if (settings.enableVideoOverlay !== false) {
+        initVideoOverlay();
+      }
+    } catch (err) {
+      reportError(`Init failed: ${err.message}`);
     }
-    if (settings.enableVideoOverlay !== false) {
-      initVideoOverlay();
-    }
-  } catch (err) {
-    reportError(`Init failed: ${err.message}`);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onReady, { once: true });
+  } else {
+    onReady();
   }
 }
 
@@ -159,6 +169,17 @@ function setupMessageListener() {
       window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
       sendResponse({ ok: true });
       return false;
+    }
+
+    if (message.type === 'DF_GET_CACHED_OBJ') {
+      sendResponse({ ok: true, objData: lastCapturedObj ? lastCapturedObj.objData : null });
+      return false;
+    }
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'DF_WEBGL_RIP_DATA' && event.data.objData) {
+      lastCapturedObj = { objData: event.data.objData, title: event.data.title, time: Date.now() };
     }
   });
 }
