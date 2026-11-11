@@ -69,12 +69,15 @@ function initFromUrl() {
 function initRecordMode(title) {
   isRecordMode = true;
   engineStatus.textContent = 'Record Mode';
-  streamTitle.textContent = `🔴 Live Buffer Recorder: ${title || 'Active Video'}`;
+  streamTitle.textContent = `Live Buffer Recorder: ${title || 'Active Video'}`;
   streamUrlInput.value = 'Capturing active browser player buffer (MSE/blob)...';
   streamUrlInput.disabled = true;
   btnLoadStream.disabled = true;
   statusMessage.textContent = 'Play or fast-forward the video in the source tab to buffer data, then click End & Save.';
-  btnStart.textContent = '⏹ End Buffer Recording & Save MP4';
+  btnStart.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+    <span>End Buffer Recording & Save MP4</span>
+  `;
 }
 
 // ── 3. Analyze Stream Manifest ───────────────────────────────
@@ -207,7 +210,7 @@ async function startDownload() {
     btnCancel.style.display = 'none';
 
     if (result.directStream) {
-      statusMessage.textContent = `✅ Saved directly to disk: ${targetFilename}`;
+      statusMessage.textContent = `Saved directly to disk: ${targetFilename}`;
       progressBarFill.style.width = '100%';
       statPercent.textContent = '100%';
     } else {

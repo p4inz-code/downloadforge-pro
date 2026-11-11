@@ -46,9 +46,9 @@
           <div class="config-item">
             <label for="concurrencySelect">Speed Profile:</label>
             <select id="concurrencySelect">
-              <option value="turbo" selected>⚡ Turbo Mode (8 Parallel Connections)</option>
-              <option value="maximum">🚀 Max Aggression (16 Parallel Connections)</option>
-              <option value="balanced">🛡️ Balanced (4 Connections - Low CPU)</option>
+              <option value="turbo" selected>Turbo Mode (8 Parallel Connections - Recommended)</option>
+              <option value="maximum">Maximum Aggression (16 Parallel Connections)</option>
+              <option value="balanced">Balanced Mode (4 Connections - Low CPU)</option>
             </select>
           </div>
 
@@ -93,15 +93,24 @@
 
         <!-- Action Buttons -->
         <div class="action-buttons">
-          <button id="btnStart" class="btn btn-primary">⚡ Start Turbo Download</button>
+          <button id="btnStart" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>
+            <span>Start Turbo Download</span>
+          </button>
           <button id="btnCancel" class="btn btn-danger" style="display: none;">Cancel</button>
-          <button id="btnSave" class="btn btn-success" style="display: none;">💾 Save MP4 File</button>
+          <button id="btnSave" class="btn btn-success" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Save MP4 File</span>
+          </button>
         </div>
       </section>
 
       <!-- Preview Player Card -->
       <section class="card preview-card" id="previewCard" style="display: none;">
-        <h3>🎬 In-Studio Player Preview</h3>
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          In-Studio Player Preview
+        </h3>
         <video id="previewPlayer" controls class="preview-video"></video>
       </section>
     </main>

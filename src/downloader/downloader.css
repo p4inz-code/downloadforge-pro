@@ -297,6 +297,10 @@ select {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 10px 20px;
   border-radius: 8px;
   font-size: 14px;
