@@ -102,7 +102,8 @@
         // Silently ignore sniffing parsing issues
       }
 
-      return originalFetch.apply(this, args).then((response) => {
+      const p = originalFetch.apply(this, args);
+      p.then((response) => {
         try {
           if (response && response.headers) {
             const contentType = response.headers.get('content-type') || '';
@@ -127,8 +128,10 @@
         } catch (respErr) {
           // Silently ignore response inspection issues
         }
-        return response;
+      }, () => {
+        // Silently swallow network aborts or blocked trackers on observer branch
       });
+      return p;
     };
   }
 
