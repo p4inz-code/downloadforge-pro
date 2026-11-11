@@ -389,27 +389,69 @@ async function handleDownload(payload, sendResponse) {
     let downloadUrl = url;
     let targetFilename = filename || extractFilenameFromUrl(url);
 
-    // Sketchfab API auto-resolution to direct 3D archive (.zip / .usdz)
+    // Sketchfab API auto-resolution to direct 3D archive (.zip / .glb / .binz)
     if (url.includes('sketchfab.com/i/models/') || url.includes('/models/')) {
       const sfMatch = url.match(/models\/([0-9a-f]{32})/i);
       if (sfMatch) {
         const uid = sfMatch[1];
         try {
-          const res = await fetch(`https://sketchfab.com/v3/models/${uid}/download`, {
-            credentials: 'include'
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.gltf && data.gltf.url) {
-              downloadUrl = data.gltf.url;
-              targetFilename = (filename || 'sketchfab_model').replace(/\.[^/.]+$/, '') + '.zip';
-            } else if (data.usdz && data.usdz.url) {
-              downloadUrl = data.usdz.url;
-              targetFilename = (filename || 'sketchfab_model').replace(/\.[^/.]+$/, '') + '.usdz';
+          // 1. Fetch metadata to extract actual model name and binary files
+          const metaRes = await fetch(`https://sketchfab.com/i/models/${uid}`);
+          let meta = null;
+          if (metaRes.ok) {
+            meta = await metaRes.json();
+          }
+
+          const modelName = ((meta && meta.name) || filename || 'sketchfab_model')
+            .replace(/[<>:"/\\|?*]/g, '_')
+            .trim()
+            .slice(0, 100);
+
+          let resolved = false;
+
+          // 2. Try official download endpoint for authenticated / free models
+          try {
+            const dlRes = await fetch(`https://sketchfab.com/v3/models/${uid}/download`, {
+              credentials: 'include'
+            });
+            if (dlRes.ok) {
+              const dlData = await dlRes.json();
+              if (dlData.gltf && dlData.gltf.url) {
+                downloadUrl = dlData.gltf.url;
+                targetFilename = `${modelName}.zip`;
+                resolved = true;
+              } else if (dlData.glb && dlData.glb.url) {
+                downloadUrl = dlData.glb.url;
+                targetFilename = `${modelName}.glb`;
+                resolved = true;
+              } else if (dlData.usdz && dlData.usdz.url) {
+                downloadUrl = dlData.usdz.url;
+                targetFilename = `${modelName}.usdz`;
+                resolved = true;
+              }
+            }
+          } catch (e) {}
+
+          // 3. Fallback: If not authenticated, download the actual binary model stream (.binz / .osgjs)
+          if (!resolved && meta && Array.isArray(meta.files) && meta.files.length > 0) {
+            const osgjsUrl = meta.files[0].osgjsUrl;
+            if (osgjsUrl) {
+              downloadUrl = osgjsUrl;
+              const binExt = osgjsUrl.split('.').pop().split('?')[0] || 'binz';
+              targetFilename = `${modelName}.${binExt}`;
+              resolved = true;
             }
           }
+
+          // Safety guard: Never download raw metadata JSON and label it as .glb
+          if (!resolved && downloadUrl.includes('/i/models/')) {
+            throw new Error('Sketchfab requires authentication for ZIP archives. Use the floating 3D Rip badge on the model viewer to extract the rendered 3D mesh.');
+          }
         } catch (e) {
-          log.warn('Sketchfab archive resolution fallback:', e.message);
+          log.warn('Sketchfab archive resolution note:', e.message);
+          if (downloadUrl.includes('/i/models/')) {
+            throw e;
+          }
         }
       }
     }

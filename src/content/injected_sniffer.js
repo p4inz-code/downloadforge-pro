@@ -305,6 +305,117 @@
     } catch (e) {}
   }
 
+  // ── WebGL Mesh Geometry Ripper (Direct GPU Buffer Extraction) ─
+  const capturedGeometries = [];
+  function hookWebGL() {
+    if (!window.WebGLRenderingContext) return;
+
+    function hookContext(proto) {
+      if (!proto || proto.__df_hooked) return;
+      proto.__df_hooked = true;
+
+      const origBufferData = proto.bufferData;
+      proto.bufferData = function(target, data, usage) {
+        try {
+          if (data && (data instanceof Float32Array || (data.buffer && data.buffer instanceof ArrayBuffer))) {
+            // Target 0x8892 is gl.ARRAY_BUFFER (vertices/normals/uvs)
+            // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
+            if (target === 0x8892 && data.length >= 9) {
+              capturedGeometries.push({
+                type: 'positions',
+                data: new Float32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)),
+                length: data.length
+              });
+              if (capturedGeometries.length > 200) capturedGeometries.shift();
+            } else if (target === 0x8893 && data.length >= 3) {
+              capturedGeometries.push({
+                type: 'indices',
+                data: data instanceof Uint16Array ? new Uint16Array(data) : new Uint32Array(data),
+                length: data.length
+              });
+              if (capturedGeometries.length > 200) capturedGeometries.shift();
+            }
+          }
+        } catch (e) {}
+        return origBufferData.apply(this, arguments);
+      };
+    }
+
+    hookContext(WebGLRenderingContext.prototype);
+    if (window.WebGL2RenderingContext) {
+      hookContext(WebGL2RenderingContext.prototype);
+    }
+  }
+
+  hookWebGL();
+
+  // Listen for mesh export request from content script
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'DF_TRIGGER_WEBGL_RIP') {
+      const title = (document.title || 'model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
+      const objData = exportCapturedMeshToObj(title);
+      if (objData) {
+        const blob = new Blob([objData], { type: 'text/plain' });
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${title}.obj`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      }
+    }
+  });
+
+  function exportCapturedMeshToObj(title) {
+    let objText = `# DownloadForge Pro WebGL 3D Ripper\n# Model: ${title}\n`;
+    const posChunks = capturedGeometries.filter(g => g.type === 'positions');
+    const idxChunks = capturedGeometries.filter(g => g.type === 'indices');
+
+    if (posChunks.length === 0) return null;
+
+    let vCount = 0;
+    for (const chunk of posChunks) {
+      const arr = chunk.data;
+      let stride = 3;
+      if (arr.length % 8 === 0 && arr.length >= 24) stride = 8;
+      else if (arr.length % 6 === 0 && arr.length >= 18) stride = 6;
+
+      for (let i = 0; i < arr.length; i += stride) {
+        const x = Number(arr[i]).toFixed(5);
+        const y = Number(arr[i + 1]).toFixed(5);
+        const z = Number(arr[i + 2]).toFixed(5);
+        if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+          objText += `v ${x} ${y} ${z}\n`;
+          vCount++;
+        }
+      }
+    }
+
+    if (vCount === 0) return null;
+
+    if (idxChunks.length > 0) {
+      for (const idxChunk of idxChunks) {
+        const arr = idxChunk.data;
+        for (let i = 0; i < arr.length - 2; i += 3) {
+          const f1 = arr[i] + 1;
+          const f2 = arr[i + 1] + 1;
+          const f3 = arr[i + 2] + 1;
+          if (f1 <= vCount && f2 <= vCount && f3 <= vCount) {
+            objText += `f ${f1} ${f2} ${f3}\n`;
+          }
+        }
+      }
+    } else {
+      for (let i = 1; i <= vCount - 2; i += 3) {
+        objText += `f ${i} ${i + 1} ${i + 2}\n`;
+      }
+    }
+
+    return objText;
+  }
+
   hookEngineLoaders();
   setTimeout(hookEngineLoaders, 1500);
 
