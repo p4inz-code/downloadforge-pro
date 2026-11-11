@@ -1,144 +1,179 @@
-# DownloadForge
+# DownloadForge Pro (v1.0.0)
 
-**By ObsidianLabs — Built by p4inz**
+**High-Performance In-Browser Video Stream Downloader & Transmuxer for Chrome (Manifest V3)**  
+*Engineered by ObsidianLabs — Maintained by p4inz*
 
-A production-quality Chrome extension for detecting and downloading resources from any webpage.
-Supports videos, audio, images, documents, archives, and non-DRM HLS streams.
+[![Release](https://img.shields.io/badge/release-v1.0.0-6366f1.svg)](https://github.com/p4inz-code/downloadforge-pro/releases)
+[![Chrome MV3](https://img.shields.io/badge/manifest-v3-10b981.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Zero Telemetry](https://img.shields.io/badge/telemetry-none-success.svg)](#privacy--security-model)
+
+---
+
+DownloadForge Pro is a zero-telemetry, developer-focused Chrome extension engineered to sniff, decrypt, transmux, and download media streams from the web. It delivers full parity with and surpasses proprietary tools like FetchV by providing **multi-threaded segment fetching**, **hardware-accelerated WebCrypto AES-128 decryption**, **zero-RAM direct-to-disk streaming** (File System Access API), and an in-player floating action pill.
+
+---
+
+## Visual Tour
+
+### 1. Dedicated Stream Studio (`downloader.html`)
+Live visual segment heatmap, real-time throughput metrics (MB/s and ETA countdown), integrated HTML5 preview player, and multi-thread concurrency tuning.
+
+![DownloadForge Pro Stream Studio](assets/screenshots/stream_studio.png)
+
+### 2. Tab Resource Inspector Popup (`popup.html`)
+Obsidian Pro glassmorphic palette, Lucide MIT vector icons, categorised media filters, and 1-click launch to Stream Studio.
+
+![DownloadForge Pro Popup Inspector](assets/screenshots/popup.png)
+
+### 3. Media Hub & History Manager (`dashboard.html`)
+Searchable local audit log, rule engine management, and direct download replay.
+
+![DownloadForge Pro Dashboard](assets/screenshots/dashboard.png)
+
+---
+
+## Key Features
+
+### 🚀 High-Throughput HLS Ingestion Engine
+- **Configurable Thread Concurrency**:
+  - `Balanced` (4 workers): Stable for rate-sensitive CDNs.
+  - `Turbo` (8 workers): Recommended default for high-speed broadband.
+  - `Maximum` (16 workers): Saturates multi-gigabit connections.
+- **Hardware AES-128 Decryption**: Uses the browser's native `window.crypto.subtle` API for multi-megabyte/sec chunk decryption without main-thread jank.
+- **Dual-Track Demuxing**: Automatically extracts separated `#EXT-X-MEDIA:TYPE=AUDIO` tracks and remuxes them alongside the primary video track into standard MP4 containers.
+- **Direct-to-Disk Zero-RAM Streaming**: For 1GB to 4GB+ files, DownloadForge Pro streams transmuxed chunks straight to disk using `showSaveFilePicker()` and `FileSystemWritableFileStream`, keeping the extension's memory footprint under 80 MB.
+- **Live Visual Segment Heatmap**: Real-time per-chunk status grid (Queued, Fetching, Transmuxed, Error).
+
+### 🎯 Non-Intrusive In-Player Floating Overlay
+- Automatically anchors a download pill to the top-right corner of any HTML5 `<video>` element on hover.
+- Displays detected resolution tag (e.g. `1080p`, `720p`, `HLS Stream`).
+- Triggers instant highest-bitrate stream capture without opening the popup menu.
+- Keyboard shortcut: **`Alt + D`** to toggle/download active player stream.
+
+### 🛡️ Low-Level Request Sniffer (Main-World Bridge)
+- Intercepts dynamic `window.fetch`, `XMLHttpRequest`, and `HTMLVideoElement.src` bindings at runtime.
+- **MediaSource Buffer Hook**: Intercepts `SourceBuffer.prototype.appendBuffer` to capture `blob:` streams that do not expose direct manifest URLs.
+- **Anti-Hotlinking Engine**: Utilizes `chrome.declarativeNetRequest` rules to strip extension headers (`Origin: chrome-extension://...`) and mirror target `Referer` headers to bypass CDN 403 anti-scrape barriers.
+- **Cryptographic Nonce Handshake**: Content script and main-world sniffer communicate via session-specific token nonces to eliminate cross-extension injection attacks.
+
+---
+
+## Technical Architecture
+
+```
+Webpage (DOM & Media)
+   │
+   ├── Main-World Sniffer (injected_sniffer.js)
+   │     ├─ Intercepts fetch / XHR / MSE appendBuffer
+   │     └─ Posts sanitized payloads to Content Script via CustomEvent + Nonce
+   │
+   ├── Video Overlay Pill (video_overlay.js)
+   │     └─ Floating glassmorphic download pill anchored to HTML5 <video>
+   │
+   └── Content Script Bridge (dist/content_script.bundle.js)
+         └─ Relays stream manifests and MSE chunks to Background Worker
+               │
+               ▼
+   Background Service Worker (service_worker.js)
+         ├─ Active tab badge counters & state store
+         ├─ declarativeNetRequest CDN header rules
+         └─ Routes stream URLs to Stream Studio
+               │
+               ▼
+   Stream Studio (src/downloader/downloader.html)
+         ├─ hls_parser.js: Manifest, variant, key & map extraction
+         ├─ hls_engine.js: Worker queue + WebCrypto AES-128
+         ├─ mux.js: In-browser TS-to-fMP4 transmuxer
+         └─ FileSystemWritableFileStream: Direct-to-disk write
+```
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut | Scope | Action |
+|---|---|---|
+| `Alt + D` | Webpage | Trigger download of currently focused video stream |
+| `Alt + R` | Webpage | Toggle MSE buffer recording mode for `blob:` streams |
+| `Escape` | Stream Studio | Abort active download job safely |
+
+---
+
+## Installation
+
+### Option A: Install via Official Release Zip (Recommended)
+1. Download `downloadforge-pro-v1.0.0.zip` from [Releases](https://github.com/p4inz-code/downloadforge-pro/releases).
+2. Unzip the file into a folder on your drive (e.g., `Documents/downloadforge-pro`).
+3. Open Google Chrome and navigate to `chrome://extensions`.
+4. Enable the **Developer mode** toggle in the top-right corner.
+5. Click **Load unpacked** and select the unzipped directory.
+6. Pin **DownloadForge Pro** to your extension toolbar.
+
+### Option B: Build from Source
+Requirements: Node.js (v18+) and npm.
+
+```bash
+# 1. Clone repository
+git clone https://github.com/p4inz-code/downloadforge-pro.git
+cd downloadforge-pro
+
+# 2. Install dependencies
+npm install
+
+# 3. Compile ESBuild bundles (dist/content_script.bundle.js & dist/downloader.bundle.js)
+npm run build
+
+# 4. Load into Chrome
+# Open chrome://extensions -> Developer mode -> Load unpacked -> Select repo directory
+```
+
+---
+
+## Privacy & Security Model
+
+- **No Remote Telemetry**: DownloadForge Pro contains zero tracking scripts, zero Google Analytics, and zero third-party CDNs.
+- **Local Transmuxing**: All TS segment processing and MP4 container packaging happen entirely inside your local browser runtime. No video data ever routes through a proxy server.
+- **Strict Content Security Policy (CSP)**: Extension pages are locked down with `script-src 'self'` and `object-src 'none'`.
+- **DRM Policy**: DownloadForge Pro does not decrypt or circumvent proprietary DRM systems (Widevine, PlayReady, FairPlay). Standard clear-key AES-128 streams (RFC 8216) are fully supported.
 
 ---
 
 ## Project Structure
 
 ```
-downloadforge/
-├── manifest.json                    ← Chrome MV3 manifest
-├── package.json                     ← Build tools (esbuild, mux.js)
-├── build.js                         ← Bundling pipeline
-├── dist/                            ← Compiled bundles (content_script, downloader)
+downloadforge-pro/
+├── manifest.json                     # Chrome MV3 manifest
+├── package.json                      # Build scripts and dependencies
+├── build.js                          # ESBuild pipeline
+├── dist/                             # Compiled production bundles
+│   ├── content_script.bundle.js      # Bundled content bridge & overlay
+│   └── downloader.bundle.js          # Bundled HLS engine & mux.js
+├── assets/
+│   ├── icons/                        # Extension icons (16, 32, 48, 128)
+│   └── screenshots/                  # Verified real UI screenshots
 ├── src/
-│   ├── background/service_worker.js ← Message hub, badge, downloads
+│   ├── background/service_worker.js  # MV3 service worker & routing
 │   ├── content/
-│   │   ├── injected_sniffer.js      ← Main-world dynamic stream sniffer
-│   │   ├── content_script.js        ← Content script bridge
-│   │   └── dom_scanner.js           ← DOM resource detection
-│   ├── downloader/                  ← Dedicated Stream Studio (HLS & Transmuxer)
+│   │   ├── injected_sniffer.js       # Main-world fetch/XHR/MSE hook
+│   │   ├── content_script.js         # Security bridge
+│   │   ├── video_overlay.js          # Hover pill component
+│   │   └── video_overlay.css         # Glassmorphic pill styling
+│   ├── core/
+│   │   ├── hls_engine.js             # Multi-threaded segment downloader
+│   │   ├── hls_parser.js             # M3U8, AES-128, and audio parser
+│   │   └── detector.js               # Resource type classifier
+│   ├── downloader/                   # Dedicated Stream Studio UI
 │   │   ├── downloader.html
 │   │   ├── downloader.css
 │   │   └── downloader_bundle.js
-│   ├── popup/                       ← Extension popup UI
-│   ├── dashboard/                   ← Full manager page
-│   ├── core/
-│   │   ├── hls_engine.js            ← In-browser multi-threaded HLS engine
-│   │   ├── hls_parser.js            ← AES-128 & manifest parser
-│   │   ├── detector.js              ← Detection orchestrator
-│   │   ├── classifier.js            ← Type inference
-│   │   ├── metadata.js              ← HEAD fetcher for file sizes
-│   │   ├── downloads.js             ← Download manager
-│   │   ├── rules.js                 ← Domain rules engine
-│   │   └── companion_bridge.js      ← Native messaging bridge
-│   ├── storage/storage.js           ← chrome.storage abstraction
-│   ├── utils/                       ← Shared utilities
-│   └── shared/constants.js          ← All constants
-├── companion/                       ← Go native app
-└── backend/                         ← Firebase Cloud Functions
+│   ├── popup/                        # Extension popup UI
+│   └── dashboard/                    # Full media manager page
+└── release/                          # Packaged release archives (.zip)
 ```
 
 ---
 
-## Building the Extension Bundles
+## License
 
-```bash
-npm install
-npm run build
-```
-
----
-
-## Loading the Extension (Development)
-
-1. Run `npm run build` to compile the bundles into `dist/`
-2. Open `chrome://extensions`
-3. Enable **Developer mode**
-4. Click **Load unpacked**
-5. Select the `downloadforge/` folder
-6. The extension appears in your toolbar
-
----
-
-## Building the Companion App
-
-```bash
-cd companion
-go build -o downloadforge-companion .
-```
-
-### Register native messaging host
-
-**macOS / Linux:**
-```bash
-cp com.obsidianlabs.downloadforge.json ~/Library/Application\ Support/Google/Chrome/NativeMessagingHosts/
-# Edit the file — set "path" to the full path of your built binary
-```
-
-**Windows:**
-```
-Copy com.obsidianlabs.downloadforge.json to:
-HKEY_CURRENT_USER\SOFTWARE\Google\Chrome\NativeMessagingHosts\com.obsidianlabs.downloadforge
-Set default value = full path to the JSON file
-```
-
-Update `allowed_origins` in the JSON with your extension's ID from `chrome://extensions`.
-
----
-
-## Firebase Backend
-
-```bash
-cd backend
-npm install -g firebase-tools
-firebase login
-firebase use YOUR_PROJECT_ID
-firebase deploy --only functions,firestore:rules
-```
-
----
-
-## Permissions Explained
-
-| Permission | Why |
-|---|---|
-| `activeTab` | Scan current tab on user click only |
-| `scripting` | Inject content script to scan DOM |
-| `downloads` | Trigger downloads via Chrome API |
-| `storage` | Save settings and history locally |
-| `tabs` | Get current tab URL for page bar |
-| `nativeMessaging` | Talk to desktop companion app |
-| `webRequest` *(optional)* | Observe network requests for resources |
-
----
-
-## Privacy
-
-- All data stored locally via `chrome.storage.local`
-- No personal data sent to any server
-- Anonymous usage pings are opt-in and contain only extension version + event name
-- No browsing history collected or stored
-- Ads appear only in the dashboard page, never in the popup
-
----
-
-## Important Constraints
-
-- ❌ Does NOT bypass DRM, paywalls, or authentication
-- ❌ Does NOT support YouTube (Chrome Web Store policy)
-- ❌ HLS download only for non-DRM, openly accessible streams
-- ✅ Only downloads resources directly accessible in your browser session
-
----
-
-## Support
-
-Discord: **discord.gg/obsidianlabs**
-Website: **obsidianlabs.pages.dev**
-
-© 2026 ObsidianLabs — Built by p4inz
+MIT License. Designed and engineered for personal high-speed media archiving.
