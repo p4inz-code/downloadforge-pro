@@ -26,6 +26,8 @@ export function inferCategory(url, mimeType, ext) {
     const lower = url.toLowerCase();
     if (lower.includes('.m3u8') || lower.includes('.m3u') || lower.includes('.mpd')) return CATEGORY.STREAM;
     if (lower.includes('sketchfab.com/i/models') || lower.includes('media.sketchfab.com/models') || lower.includes('sketchfab.com/3d-models')) return CATEGORY.MODEL_3D;
+    if (lower.includes('cgtrader.com/3d-models') || lower.includes('cgtrader.com/free-3d-models') || lower.includes('cgtrader.com/items')) return CATEGORY.MODEL_3D;
+    if (lower.includes('turbosquid.com/3d-models') || lower.includes('cults3d.com') || lower.includes('thingiverse.com/thing:') || lower.includes('printables.com/model') || lower.includes('free3d.com/3d-model') || lower.includes('thangs.com')) return CATEGORY.MODEL_3D;
     if (lower.includes('models.readyplayer.me') || lower.includes('prod.spline.design') || lower.includes('lumalabs.ai')) return CATEGORY.MODEL_3D;
     if (lower.includes('googlevideo.com/videoplayback') || lower.includes('vimeocdn.com') || lower.includes('twimg.com/video') || lower.includes('tiktokcdn.com') || lower.includes('v.redd.it')) return CATEGORY.VIDEO;
     if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply|3mf|dae|blend|step|stp|iges|osgjs|binz|splinecode|drc)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;

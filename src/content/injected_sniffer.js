@@ -310,6 +310,41 @@
   function hookWebGL() {
     if (!window.WebGLRenderingContext) return;
 
+    function captureBuffer(target, data) {
+      if (!data) return;
+      // Target 0x8892 is gl.ARRAY_BUFFER (vertices/normals/uvs)
+      // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
+      if (target === 0x8892 && (data instanceof Float32Array || (data.buffer && data.buffer instanceof ArrayBuffer))) {
+        const floatView = data instanceof Float32Array ? data : new Float32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+        if (floatView.length >= 9) {
+          capturedGeometries.push({
+            type: 'positions',
+            data: new Float32Array(floatView),
+            length: floatView.length,
+            time: Date.now()
+          });
+          if (capturedGeometries.length > 300) capturedGeometries.shift();
+        }
+      } else if (target === 0x8893 && (data instanceof Uint16Array || data instanceof Uint32Array || (data.buffer && data.buffer instanceof ArrayBuffer))) {
+        const isUint32 = data instanceof Uint32Array || (data.byteLength % 4 === 0 && data.byteLength > 0);
+        const idxView = data instanceof Uint16Array || data instanceof Uint32Array
+          ? data
+          : (isUint32
+            ? new Uint32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength))
+            : new Uint16Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)));
+
+        if (idxView.length >= 3) {
+          capturedGeometries.push({
+            type: 'indices',
+            data: idxView instanceof Uint16Array ? new Uint16Array(idxView) : new Uint32Array(idxView),
+            length: idxView.length,
+            time: Date.now()
+          });
+          if (capturedGeometries.length > 300) capturedGeometries.shift();
+        }
+      }
+    }
+
     function hookContext(proto) {
       if (!proto || proto.__df_hooked) return;
       proto.__df_hooked = true;
@@ -317,27 +352,17 @@
       const origBufferData = proto.bufferData;
       proto.bufferData = function(target, data, usage) {
         try {
-          if (data && (data instanceof Float32Array || (data.buffer && data.buffer instanceof ArrayBuffer))) {
-            // Target 0x8892 is gl.ARRAY_BUFFER (vertices/normals/uvs)
-            // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
-            if (target === 0x8892 && data.length >= 9) {
-              capturedGeometries.push({
-                type: 'positions',
-                data: new Float32Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)),
-                length: data.length
-              });
-              if (capturedGeometries.length > 200) capturedGeometries.shift();
-            } else if (target === 0x8893 && data.length >= 3) {
-              capturedGeometries.push({
-                type: 'indices',
-                data: data instanceof Uint16Array ? new Uint16Array(data) : new Uint32Array(data),
-                length: data.length
-              });
-              if (capturedGeometries.length > 200) capturedGeometries.shift();
-            }
-          }
+          captureBuffer(target, data);
         } catch (e) {}
         return origBufferData.apply(this, arguments);
+      };
+
+      const origBufferSubData = proto.bufferSubData;
+      proto.bufferSubData = function(target, offset, data) {
+        try {
+          captureBuffer(target, data);
+        } catch (e) {}
+        return origBufferSubData.apply(this, arguments);
       };
     }
 
@@ -364,23 +389,61 @@
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+        notifyDetected({
+          url: blobUrl,
+          category: 'model_3d',
+          title: `${title} (WebGL Mesh OBJ)`,
+          mimeType: 'text/plain',
+          method: 'TIER_4_MSE_BUFFER',
+          initiator: 'webgl-mesh-ripper'
+        });
+
+        window.postMessage({ type: 'DF_WEBGL_RIP_SUCCESS', title }, '*');
+      } else {
+        window.postMessage({ type: 'DF_WEBGL_RIP_FAIL', reason: 'No WebGL buffer data captured yet. Interact with the 3D model viewer to stream geometry.' }, '*');
       }
     }
   });
 
   function exportCapturedMeshToObj(title) {
-    let objText = `# DownloadForge Pro WebGL 3D Ripper\n# Model: ${title}\n`;
+    let objText = `# DownloadForge Pro WebGL 3D Ripper\n# Model: ${title}\n# Extracted: ${new Date().toISOString()}\n\n`;
     const posChunks = capturedGeometries.filter(g => g.type === 'positions');
     const idxChunks = capturedGeometries.filter(g => g.type === 'indices');
 
     if (posChunks.length === 0) return null;
 
-    let vCount = 0;
-    for (const chunk of posChunks) {
+    let globalVOffset = 0;
+    let globalVtOffset = 0;
+    let globalVnOffset = 0;
+    let totalFaces = 0;
+
+    for (let c = 0; c < posChunks.length; c++) {
+      const chunk = posChunks[c];
       const arr = chunk.data;
       let stride = 3;
-      if (arr.length % 8 === 0 && arr.length >= 24) stride = 8;
-      else if (arr.length % 6 === 0 && arr.length >= 18) stride = 6;
+      let hasUVs = false;
+      let hasNormals = false;
+
+      // Stride detection
+      if (arr.length % 8 === 0 && arr.length >= 24) {
+        stride = 8; // x, y, z, nx, ny, nz, u, v
+        hasNormals = true;
+        hasUVs = true;
+      } else if (arr.length % 6 === 0 && arr.length >= 18) {
+        stride = 6; // x, y, z, nx, ny, nz
+        hasNormals = true;
+      } else if (arr.length % 5 === 0 && arr.length >= 15) {
+        stride = 5; // x, y, z, u, v
+        hasUVs = true;
+      }
+
+      const submeshVStart = globalVOffset;
+      const submeshVtStart = globalVtOffset;
+      const submeshVnStart = globalVnOffset;
+      let submeshVCount = 0;
+
+      objText += `g submesh_${c + 1}\n`;
 
       for (let i = 0; i < arr.length; i += stride) {
         const x = Number(arr[i]).toFixed(5);
@@ -388,31 +451,77 @@
         const z = Number(arr[i + 2]).toFixed(5);
         if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
           objText += `v ${x} ${y} ${z}\n`;
-          vCount++;
-        }
-      }
-    }
+          submeshVCount++;
+          globalVOffset++;
 
-    if (vCount === 0) return null;
+          if (hasNormals) {
+            const nx = Number(arr[i + 3]).toFixed(5);
+            const ny = Number(arr[i + 4]).toFixed(5);
+            const nz = Number(arr[i + 5]).toFixed(5);
+            objText += `vn ${nx} ${ny} ${nz}\n`;
+            globalVnOffset++;
+          }
 
-    if (idxChunks.length > 0) {
-      for (const idxChunk of idxChunks) {
-        const arr = idxChunk.data;
-        for (let i = 0; i < arr.length - 2; i += 3) {
-          const f1 = arr[i] + 1;
-          const f2 = arr[i + 1] + 1;
-          const f3 = arr[i + 2] + 1;
-          if (f1 <= vCount && f2 <= vCount && f3 <= vCount) {
-            objText += `f ${f1} ${f2} ${f3}\n`;
+          if (hasUVs) {
+            const uOffset = hasNormals ? 6 : 3;
+            const u = Number(arr[i + uOffset]).toFixed(5);
+            const v = Number(arr[i + uOffset + 1]).toFixed(5);
+            objText += `vt ${u} ${v}\n`;
+            globalVtOffset++;
           }
         }
       }
-    } else {
-      for (let i = 1; i <= vCount - 2; i += 3) {
-        objText += `f ${i} ${i + 1} ${i + 2}\n`;
+
+      if (submeshVCount === 0) continue;
+
+      // Match corresponding index chunk if available, or sequential faces
+      const matchingIdx = idxChunks[c];
+      if (matchingIdx && matchingIdx.data) {
+        const iarr = matchingIdx.data;
+        for (let j = 0; j < iarr.length - 2; j += 3) {
+          const i1 = iarr[j];
+          const i2 = iarr[j + 1];
+          const i3 = iarr[j + 2];
+          if (i1 < submeshVCount && i2 < submeshVCount && i3 < submeshVCount) {
+            const f1 = i1 + 1 + submeshVStart;
+            const f2 = i2 + 1 + submeshVStart;
+            const f3 = i3 + 1 + submeshVStart;
+            if (hasNormals && hasUVs) {
+              const vt1 = i1 + 1 + submeshVtStart;
+              const vt2 = i2 + 1 + submeshVtStart;
+              const vt3 = i3 + 1 + submeshVtStart;
+              const vn1 = i1 + 1 + submeshVnStart;
+              const vn2 = i2 + 1 + submeshVnStart;
+              const vn3 = i3 + 1 + submeshVnStart;
+              objText += `f ${f1}/${vt1}/${vn1} ${f2}/${vt2}/${vn2} ${f3}/${vt3}/${vn3}\n`;
+            } else if (hasNormals) {
+              const vn1 = i1 + 1 + submeshVnStart;
+              const vn2 = i2 + 1 + submeshVnStart;
+              const vn3 = i3 + 1 + submeshVnStart;
+              objText += `f ${f1}//${vn1} ${f2}//${vn2} ${f3}//${vn3}\n`;
+            } else if (hasUVs) {
+              const vt1 = i1 + 1 + submeshVtStart;
+              const vt2 = i2 + 1 + submeshVtStart;
+              const vt3 = i3 + 1 + submeshVtStart;
+              objText += `f ${f1}/${vt1} ${f2}/${vt2} ${f3}/${vt3}\n`;
+            } else {
+              objText += `f ${f1} ${f2} ${f3}\n`;
+            }
+            totalFaces++;
+          }
+        }
+      } else {
+        for (let j = 1; j <= submeshVCount - 2; j += 3) {
+          const f1 = j + submeshVStart;
+          const f2 = j + 1 + submeshVStart;
+          const f3 = j + 2 + submeshVStart;
+          objText += `f ${f1} ${f2} ${f3}\n`;
+          totalFaces++;
+        }
       }
     }
 
+    if (globalVOffset === 0) return null;
     return objText;
   }
 
@@ -580,7 +689,10 @@
       // G. Dedicated Sketchfab Adapter
       detectSketchfabModel();
 
-      // H. Dedicated 3D Sites Adapter (Thingiverse, Printables, Cults3D, Spline)
+      // H. Dedicated CGTrader Adapter
+      detectCGTraderModel();
+
+      // I. Dedicated 3D Sites Adapter (Thingiverse, Printables, Cults3D, TurboSquid, Free3D, Thangs, Spline)
       detectFamous3DPlatforms();
 
     } catch (err) {}
@@ -632,7 +744,48 @@
     } catch (e) {}
   }
 
-  // ── 10. Dedicated Famous 3D Platforms Adapter ────────────────
+  // ── 10. Specialized CGTrader 3D Model Adapter ────────────────
+  function detectCGTraderModel() {
+    try {
+      const href = window.location.href;
+      if (!href.includes('cgtrader.com')) return;
+
+      if (href.includes('/3d-models/') || href.includes('/free-3d-models/')) {
+        let title = (document.title || 'CGTrader 3D Model')
+          .replace(/\s*\|\s*CGTrader.*$/i, '')
+          .replace(/\s*-\s*3D\s*model.*$/i, '')
+          .trim();
+
+        let thumbnail = '';
+        const ogImg = document.querySelector('meta[property="og:image"]');
+        if (ogImg) thumbnail = ogImg.getAttribute('content') || '';
+
+        // Check for download buttons or action endpoints
+        const downloadLinks = document.querySelectorAll('a[href*="/download"], a[href*="download-locations"], button[data-testid*="download"], .product-action__download-button');
+        let dlUrl = null;
+        for (const a of downloadLinks) {
+          const h = a.getAttribute('href');
+          if (h && !h.startsWith('#') && !h.startsWith('javascript:')) {
+            try {
+              dlUrl = new URL(h, window.location.origin).href;
+              break;
+            } catch (e) {}
+          }
+        }
+
+        notifyDetected({
+          url: dlUrl || href,
+          category: 'model_3d',
+          title: title || 'CGTrader 3D Model',
+          preview: thumbnail,
+          method: dlUrl ? 'TIER_2_DOM_TAG' : 'TIER_3_PLAYER_CONFIG',
+          initiator: 'cgtrader-adapter'
+        });
+      }
+    } catch (e) {}
+  }
+
+  // ── 11. Dedicated Famous 3D Platforms Adapter ────────────────
   function detectFamous3DPlatforms() {
     try {
       const href = window.location.href;
@@ -658,6 +811,54 @@
           method: 'TIER_3_PLAYER_CONFIG',
           initiator: 'printables-adapter'
         });
+      }
+
+      // Cults3D
+      if (href.includes('cults3d.com')) {
+        if (href.includes('/3d-model/')) {
+          notifyDetected({
+            url: href,
+            category: 'model_3d',
+            title: document.title.replace(/\s*·.*Cults.*$/i, '').trim() || 'Cults3D Model',
+            method: 'TIER_3_PLAYER_CONFIG',
+            initiator: 'cults3d-adapter'
+          });
+        }
+      }
+
+      // TurboSquid
+      if (href.includes('turbosquid.com/3d-models/')) {
+        notifyDetected({
+          url: href,
+          category: 'model_3d',
+          title: document.title.replace(/\s*\|\s*TurboSquid.*$/i, '').trim() || 'TurboSquid 3D Model',
+          method: 'TIER_3_PLAYER_CONFIG',
+          initiator: 'turbosquid-adapter'
+        });
+      }
+
+      // Free3D
+      if (href.includes('free3d.com/3d-model/')) {
+        notifyDetected({
+          url: href,
+          category: 'model_3d',
+          title: document.title.replace(/\s*\|\s*Free3D.*$/i, '').trim() || 'Free3D Model',
+          method: 'TIER_3_PLAYER_CONFIG',
+          initiator: 'free3d-adapter'
+        });
+      }
+
+      // Thangs
+      if (href.includes('thangs.com/')) {
+        if (href.includes('/3d-model/')) {
+          notifyDetected({
+            url: href,
+            category: 'model_3d',
+            title: document.title.replace(/\s*\|\s*Thangs.*$/i, '').trim() || 'Thangs 3D Model',
+            method: 'TIER_3_PLAYER_CONFIG',
+            initiator: 'thangs-adapter'
+          });
+        }
       }
 
       // Spline Viewer URL / code

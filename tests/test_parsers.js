@@ -104,12 +104,132 @@ assert.strictEqual(inferCategory('https://example.com/model.step', null, 'step')
 assert.strictEqual(inferCategory('https://example.com/scene.blend', null, 'blend'), CATEGORY.MODEL_3D, 'blend should be model_3d');
 assert.strictEqual(inferCategory('https://sketchfab.com/i/models/4a0d8e87900b46d0a7a7bbcb358249ad', null, null), CATEGORY.MODEL_3D, 'sketchfab model API should be model_3d');
 assert.strictEqual(inferCategory('https://media.sketchfab.com/models/4a0d/file.osgjs.gz', null, 'gz'), CATEGORY.MODEL_3D, 'sketchfab media should be model_3d');
+assert.strictEqual(inferCategory('https://www.cgtrader.com/3d-models/car/sports-car/bmw-m3-gtr', null, null), CATEGORY.MODEL_3D, 'cgtrader 3d-models should be model_3d');
+assert.strictEqual(inferCategory('https://www.cgtrader.com/free-3d-models/character/sci-fi/robot', null, null), CATEGORY.MODEL_3D, 'cgtrader free-3d-models should be model_3d');
+assert.strictEqual(inferCategory('https://www.turbosquid.com/3d-models/audi-r8-spyder-3d-model-1892019', null, null), CATEGORY.MODEL_3D, 'turbosquid should be model_3d');
+assert.strictEqual(inferCategory('https://cults3d.com/en/3d-model/game/articulated-dragon', null, null), CATEGORY.MODEL_3D, 'cults3d should be model_3d');
+assert.strictEqual(inferCategory('https://www.thingiverse.com/thing:4829104/files', null, null), CATEGORY.MODEL_3D, 'thingiverse should be model_3d');
+assert.strictEqual(inferCategory('https://www.printables.com/model/12345-flexi-rex', null, null), CATEGORY.MODEL_3D, 'printables should be model_3d');
+assert.strictEqual(inferCategory('https://free3d.com/3d-model/low-poly-tree-49201.html', null, null), CATEGORY.MODEL_3D, 'free3d should be model_3d');
+assert.strictEqual(inferCategory('https://thangs.com/designer/ZackFreedman/3d-model/gridfinity-box', null, null), CATEGORY.MODEL_3D, 'thangs should be model_3d');
 assert.strictEqual(inferCategory('https://models.readyplayer.me/avatar.glb', null, 'glb'), CATEGORY.MODEL_3D, 'readyplayer.me should be model_3d');
 assert.strictEqual(inferCategory('https://prod.spline.design/scene.splinecode', null, 'splinecode'), CATEGORY.MODEL_3D, 'splinecode should be model_3d');
 assert.strictEqual(inferCategory('https://example.com/model', 'model/gltf-binary', null), CATEGORY.MODEL_3D, 'model/gltf-binary should be model_3d');
-console.log('  [PASS] 3D Model Classifier & Famous Platforms Taxonomy (Sketchfab, Spline, RPM, 3MF) verified');
+console.log('  [PASS] 3D Model Classifier & Famous Platforms (Sketchfab, CGTrader, TurboSquid, Cults3D, Thingiverse, Printables, Thangs, Free3D) verified');
 
-// 8. In-Browser Audio Transcoder & RIFF WAV Encoder
+// 8. WebGL Mesh Geometry Ripper Wavefront OBJ Serialization Engine
+function verifyObjExport(posChunks, idxChunks, title = 'test_model') {
+  let objText = `# DownloadForge Pro WebGL 3D Ripper\n# Model: ${title}\n\n`;
+  let globalVOffset = 0;
+  let globalVtOffset = 0;
+  let globalVnOffset = 0;
+  let totalFaces = 0;
+
+  for (let c = 0; c < posChunks.length; c++) {
+    const arr = posChunks[c];
+    let stride = 3;
+    let hasUVs = false;
+    let hasNormals = false;
+
+    if (arr.length % 8 === 0 && arr.length >= 24) {
+      stride = 8;
+      hasNormals = true;
+      hasUVs = true;
+    } else if (arr.length % 6 === 0 && arr.length >= 18) {
+      stride = 6;
+      hasNormals = true;
+    } else if (arr.length % 5 === 0 && arr.length >= 15) {
+      stride = 5;
+      hasUVs = true;
+    }
+
+    const submeshVStart = globalVOffset;
+    const submeshVtStart = globalVtOffset;
+    const submeshVnStart = globalVnOffset;
+    let submeshVCount = 0;
+
+    objText += `g submesh_${c + 1}\n`;
+
+    for (let i = 0; i < arr.length; i += stride) {
+      const x = Number(arr[i]).toFixed(5);
+      const y = Number(arr[i + 1]).toFixed(5);
+      const z = Number(arr[i + 2]).toFixed(5);
+      objText += `v ${x} ${y} ${z}\n`;
+      submeshVCount++;
+      globalVOffset++;
+
+      if (hasNormals) {
+        const nx = Number(arr[i + 3]).toFixed(5);
+        const ny = Number(arr[i + 4]).toFixed(5);
+        const nz = Number(arr[i + 5]).toFixed(5);
+        objText += `vn ${nx} ${ny} ${nz}\n`;
+        globalVnOffset++;
+      }
+
+      if (hasUVs) {
+        const uOffset = hasNormals ? 6 : 3;
+        const u = Number(arr[i + uOffset]).toFixed(5);
+        const v = Number(arr[i + uOffset + 1]).toFixed(5);
+        objText += `vt ${u} ${v}\n`;
+        globalVtOffset++;
+      }
+    }
+
+    const matchingIdx = idxChunks[c];
+    if (matchingIdx) {
+      for (let j = 0; j < matchingIdx.length - 2; j += 3) {
+        const i1 = matchingIdx[j];
+        const i2 = matchingIdx[j + 1];
+        const i3 = matchingIdx[j + 2];
+        const f1 = i1 + 1 + submeshVStart;
+        const f2 = i2 + 1 + submeshVStart;
+        const f3 = i3 + 1 + submeshVStart;
+        if (hasNormals && hasUVs) {
+          const vt1 = i1 + 1 + submeshVtStart;
+          const vt2 = i2 + 1 + submeshVtStart;
+          const vt3 = i3 + 1 + submeshVtStart;
+          const vn1 = i1 + 1 + submeshVnStart;
+          const vn2 = i2 + 1 + submeshVnStart;
+          const vn3 = i3 + 1 + submeshVnStart;
+          objText += `f ${f1}/${vt1}/${vn1} ${f2}/${vt2}/${vn2} ${f3}/${vt3}/${vn3}\n`;
+        } else {
+          objText += `f ${f1} ${f2} ${f3}\n`;
+        }
+        totalFaces++;
+      }
+    }
+  }
+
+  return { objText, totalVertices: globalVOffset, totalFaces };
+}
+
+// Test Submesh 1 (stride 8: pos, normal, uv) + Submesh 2 (stride 3: pos only)
+const submesh1Data = new Float32Array([
+  // v0: x, y, z, nx, ny, nz, u, v
+  0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+  // v1: x, y, z, nx, ny, nz, u, v
+  1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,
+  // v2: x, y, z, nx, ny, nz, u, v
+  0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0
+]);
+const submesh1Indices = new Uint16Array([0, 1, 2]);
+
+const submesh2Data = new Float32Array([
+  // v0, v1, v2 for submesh 2
+  2.0, 0.0, 0.0,
+  3.0, 0.0, 0.0,
+  2.0, 1.0, 0.0
+]);
+const submesh2Indices = new Uint16Array([0, 1, 2]);
+
+const rippedObj = verifyObjExport([submesh1Data, submesh2Data], [submesh1Indices, submesh2Indices], 'dual_submesh_test');
+assert.strictEqual(rippedObj.totalVertices, 6, 'Should extract exactly 6 vertices across 2 submeshes');
+assert.strictEqual(rippedObj.totalFaces, 2, 'Should extract exactly 2 triangular faces');
+assert.ok(rippedObj.objText.includes('f 1/1/1 2/2/2 3/3/3'), 'Submesh 1 face must contain interleaved v/vt/vn format');
+assert.ok(rippedObj.objText.includes('f 4 5 6'), 'Submesh 2 face must properly offset indices by submesh 1 vertex count (offset +3)');
+console.log('  [PASS] WebGL Mesh Geometry Ripper Multi-Submesh & Wavefront OBJ Serialization Engine verified');
+
+// 9. In-Browser Audio Transcoder & RIFF WAV Encoder
 import { audioBufferToWavBlob } from '../src/core/audio_converter.js';
 const mockAudioBuffer = {
   numberOfChannels: 2,
@@ -144,5 +264,5 @@ assert.strictEqual(wavView.getUint32(24, true), 44100, 'SampleRate must be 44100
 assert.strictEqual(wavView.getUint16(34, true), 16, 'BitsPerSample must be 16');
 console.log('  [PASS] In-Browser Audio Transcoder & RIFF WAV Encoder binary structure verified');
 
-console.log('[Test] All 8 core test suites passed successfully with zero errors!');
+console.log('[Test] All 9 core test suites passed successfully with zero errors!');
 

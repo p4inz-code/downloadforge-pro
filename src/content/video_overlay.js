@@ -435,6 +435,46 @@ export function initVideoOverlay() {
 export function init3DOverlay() {
   const tracked3D = new WeakSet();
 
+  function show3DToast(message, isError = false) {
+    const existing = document.getElementById('df-3d-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'df-3d-toast';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 2147483647;
+      background: #0f172a;
+      border: 1px solid ${isError ? '#ef4444' : '#06b6d4'};
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  // Listen for WebGL Ripper feedback
+  window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'DF_WEBGL_RIP_SUCCESS') {
+      show3DToast(`DownloadForge 3D Rip: Exported ${e.data.title || 'model'} to Wavefront OBJ`);
+    } else if (e.data && e.data.type === 'DF_WEBGL_RIP_FAIL') {
+      show3DToast(e.data.reason || 'No 3D buffer captured yet', true);
+    }
+  });
+
   function attachOverlayTo3D(el) {
     if (!el || tracked3D.has(el)) return;
     tracked3D.add(el);
@@ -469,10 +509,15 @@ export function init3DOverlay() {
       e.stopPropagation();
       e.preventDefault();
 
+      show3DToast('DownloadForge 3D Ripper: Extracting GPU WebGL geometry to OBJ...');
+
+      // 1. Trigger in-page WebGL geometry extractor
+      window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
+
+      // 2. Also check if resolvable URL exists for official assets (e.g. Sketchfab authenticated zip)
       let targetUrl = el.getAttribute('src') || el.src || el.getAttribute('url');
       let targetTitle = (document.title || '3D_Model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
 
-      // Check if Sketchfab model
       const loc = window.location.href;
       const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) ||
                       (el.getAttribute('data-model-id') ? [null, el.getAttribute('data-model-id')] : null) ||
@@ -483,21 +528,13 @@ export function init3DOverlay() {
         targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, '').trim();
       }
 
-      if (targetUrl) {
+      if (targetUrl && !targetUrl.startsWith('blob:')) {
         const ext = targetUrl.split('.').pop().split('?')[0] || 'glb';
         const filename = `${targetTitle || 'model'}.${ext.length <= 4 ? ext : 'glb'}`;
         chrome.runtime.sendMessage({
           type: MSG.DOWNLOAD_ITEM,
           payload: { url: targetUrl, filename }
         });
-      } else {
-        const found = detectedMediaList.find((m) => m.category === 'model_3d');
-        if (found) {
-          chrome.runtime.sendMessage({
-            type: MSG.DOWNLOAD_ITEM,
-            payload: { url: found.url, filename: found.title ? `${found.title}.glb` : 'model.glb' }
-          });
-        }
       }
     });
 
@@ -516,8 +553,18 @@ export function init3DOverlay() {
       // 3. Sketchfab Embed Iframes
       document.querySelectorAll('iframe[src*="sketchfab.com"]').forEach(attachOverlayTo3D);
 
-      // 4. Three.js / Babylon / WebGL Canvases
-      document.querySelectorAll('canvas[data-engine], div.three-container, div.babylon-container').forEach(attachOverlayTo3D);
+      // 4. CGTrader 3D Viewers
+      document.querySelectorAll('.product-viewer, .interactive-viewer, div[data-react-class*="Viewer"], div[data-react-class*="ModelViewer"], .view-3d, .canvas-container').forEach(attachOverlayTo3D);
+
+      // 5. TurboSquid, Marmoset, Thangs & Three.js / Babylon / WebGL Canvases
+      document.querySelectorAll('#turbosquid-viewer, .turbosquid-canvas, #marmoset-viewer, .mview-container, .thangs-viewer, canvas[data-engine], div.three-container, div.babylon-container').forEach(attachOverlayTo3D);
+
+      // 6. Generic large WebGL canvases
+      document.querySelectorAll('canvas').forEach(c => {
+        if (c.width >= 200 && c.height >= 200) {
+          attachOverlayTo3D(c);
+        }
+      });
     } catch (e) {}
   }
 

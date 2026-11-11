@@ -456,6 +456,25 @@ async function handleDownload(payload, sendResponse) {
       }
     }
 
+    // CGTrader direct download resolution
+    if (url.includes('cgtrader.com/')) {
+      if (url.includes('/3d-models/') && !url.match(/\.(glb|gltf|zip|obj|stl|fbx|blend)(\?|$)/i)) {
+        try {
+          const res = await fetch(url, { credentials: 'include' });
+          if (res.ok) {
+            const html = await res.text();
+            const dlMatch = html.match(/href="([^"]*(?:\/download|download-locations)[^"]*)"/i);
+            if (dlMatch) {
+              downloadUrl = new URL(dlMatch[1], 'https://www.cgtrader.com').href;
+              targetFilename = (filename || 'cgtrader_model').replace(/\.[^/.]+$/, '') + '.zip';
+            }
+          }
+        } catch (e) {
+          log.warn('CGTrader download resolution note:', e.message);
+        }
+      }
+    }
+
     const settings = await StorageService.getSettings();
 
     const downloadId = await chrome.downloads.download({

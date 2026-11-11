@@ -369,6 +369,84 @@ function collect3DViewerElements(doc) {
     }
   } catch (e) {}
 
+  // 3. CGTrader In-Page Model & Download Links
+  try {
+    const loc = window.location.href;
+    if (loc.includes('cgtrader.com')) {
+      if (loc.includes('/3d-models/') || loc.includes('/free-3d-models/')) {
+        const title = (doc.title || 'CGTrader 3D Model')
+          .replace(/\s*\|\s*CGTrader.*$/i, '')
+          .replace(/\s*-\s*3D\s*model.*$/i, '')
+          .trim();
+
+        // Scan for download buttons or endpoints
+        const dlLinks = doc.querySelectorAll('a[href*="/download"], a[href*="download-locations"], button[data-testid*="download"]');
+        let foundDlUrl = null;
+        for (const a of dlLinks) {
+          const h = a.getAttribute('href');
+          if (h && !h.startsWith('#') && !h.startsWith('javascript:')) {
+            foundDlUrl = resolveUrl(h, doc);
+            break;
+          }
+        }
+
+        items.push(buildResource({
+          url: foundDlUrl || loc,
+          category: CATEGORY.MODEL_3D,
+          ext: 'glb',
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'cgtrader_model'}.glb`,
+          mimeType: 'model/gltf-binary',
+          source: SOURCE.DOM_EMBED,
+          title: title || 'CGTrader 3D Model',
+          status: STATUS.DOWNLOADABLE,
+        }));
+      }
+    }
+  } catch (e) {}
+
+  // 4. Thingiverse, Printables & Cults3D
+  try {
+    const loc = window.location.href;
+    if (loc.includes('thingiverse.com/thing:')) {
+      const thingId = loc.split('thing:')[1].split('/')[0].split('?')[0];
+      const title = (doc.title || 'Thingiverse Model').replace(/\s*-\s*Thingiverse.*$/i, '').trim();
+      items.push(buildResource({
+        url: `https://www.thingiverse.com/thing:${thingId}/files`,
+        category: CATEGORY.MODEL_3D,
+        ext: 'stl',
+        filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'thingiverse'}.stl`,
+        mimeType: 'model/stl',
+        source: SOURCE.DOM_ANCHOR,
+        title,
+        status: STATUS.DOWNLOADABLE,
+      }));
+    } else if (loc.includes('printables.com/model/')) {
+      const title = (doc.title || 'Printables Model').replace(/\s*\|\s*Printables.*$/i, '').trim();
+      items.push(buildResource({
+        url: loc,
+        category: CATEGORY.MODEL_3D,
+        ext: '3mf',
+        filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'printables'}.3mf`,
+        mimeType: 'model/3mf',
+        source: SOURCE.DOM_EMBED,
+        title,
+        status: STATUS.DOWNLOADABLE,
+      }));
+    } else if (loc.includes('cults3d.com') && loc.includes('/3d-model/')) {
+      const title = (doc.title || 'Cults3D Model').replace(/\s*·.*Cults.*$/i, '').trim();
+      items.push(buildResource({
+        url: loc,
+        category: CATEGORY.MODEL_3D,
+        ext: 'stl',
+        filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'cults3d'}.stl`,
+        mimeType: 'model/stl',
+        source: SOURCE.DOM_EMBED,
+        title,
+        status: STATUS.DOWNLOADABLE,
+      }));
+    }
+  } catch (e) {}
+
   return items;
 }
 

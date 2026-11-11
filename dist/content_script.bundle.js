@@ -337,6 +337,8 @@
       const lower = url.toLowerCase();
       if (lower.includes(".m3u8") || lower.includes(".m3u") || lower.includes(".mpd")) return CATEGORY.STREAM;
       if (lower.includes("sketchfab.com/i/models") || lower.includes("media.sketchfab.com/models") || lower.includes("sketchfab.com/3d-models")) return CATEGORY.MODEL_3D;
+      if (lower.includes("cgtrader.com/3d-models") || lower.includes("cgtrader.com/free-3d-models") || lower.includes("cgtrader.com/items")) return CATEGORY.MODEL_3D;
+      if (lower.includes("turbosquid.com/3d-models") || lower.includes("cults3d.com") || lower.includes("thingiverse.com/thing:") || lower.includes("printables.com/model") || lower.includes("free3d.com/3d-model") || lower.includes("thangs.com")) return CATEGORY.MODEL_3D;
       if (lower.includes("models.readyplayer.me") || lower.includes("prod.spline.design") || lower.includes("lumalabs.ai")) return CATEGORY.MODEL_3D;
       if (lower.includes("googlevideo.com/videoplayback") || lower.includes("vimeocdn.com") || lower.includes("twimg.com/video") || lower.includes("tiktokcdn.com") || lower.includes("v.redd.it")) return CATEGORY.VIDEO;
       if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply|3mf|dae|blend|step|stp|iges|osgjs|binz|splinecode|drc)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
@@ -595,6 +597,76 @@
             status: STATUS.DOWNLOADABLE
           }));
         }
+      }
+    } catch (e) {
+    }
+    try {
+      const loc = window.location.href;
+      if (loc.includes("cgtrader.com")) {
+        if (loc.includes("/3d-models/") || loc.includes("/free-3d-models/")) {
+          const title = (doc.title || "CGTrader 3D Model").replace(/\s*\|\s*CGTrader.*$/i, "").replace(/\s*-\s*3D\s*model.*$/i, "").trim();
+          const dlLinks = doc.querySelectorAll('a[href*="/download"], a[href*="download-locations"], button[data-testid*="download"]');
+          let foundDlUrl = null;
+          for (const a of dlLinks) {
+            const h = a.getAttribute("href");
+            if (h && !h.startsWith("#") && !h.startsWith("javascript:")) {
+              foundDlUrl = resolveUrl(h, doc);
+              break;
+            }
+          }
+          items.push(buildResource({
+            url: foundDlUrl || loc,
+            category: CATEGORY.MODEL_3D,
+            ext: "glb",
+            filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || "cgtrader_model"}.glb`,
+            mimeType: "model/gltf-binary",
+            source: SOURCE.DOM_EMBED,
+            title: title || "CGTrader 3D Model",
+            status: STATUS.DOWNLOADABLE
+          }));
+        }
+      }
+    } catch (e) {
+    }
+    try {
+      const loc = window.location.href;
+      if (loc.includes("thingiverse.com/thing:")) {
+        const thingId = loc.split("thing:")[1].split("/")[0].split("?")[0];
+        const title = (doc.title || "Thingiverse Model").replace(/\s*-\s*Thingiverse.*$/i, "").trim();
+        items.push(buildResource({
+          url: `https://www.thingiverse.com/thing:${thingId}/files`,
+          category: CATEGORY.MODEL_3D,
+          ext: "stl",
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || "thingiverse"}.stl`,
+          mimeType: "model/stl",
+          source: SOURCE.DOM_ANCHOR,
+          title,
+          status: STATUS.DOWNLOADABLE
+        }));
+      } else if (loc.includes("printables.com/model/")) {
+        const title = (doc.title || "Printables Model").replace(/\s*\|\s*Printables.*$/i, "").trim();
+        items.push(buildResource({
+          url: loc,
+          category: CATEGORY.MODEL_3D,
+          ext: "3mf",
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || "printables"}.3mf`,
+          mimeType: "model/3mf",
+          source: SOURCE.DOM_EMBED,
+          title,
+          status: STATUS.DOWNLOADABLE
+        }));
+      } else if (loc.includes("cults3d.com") && loc.includes("/3d-model/")) {
+        const title = (doc.title || "Cults3D Model").replace(/\s*·.*Cults.*$/i, "").trim();
+        items.push(buildResource({
+          url: loc,
+          category: CATEGORY.MODEL_3D,
+          ext: "stl",
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || "cults3d"}.stl`,
+          mimeType: "model/stl",
+          source: SOURCE.DOM_EMBED,
+          title,
+          status: STATUS.DOWNLOADABLE
+        }));
       }
     } catch (e) {
     }
@@ -1084,6 +1156,42 @@
   }
   function init3DOverlay() {
     const tracked3D = /* @__PURE__ */ new WeakSet();
+    function show3DToast(message, isError = false) {
+      const existing = document.getElementById("df-3d-toast");
+      if (existing) existing.remove();
+      const toast = document.createElement("div");
+      toast.id = "df-3d-toast";
+      toast.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 2147483647;
+      background: #0f172a;
+      border: 1px solid ${isError ? "#ef4444" : "#06b6d4"};
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, 4e3);
+    }
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "DF_WEBGL_RIP_SUCCESS") {
+        show3DToast(`DownloadForge 3D Rip: Exported ${e.data.title || "model"} to Wavefront OBJ`);
+      } else if (e.data && e.data.type === "DF_WEBGL_RIP_FAIL") {
+        show3DToast(e.data.reason || "No 3D buffer captured yet", true);
+      }
+    });
     function attachOverlayTo3D(el) {
       if (!el || tracked3D.has(el)) return;
       tracked3D.add(el);
@@ -1111,6 +1219,8 @@
       pill.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        show3DToast("DownloadForge 3D Ripper: Extracting GPU WebGL geometry to OBJ...");
+        window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
         let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url");
         let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
         const loc = window.location.href;
@@ -1119,21 +1229,13 @@
           targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
           targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
         }
-        if (targetUrl) {
+        if (targetUrl && !targetUrl.startsWith("blob:")) {
           const ext = targetUrl.split(".").pop().split("?")[0] || "glb";
           const filename = `${targetTitle || "model"}.${ext.length <= 4 ? ext : "glb"}`;
           chrome.runtime.sendMessage({
             type: MSG.DOWNLOAD_ITEM,
             payload: { url: targetUrl, filename }
           });
-        } else {
-          const found = detectedMediaList.find((m) => m.category === "model_3d");
-          if (found) {
-            chrome.runtime.sendMessage({
-              type: MSG.DOWNLOAD_ITEM,
-              payload: { url: found.url, filename: found.title ? `${found.title}.glb` : "model.glb" }
-            });
-          }
         }
       });
       overlay.appendChild(pill);
@@ -1144,7 +1246,13 @@
         document.querySelectorAll("model-viewer, spline-viewer").forEach(attachOverlayTo3D);
         document.querySelectorAll(".c-viewer, canvas.viewer, #sketchfab-viewer, div[data-model-id], div[data-uid]").forEach(attachOverlayTo3D);
         document.querySelectorAll('iframe[src*="sketchfab.com"]').forEach(attachOverlayTo3D);
-        document.querySelectorAll("canvas[data-engine], div.three-container, div.babylon-container").forEach(attachOverlayTo3D);
+        document.querySelectorAll('.product-viewer, .interactive-viewer, div[data-react-class*="Viewer"], div[data-react-class*="ModelViewer"], .view-3d, .canvas-container').forEach(attachOverlayTo3D);
+        document.querySelectorAll("#turbosquid-viewer, .turbosquid-canvas, #marmoset-viewer, .mview-container, .thangs-viewer, canvas[data-engine], div.three-container, div.babylon-container").forEach(attachOverlayTo3D);
+        document.querySelectorAll("canvas").forEach((c) => {
+          if (c.width >= 200 && c.height >= 200) {
+            attachOverlayTo3D(c);
+          }
+        });
       } catch (e) {
       }
     }
