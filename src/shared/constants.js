@@ -8,7 +8,7 @@
 // ── App Identity ────────────────────────────────────────────
 export const APP = {
   NAME:        'DownloadForge',
-  VERSION:     '1.0.0',
+  VERSION:     '1.0.1',
   COMPANY:     'P4inz Interactive Labs',
   AUTHOR:      'p4inz',
   SUPPORT_URL: 'https://discord.gg/P4inz Interactive Labs',

@@ -1,9 +1,9 @@
-# DownloadForge Pro (v1.0.0)
+# DownloadForge Pro (v1.0.1)
 
 **High-Performance In-Browser Video Stream Downloader & Transmuxer for Chrome (Manifest V3)**  
 *Engineered by P4inz Interactive Labs — Maintained by p4inz*
 
-[![Release](https://img.shields.io/badge/release-v1.0.0-6366f1.svg)](https://github.com/p4inz-code/downloadforge-pro/releases)
+[![Release](https://img.shields.io/badge/release-v1.0.1-6366f1.svg)](https://github.com/p4inz-code/downloadforge-pro/releases)
 [![Chrome MV3](https://img.shields.io/badge/manifest-v3-10b981.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Zero Telemetry](https://img.shields.io/badge/telemetry-none-success.svg)](#privacy--security-model)
@@ -103,7 +103,7 @@ Webpage (DOM & Media)
 ## Installation
 
 ### Option A: Install via Official Release Zip (Recommended)
-1. Download `downloadforge-pro-v1.0.0.zip` from [Releases](https://github.com/p4inz-code/downloadforge-pro/releases).
+1. Download `downloadforge-pro-v1.0.1.zip` from [Releases](https://github.com/p4inz-code/downloadforge-pro/releases).
 2. Unzip the file into a folder on your drive (e.g., `Documents/downloadforge-pro`).
 3. Open Google Chrome and navigate to `chrome://extensions`.
 4. Enable the **Developer mode** toggle in the top-right corner.

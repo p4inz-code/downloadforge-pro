@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DownloadForge",
   "short_name": "DownloadForge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Detect and download videos, audio, images, documents and archives from any webpage. By P4inz Interactive Labs.",
 
   "author": "P4inz Interactive Labs — p4inz",

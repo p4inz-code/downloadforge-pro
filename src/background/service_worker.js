@@ -12,7 +12,7 @@
 //   - Handle tab lifecycle (cleanup on close/navigate)
 // ============================================================
 
-import { MSG, BADGE, STORAGE, LIMITS, DEFAULT_SETTINGS, APP } from '../shared/constants.js';
+import { MSG, BADGE, STORAGE, LIMITS, DEFAULT_SETTINGS, APP, NATIVE_HOST } from '../shared/constants.js';
 import { StorageService } from '../storage/storage.js';
 import { Logger } from '../utils/logger.js';
 import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
@@ -342,7 +342,7 @@ async function handleBatchDownload(payload, sendResponse) {
 // ── Handler: companion check ──────────────────────────────────
 function handleCompanionCheck(sendResponse) {
   try {
-    const port = chrome.runtime.connectNative('com.P4inz Interactive Labs.downloadforge');
+    const port = chrome.runtime.connectNative(NATIVE_HOST);
     port.postMessage({ type: 'PING' });
     port.onMessage.addListener((msg) => {
       if (msg.type === 'PONG') {
@@ -363,7 +363,7 @@ function handleCompanionCheck(sendResponse) {
 // ── Handler: send to companion ────────────────────────────────
 function handleCompanionSend(payload, sendResponse) {
   try {
-    const port = chrome.runtime.connectNative('com.P4inz Interactive Labs.downloadforge');
+    const port = chrome.runtime.connectNative(NATIVE_HOST);
     port.postMessage({ type: 'DOWNLOAD', payload });
     port.onMessage.addListener((msg) => {
       sendResponse({ ok: true, response: msg });
