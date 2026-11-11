@@ -82,16 +82,23 @@ When extracting audio from a streaming video or audio-only playlist, DownloadFor
 
 ---
 
-## 3D Spatial Asset Ripper & glTF Standalone Bundler
+## 3D Spatial Asset Ripper & WebGL GPU Geometry Extraction
 
-When websites render 3D scenes using `<model-viewer>`, Spline, or Three.js, models are often delivered as fragmented `.gltf` JSON files referencing external `.bin` geometry buffers and image textures. Downloading only the `.gltf` yields a broken, unrenderable file.
+Modern 3D web platforms use fragmented delivery pipelines to prevent trivial downloading:
+- **WebGL Geometry Encryption & Proprietary Chunks**: Platforms like Sketchfab, Spline, and custom Three.js viewers stream binary buffers (`.binz`, `.osgjs`) or deliver raw JSON metadata endpoints (`/i/models/<uid>`). Direct downloads of these endpoints yield raw JSON strings or broken assets.
+- **Fragmented glTF Archives**: Other sites deliver `.gltf` JSON files referencing external `.bin` geometry buffers and image textures.
 
-DownloadForge Pro solves this with an in-browser glTF 2.0 Binary container packager (`src/core/gltf_packager.js`):
-1. **Network Sniffing**: Automatically intercepts calls for `.glb`, `.gltf`, `.obj`, `.stl`, `.fbx`, `.usdz`, `.splat`, and `.ply`.
-2. **Buffer Merging**: Fetches external `.bin` files, aligns buffer views to 4-byte boundaries, shifts byte offsets, and embeds textures.
-3. **GLB Header Serialization**: Generates the 12-byte binary header (`0x46546C67`), chunk 0 JSON, and chunk 1 BIN.
-4. **Export**: Produces a self-contained `.glb` file ready for Blender, Unity, Unreal Engine, and Windows 3D Viewer.
-5. **In-Page Hover Overlay**: Adds an interactive `3D Rip` badge when hovering over any `<model-viewer>` or `<spline-viewer>` canvas.
+DownloadForge Pro solves this through a dual-mode 3D extraction pipeline:
+
+1. **In-Page WebGL GPU Mesh Ripper (Hardware Buffer Hook)**:
+   - Intercepts `WebGLRenderingContext.prototype.bufferData` and `WebGL2RenderingContext.prototype.bufferData`.
+   - Captures vertex arrays (`gl.ARRAY_BUFFER`, 0x8892) and element indices (`gl.ELEMENT_ARRAY_BUFFER`, 0x8893) directly as they are loaded into the GPU.
+   - Reconstructs 3D coordinates, detects stride (normals/UVs), and exports a clean Wavefront `.obj` file on demand via the floating `3D Rip` viewer badge.
+2. **Dedicated Platform Resolvers**:
+   - **Sketchfab**: Extracts model UIDs, queries authenticated download endpoints for official `.zip`/`.glb` archives, automatically resolves streaming binary geometries (`.binz`/`.osgjs`), and strictly protects against downloading raw JSON metadata as `.glb`.
+   - **Supported Ecosystems**: Automatic adapters for Sketchfab, Thingiverse, Printables, Cults3D, Spline (`.splinecode`), Ready Player Me (`.glb`), and Luma AI (`.splat`).
+3. **glTF 2.0 Binary Container Packager (`src/core/gltf_packager.js`)**:
+   - Merges external `.bin` files and embedded textures into standard standalone `.glb` containers ready for Blender, Unity, and Unreal Engine.
 
 ---
 
