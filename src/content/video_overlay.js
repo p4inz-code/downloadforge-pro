@@ -210,27 +210,6 @@ export function initVideoOverlay() {
     let isChronoActive = false;
     const originalMuted = video.muted;
 
-    // Enable main-world MSE bitstream chunk interception
-    window.postMessage({ type: 'DF_RECORD_MODE_TOGGLE', active: true }, '*');
-    interceptedMseChunks = [];
-
-    onMseChunkCallback = (chunkData) => {
-      rawMseBytes += chunkData.byteLength || 0;
-      if (sizeEl) {
-        const totalMB = ((recordedBytes + rawMseBytes) / (1024 * 1024)).toFixed(1);
-        sizeEl.textContent = `${totalMB} MB${interceptedMseChunks.length > 0 ? ' (Lossless)' : ''}`;
-      }
-    };
-
-    const recorder = new MediaRecorder(stream, { mimeType });
-
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) {
-        chunks.push(e.data);
-        recordedBytes += e.data.size;
-      }
-    };
-
     // Build Outlinedesk Floating HUD with Chrono-Pacer & Buffer Bar
     const hud = document.createElement('div');
     hud.className = 'df-rec-hud';
@@ -262,6 +241,27 @@ export function initVideoOverlay() {
     const speedBtns = hud.querySelectorAll('.df-spd-btn');
     const chronoBtn = hud.querySelector('#dfRecChrono');
     const bufferFill = hud.querySelector('#dfBufferFill');
+
+    // Enable main-world MSE bitstream chunk interception
+    window.postMessage({ type: 'DF_RECORD_MODE_TOGGLE', active: true }, '*');
+    interceptedMseChunks = [];
+
+    onMseChunkCallback = (chunkData) => {
+      rawMseBytes += chunkData.byteLength || 0;
+      if (sizeEl) {
+        const totalMB = ((recordedBytes + rawMseBytes) / (1024 * 1024)).toFixed(1);
+        sizeEl.textContent = `${totalMB} MB${interceptedMseChunks.length > 0 ? ' (Lossless)' : ''}`;
+      }
+    };
+
+    const recorder = new MediaRecorder(stream, { mimeType });
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        chunks.push(e.data);
+        recordedBytes += e.data.size;
+      }
+    };
 
     function updateBufferBar() {
       if (!video || !video.duration || video.buffered.length === 0) return;
@@ -368,6 +368,9 @@ export function initVideoOverlay() {
 
       // Check if lossless MSE bitstream chunks were intercepted
       if (interceptedMseChunks.length > 0) {
+        if (recorder.state === 'recording') {
+          try { recorder.stop(); } catch (e) {}
+        }
         const lossLessBlob = new Blob(interceptedMseChunks, { type: 'video/mp4' });
         finishDownload(lossLessBlob, 'mp4');
       } else {

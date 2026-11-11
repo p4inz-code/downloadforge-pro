@@ -890,22 +890,6 @@
       let chronoInterval = null;
       let isChronoActive = false;
       const originalMuted = video.muted;
-      window.postMessage({ type: "DF_RECORD_MODE_TOGGLE", active: true }, "*");
-      interceptedMseChunks = [];
-      onMseChunkCallback = (chunkData) => {
-        rawMseBytes += chunkData.byteLength || 0;
-        if (sizeEl) {
-          const totalMB = ((recordedBytes + rawMseBytes) / (1024 * 1024)).toFixed(1);
-          sizeEl.textContent = `${totalMB} MB${interceptedMseChunks.length > 0 ? " (Lossless)" : ""}`;
-        }
-      };
-      const recorder = new MediaRecorder(stream, { mimeType });
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          chunks.push(e.data);
-          recordedBytes += e.data.size;
-        }
-      };
       const hud = document.createElement("div");
       hud.className = "df-rec-hud";
       hud.innerHTML = `
@@ -934,6 +918,22 @@
       const speedBtns = hud.querySelectorAll(".df-spd-btn");
       const chronoBtn = hud.querySelector("#dfRecChrono");
       const bufferFill = hud.querySelector("#dfBufferFill");
+      window.postMessage({ type: "DF_RECORD_MODE_TOGGLE", active: true }, "*");
+      interceptedMseChunks = [];
+      onMseChunkCallback = (chunkData) => {
+        rawMseBytes += chunkData.byteLength || 0;
+        if (sizeEl) {
+          const totalMB = ((recordedBytes + rawMseBytes) / (1024 * 1024)).toFixed(1);
+          sizeEl.textContent = `${totalMB} MB${interceptedMseChunks.length > 0 ? " (Lossless)" : ""}`;
+        }
+      };
+      const recorder = new MediaRecorder(stream, { mimeType });
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+          recordedBytes += e.data.size;
+        }
+      };
       function updateBufferBar() {
         if (!video || !video.duration || video.buffered.length === 0) return;
         const lastEnd = video.buffered.end(video.buffered.length - 1);
@@ -1023,6 +1023,12 @@
           cleanup();
         };
         if (interceptedMseChunks.length > 0) {
+          if (recorder.state === "recording") {
+            try {
+              recorder.stop();
+            } catch (e2) {
+            }
+          }
           const lossLessBlob = new Blob(interceptedMseChunks, { type: "video/mp4" });
           finishDownload(lossLessBlob, "mp4");
         } else {

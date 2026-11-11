@@ -386,16 +386,44 @@ async function handleDownload(payload, sendResponse) {
   }
 
   try {
+    let downloadUrl = url;
+    let targetFilename = filename || extractFilenameFromUrl(url);
+
+    // Sketchfab API auto-resolution to direct 3D archive (.zip / .usdz)
+    if (url.includes('sketchfab.com/i/models/') || url.includes('/models/')) {
+      const sfMatch = url.match(/models\/([0-9a-f]{32})/i);
+      if (sfMatch) {
+        const uid = sfMatch[1];
+        try {
+          const res = await fetch(`https://sketchfab.com/v3/models/${uid}/download`, {
+            credentials: 'include'
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.gltf && data.gltf.url) {
+              downloadUrl = data.gltf.url;
+              targetFilename = (filename || 'sketchfab_model').replace(/\.[^/.]+$/, '') + '.zip';
+            } else if (data.usdz && data.usdz.url) {
+              downloadUrl = data.usdz.url;
+              targetFilename = (filename || 'sketchfab_model').replace(/\.[^/.]+$/, '') + '.usdz';
+            }
+          }
+        } catch (e) {
+          log.warn('Sketchfab archive resolution fallback:', e.message);
+        }
+      }
+    }
+
     const settings = await StorageService.getSettings();
 
     const downloadId = await chrome.downloads.download({
-      url,
-      filename: filename || undefined,
+      url: downloadUrl,
+      filename: targetFilename || undefined,
       saveAs: saveAs ?? settings.defaultSaveAs ?? false,
       conflictAction: 'uniquify',
     });
 
-    log.info(`Download started: id=${downloadId} url=${url}`);
+    log.info(`Download started: id=${downloadId} url=${downloadUrl}`);
 
     // Save to history
     await StorageService.addToHistory({
