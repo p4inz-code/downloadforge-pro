@@ -149,6 +149,8 @@ function parseMediaPlaylist(lines, baseUrl, result) {
   let currentKey = null;
   let initMap = null;
   let sequence = 0;
+  let currentByteRange = null;
+  let currentByteOffset = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -177,6 +179,14 @@ function parseMediaPlaylist(lines, baseUrl, result) {
         currentKey = null;
       }
     }
+    if (line.startsWith('#EXT-X-BYTERANGE:')) {
+      const val = line.replace('#EXT-X-BYTERANGE:', '').trim();
+      const parts = val.split('@');
+      const length = parseInt(parts[0], 10) || 0;
+      const offset = parts[1] !== undefined ? parseInt(parts[1], 10) : currentByteOffset;
+      currentByteRange = { length, offset };
+      currentByteOffset = offset + length;
+    }
     if (line.startsWith('#EXTINF:')) {
       segDuration = parseFloat(line.split(':')[1].split(',')[0]) || 0;
     }
@@ -188,8 +198,10 @@ function parseMediaPlaylist(lines, baseUrl, result) {
           duration: segDuration,
           key: currentKey ? { ...currentKey } : null,
           initMap: initMap ? { ...initMap } : null,
+          byteRange: currentByteRange ? { ...currentByteRange } : null,
           sequence: sequence++,
         });
+        currentByteRange = null;
         totalDuration += segDuration;
         segDuration = 0;
       }

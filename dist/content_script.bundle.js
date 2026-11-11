@@ -697,7 +697,23 @@
       overlay.appendChild(pill);
       parent.appendChild(overlay);
     }
-    document.querySelectorAll("video").forEach(attachOverlayToVideo);
+    function findVideosRecursively(root = document) {
+      if (!root) return [];
+      let videos = [];
+      try {
+        if (root.querySelectorAll) {
+          videos = Array.from(root.querySelectorAll("video"));
+          root.querySelectorAll("*").forEach((el) => {
+            if (el.shadowRoot) {
+              videos = videos.concat(findVideosRecursively(el.shadowRoot));
+            }
+          });
+        }
+      } catch (e) {
+      }
+      return videos;
+    }
+    findVideosRecursively(document).forEach(attachOverlayToVideo);
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
@@ -705,7 +721,7 @@
             if (node.tagName === "VIDEO") {
               attachOverlayToVideo(node);
             } else {
-              node.querySelectorAll?.("video").forEach(attachOverlayToVideo);
+              findVideosRecursively(node).forEach(attachOverlayToVideo);
             }
           }
         }
@@ -824,6 +840,7 @@
       var sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
       function injectMainWorldSniffer() {
         try {
+          document.documentElement.dataset.dfSnifferToken = sessionToken;
           const script = document.createElement("script");
           script.src = chrome.runtime.getURL("src/content/injected_sniffer.js");
           script.dataset.token = sessionToken;

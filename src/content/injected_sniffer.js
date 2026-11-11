@@ -16,7 +16,11 @@
 
   // Retrieve security nonce passed from content script
   const scriptEl = document.currentScript;
-  const sessionToken = scriptEl ? scriptEl.dataset.token : null;
+  const sessionToken = (document.documentElement && document.documentElement.dataset.dfSnifferToken) ||
+                       (scriptEl ? scriptEl.dataset.token : null);
+  if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
+    delete document.documentElement.dataset.dfSnifferToken;
+  }
 
   const MEDIA_REGEX = /\.(m3u8|mpd|mp4|webm|ts|m4s|f4m|flv)(\?|$)/i;
   const MIME_REGEX = /(mpegurl|x-mpegurl|video\/|audio\/|dash\+xml)/i;

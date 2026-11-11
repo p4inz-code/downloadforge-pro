@@ -23,9 +23,41 @@ const log = new Logger('ServiceWorker');
 // Map<tabId, { resources: [], scannedAt: timestamp, scanning: bool }>
 const tabStore = new Map();
 
+// ── DeclarativeNetRequest Anti-Hotlink Engine ──────────────
+const DNR_RULE_ID_STRIP_ORIGIN = 9001;
+
+async function configureDeclarativeNetRequestRules() {
+  if (!chrome.declarativeNetRequest) return;
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: [DNR_RULE_ID_STRIP_ORIGIN],
+      addRules: [
+        {
+          id: DNR_RULE_ID_STRIP_ORIGIN,
+          priority: 1,
+          action: {
+            type: 'modifyHeaders',
+            requestHeaders: [
+              { header: 'origin', operation: 'remove' }
+            ]
+          },
+          condition: {
+            resourceTypes: ['xmlhttprequest', 'media', 'other'],
+            initiatorDomains: [chrome.runtime.id]
+          }
+        }
+      ]
+    });
+    log.info('DeclarativeNetRequest anti-hotlink rules configured.');
+  } catch (err) {
+    log.warn('Failed to configure DNR rules:', err.message);
+  }
+}
+
 // ── Install / startup ────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   log.info(`DownloadForge ${APP.VERSION} installed. Reason: ${reason}`);
+  await configureDeclarativeNetRequestRules();
 
   if (reason === 'install') {
     await StorageService.initDefaults();
@@ -40,6 +72,7 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 
 chrome.runtime.onStartup.addListener(async () => {
   log.info('Browser startup — DownloadForge service worker ready.');
+  await configureDeclarativeNetRequestRules();
   // Re-enable network observer if user previously granted webRequest
   const hasWR = await chrome.permissions.contains({ permissions: ['webRequest'] });
   if (hasWR) startNetworkObserver();

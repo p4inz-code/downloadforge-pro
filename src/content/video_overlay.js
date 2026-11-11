@@ -92,10 +92,27 @@ export function initVideoOverlay() {
     parent.appendChild(overlay);
   }
 
-  // Scan existing videos
-  document.querySelectorAll('video').forEach(attachOverlayToVideo);
+  // Recursive video locator across Light and Open Shadow DOM
+  function findVideosRecursively(root = document) {
+    if (!root) return [];
+    let videos = [];
+    try {
+      if (root.querySelectorAll) {
+        videos = Array.from(root.querySelectorAll('video'));
+        root.querySelectorAll('*').forEach((el) => {
+          if (el.shadowRoot) {
+            videos = videos.concat(findVideosRecursively(el.shadowRoot));
+          }
+        });
+      }
+    } catch (e) {}
+    return videos;
+  }
 
-  // Observe dynamically inserted videos
+  // Scan existing videos across light & shadow DOM
+  findVideosRecursively(document).forEach(attachOverlayToVideo);
+
+  // Observe dynamically inserted videos & shadow DOM roots
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       for (const node of m.addedNodes) {
@@ -103,7 +120,7 @@ export function initVideoOverlay() {
           if (node.tagName === 'VIDEO') {
             attachOverlayToVideo(node);
           } else {
-            node.querySelectorAll?.('video').forEach(attachOverlayToVideo);
+            findVideosRecursively(node).forEach(attachOverlayToVideo);
           }
         }
       }

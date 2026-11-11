@@ -8264,6 +8264,8 @@
     let currentKey = null;
     let initMap = null;
     let sequence = 0;
+    let currentByteRange = null;
+    let currentByteOffset = 0;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line.startsWith("#EXT-X-MEDIA-SEQUENCE:")) {
@@ -8291,6 +8293,14 @@
           currentKey = null;
         }
       }
+      if (line.startsWith("#EXT-X-BYTERANGE:")) {
+        const val = line.replace("#EXT-X-BYTERANGE:", "").trim();
+        const parts = val.split("@");
+        const length = parseInt(parts[0], 10) || 0;
+        const offset = parts[1] !== void 0 ? parseInt(parts[1], 10) : currentByteOffset;
+        currentByteRange = { length, offset };
+        currentByteOffset = offset + length;
+      }
       if (line.startsWith("#EXTINF:")) {
         segDuration = parseFloat(line.split(":")[1].split(",")[0]) || 0;
       }
@@ -8302,8 +8312,10 @@
             duration: segDuration,
             key: currentKey ? { ...currentKey } : null,
             initMap: initMap ? { ...initMap } : null,
+            byteRange: currentByteRange ? { ...currentByteRange } : null,
             sequence: sequence++
           });
+          currentByteRange = null;
           totalDuration += segDuration;
           segDuration = 0;
         }
@@ -8417,11 +8429,17 @@
           });
           const inMemoryInit = [];
           const inMemoryMedia = [];
-          transmuxer.on("data", async (segment) => {
+          let writeChain = Promise.resolve();
+          const queueStreamWrite = (u8) => {
+            if (writableStream) {
+              writeChain = writeChain.then(() => writableStream.write(u8));
+            }
+          };
+          transmuxer.on("data", (segment) => {
             if (segment.initSegment) {
               const u8 = new Uint8Array(segment.initSegment);
               if (writableStream) {
-                await writableStream.write(u8);
+                queueStreamWrite(u8);
               } else {
                 inMemoryInit.push(u8);
               }
@@ -8429,7 +8447,7 @@
             if (segment.data) {
               const u8 = new Uint8Array(segment.data);
               if (writableStream) {
-                await writableStream.write(u8);
+                queueStreamWrite(u8);
               } else {
                 inMemoryMedia.push(u8);
               }
@@ -8440,7 +8458,7 @@
             const initBuffer = await this.fetchBufferWithRetry(segments[0].initMap.url);
             const u8 = new Uint8Array(initBuffer);
             if (writableStream) {
-              await writableStream.write(u8);
+              queueStreamWrite(u8);
             } else {
               inMemoryInit.push(u8);
             }
@@ -8450,19 +8468,33 @@
           let totalBytes = 0;
           const startTime = performance.now();
           const downloadedBuffers = new Array(total);
+          let nextToPumpIndex = 0;
+          const pumpNextSegments = () => {
+            while (nextToPumpIndex < total && downloadedBuffers[nextToPumpIndex] !== void 0) {
+              const buf = downloadedBuffers[nextToPumpIndex];
+              if (buf) {
+                transmuxer.push(buf);
+                if (writableStream) {
+                  downloadedBuffers[nextToPumpIndex] = null;
+                }
+              }
+              nextToPumpIndex++;
+            }
+          };
           let currentIndex = 0;
           const worker = async () => {
             while (currentIndex < total && !this.aborted) {
               const index = currentIndex++;
               const seg = segments[index];
               try {
-                let segData = await this.fetchBufferWithRetry(seg.url);
+                let segData = await this.fetchBufferWithRetry(seg.url, seg.byteRange);
                 if (seg.key && seg.key.method === "AES-128") {
                   segData = await this.decryptSegment(segData, seg.key, seg.sequence);
                 }
                 downloadedBuffers[index] = new Uint8Array(segData);
                 completedCount++;
                 totalBytes += segData.byteLength;
+                pumpNextSegments();
                 const elapsedSec = (performance.now() - startTime) / 1e3;
                 const speedBps = elapsedSec > 0 ? totalBytes / elapsedSec : 0;
                 const percent = Math.round(completedCount / total * 100);
@@ -8488,25 +8520,17 @@
           }
           await Promise.all(workers);
           if (this.aborted) {
-            if (writableStream) await writableStream.abort();
+            if (writableStream) await writableStream.abort().catch(() => {
+            });
             throw new Error("Download cancelled");
           }
-          this.onStatus("Transmuxing TS transport stream to MP4...");
-          for (let i = 0; i < total; i++) {
-            const buffer = downloadedBuffers[i];
-            if (buffer) {
-              transmuxer.push(buffer);
-              if (writableStream) {
-                downloadedBuffers[i] = null;
-              }
-            }
-          }
+          pumpNextSegments();
           if (audioSegments.length > 0 && !this.aborted) {
             this.onStatus("Multiplexing synchronized audio track into MP4...");
             for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
               const aSeg = audioSegments[i];
               try {
-                let aBuf = await this.fetchBufferWithRetry(aSeg.url);
+                let aBuf = await this.fetchBufferWithRetry(aSeg.url, aSeg.byteRange);
                 if (aSeg.key && aSeg.key.method === "AES-128") {
                   aBuf = await this.decryptSegment(aBuf, aSeg.key, aSeg.sequence);
                 }
@@ -8519,6 +8543,7 @@
           transmuxer.flush();
           if (writableStream) {
             this.onStatus("Finalizing direct disk stream...");
+            await writeChain;
             await writableStream.close();
             return { directStream: true };
           }
@@ -8527,7 +8552,8 @@
           if (inMemoryInit.length > 0 && inMemoryMedia.length > 0) {
             finalBlob = new Blob([...inMemoryInit, ...inMemoryMedia], { type: "video/mp4" });
           } else {
-            finalBlob = new Blob(downloadedBuffers, { type: "video/mp4" });
+            const remaining = downloadedBuffers.filter(Boolean);
+            finalBlob = new Blob(remaining, { type: "video/mp4" });
           }
           this.onStatus("Download complete!");
           return { blob: finalBlob, directStream: false };
@@ -8537,15 +8563,13 @@
          */
         async decryptSegment(encryptedBuffer, keyInfo, sequenceNumber) {
           const rawKey = await this.getKeyBytes(keyInfo.uri);
-          let ivBuffer;
+          const ivBuffer = new Uint8Array(16);
           if (keyInfo.iv) {
             const hex = keyInfo.iv.startsWith("0x") ? keyInfo.iv.slice(2) : keyInfo.iv;
-            ivBuffer = new Uint8Array(16);
             for (let i = 0; i < 16; i++) {
               ivBuffer[i] = parseInt(hex.substr(i * 2, 2), 16) || 0;
             }
           } else {
-            ivBuffer = new Uint8Array(16);
             const view = new DataView(ivBuffer.buffer);
             view.setUint32(12, sequenceNumber, false);
           }
@@ -8572,15 +8596,20 @@
           this.keyCache.set(keyUri, keyBuf);
           return keyBuf;
         }
-        async fetchBufferWithRetry(url, attempt = 1) {
+        async fetchBufferWithRetry(url, byteRange = null, attempt = 1) {
           try {
-            const res = await fetch(url, { cache: "no-store" });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const headers = {};
+            if (byteRange && byteRange.length > 0) {
+              const end = byteRange.offset + byteRange.length - 1;
+              headers["Range"] = `bytes=${byteRange.offset}-${end}`;
+            }
+            const res = await fetch(url, { cache: "no-store", headers });
+            if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
             return await res.arrayBuffer();
           } catch (err) {
             if (attempt < this.maxRetries && !this.aborted) {
               await new Promise((r) => setTimeout(r, 1e3 * attempt));
-              return this.fetchBufferWithRetry(url, attempt + 1);
+              return this.fetchBufferWithRetry(url, byteRange, attempt + 1);
             }
             throw err;
           }

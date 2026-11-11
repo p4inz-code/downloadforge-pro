@@ -27,6 +27,7 @@ const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(3
 
 function injectMainWorldSniffer() {
   try {
+    document.documentElement.dataset.dfSnifferToken = sessionToken;
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('src/content/injected_sniffer.js');
     script.dataset.token = sessionToken;
