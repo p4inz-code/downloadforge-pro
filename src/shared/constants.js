@@ -8,7 +8,7 @@
 // ── App Identity ────────────────────────────────────────────
 export const APP = {
   NAME:        'DownloadForge Pro',
-  VERSION:     '1.2.0',
+  VERSION:     '1.2.1',
   COMPANY:     'P4inz Interactive Labs',
   AUTHOR:      'Atharva Patil (p4inz)',
   WEBSITE:     'https://atharvapatil.tech',

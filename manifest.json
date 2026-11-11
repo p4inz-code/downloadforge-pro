@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DownloadForge",
   "short_name": "DownloadForge",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Detect and download videos, audio, images, 3D models, documents and archives from any webpage. By P4inz Interactive Labs.",
 
   "author": "P4inz Interactive Labs — p4inz",
@@ -31,6 +31,13 @@
   },
 
   "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/injected_sniffer.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    },
     {
       "matches": ["<all_urls>"],
       "js": ["dist/content_script.bundle.js"],

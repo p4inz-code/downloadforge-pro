@@ -290,6 +290,9 @@
             if (data instanceof ArrayBuffer) {
               const blob = new Blob([data], { type: 'model/gltf-binary' });
               const blobUrl = URL.createObjectURL(blob);
+              setTimeout(() => {
+                try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+              }, 120000);
               notifyDetected({
                 url: blobUrl,
                 mimeType: 'model/gltf-binary',
@@ -312,52 +315,51 @@
 
     function captureBuffer(target, data) {
       if (!data) return;
-      const isArrayBuf = data instanceof ArrayBuffer;
-      const isView = ArrayBuffer.isView(data);
-      if (!isArrayBuf && !isView) return;
-
-      const rawBuffer = isArrayBuf ? data : data.buffer;
-      const byteOffset = isArrayBuf ? 0 : data.byteOffset;
-      const byteLength = isArrayBuf ? data.byteLength : data.byteLength;
-      if (!rawBuffer || byteLength < 6) return;
+      let rawBytes = null;
+      if (data instanceof ArrayBuffer) {
+        rawBytes = new Uint8Array(data.slice(0));
+      } else if (ArrayBuffer.isView(data)) {
+        rawBytes = new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+      }
+      if (!rawBytes || rawBytes.byteLength < 12) return;
 
       // Target 0x8892 is gl.ARRAY_BUFFER (vertices/normals/uvs)
       if (target === 0x8892) {
         let floatView = null;
         if (data instanceof Float32Array) {
-          floatView = new Float32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+          floatView = new Float32Array(rawBytes.buffer);
         } else if (data instanceof Int16Array) {
-          // Dequantize 16-bit signed normalized vertex positions
-          const i16 = new Int16Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+          const i16 = new Int16Array(rawBytes.buffer);
           floatView = new Float32Array(i16.length);
-          for (let i = 0; i < i16.length; i++) {
-            floatView[i] = i16[i] / 32767.0;
-          }
-        } else if (byteLength % 4 === 0 && byteLength >= 36) {
-          floatView = new Float32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+          for (let i = 0; i < i16.length; i++) floatView[i] = i16[i] / 32767.0;
+        } else if (rawBytes.byteLength % 4 === 0) {
+          floatView = new Float32Array(rawBytes.buffer);
+        } else if (rawBytes.byteLength % 2 === 0) {
+          const i16 = new Int16Array(rawBytes.buffer);
+          floatView = new Float32Array(i16.length);
+          for (let i = 0; i < i16.length; i++) floatView[i] = i16[i] / 32767.0;
         }
 
         if (floatView && floatView.length >= 9) {
-          capturedGeometries.push({
-            type: 'positions',
-            data: floatView,
-            length: floatView.length,
-            time: Date.now()
-          });
-          if (capturedGeometries.length > 300) capturedGeometries.shift();
+          const duplicate = capturedGeometries.some(g => g.type === 'positions' && g.length === floatView.length && g.data[0] === floatView[0]);
+          if (!duplicate) {
+            capturedGeometries.push({
+              type: 'positions',
+              data: floatView,
+              length: floatView.length,
+              time: Date.now()
+            });
+            if (capturedGeometries.length > 500) capturedGeometries.shift();
+          }
         }
       }
       // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
       else if (target === 0x8893) {
         let idxView = null;
-        if (data instanceof Uint16Array) {
-          idxView = new Uint16Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
-        } else if (data instanceof Uint32Array) {
-          idxView = new Uint32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
-        } else if (byteLength % 4 === 0 && byteLength >= 12) {
-          idxView = new Uint32Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
-        } else if (byteLength % 2 === 0 && byteLength >= 6) {
-          idxView = new Uint16Array(rawBuffer.slice(byteOffset, byteOffset + byteLength));
+        if (data instanceof Uint16Array || (rawBytes.byteLength % 2 === 0 && rawBytes.byteLength % 4 !== 0)) {
+          idxView = new Uint16Array(rawBytes.buffer);
+        } else if (data instanceof Uint32Array || rawBytes.byteLength % 4 === 0) {
+          idxView = new Uint32Array(rawBytes.buffer);
         }
 
         if (idxView && idxView.length >= 3) {
@@ -367,7 +369,7 @@
             length: idxView.length,
             time: Date.now()
           });
-          if (capturedGeometries.length > 300) capturedGeometries.shift();
+          if (capturedGeometries.length > 500) capturedGeometries.shift();
         }
       }
     }
@@ -415,31 +417,12 @@
 
   hookWebGL();
 
-  // Listen for mesh export request from content script
+  // Listen for mesh export request from content script (Zero rogue downloads)
   window.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'DF_TRIGGER_WEBGL_RIP') {
+    if (e.data && (e.data.type === 'DF_TRIGGER_WEBGL_RIP' || e.data.type === 'DF_REQUEST_MESH')) {
       const title = (document.title || 'model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
       const objData = exportCapturedMeshToObj(title);
       if (objData) {
-        const blob = new Blob([objData], { type: 'text/plain' });
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${title}.obj`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-
-        notifyDetected({
-          url: blobUrl,
-          category: 'model_3d',
-          title: `${title} (WebGL Mesh OBJ)`,
-          mimeType: 'text/plain',
-          method: 'TIER_4_MSE_BUFFER',
-          initiator: 'webgl-mesh-ripper'
-        });
-
         window.postMessage({ type: 'DF_WEBGL_RIP_DATA', objData, title }, '*');
         window.postMessage({ type: 'DF_WEBGL_RIP_SUCCESS', title }, '*');
       } else {
@@ -463,21 +446,36 @@
     for (let c = 0; c < posChunks.length; c++) {
       const chunk = posChunks[c];
       const arr = chunk.data;
+      if (!arr || arr.length < 9) continue;
+
       let stride = 3;
       let hasUVs = false;
       let hasNormals = false;
 
-      // Stride detection
-      if (arr.length % 8 === 0 && arr.length >= 24) {
-        stride = 8; // x, y, z, nx, ny, nz, u, v
-        hasNormals = true;
-        hasUVs = true;
-      } else if (arr.length % 6 === 0 && arr.length >= 18) {
-        stride = 6; // x, y, z, nx, ny, nz
-        hasNormals = true;
-      } else if (arr.length % 5 === 0 && arr.length >= 15) {
-        stride = 5; // x, y, z, u, v
-        hasUVs = true;
+      // Physically validated stride detection:
+      // In interleaved buffers (stride 8 or 6), indices 3, 4, 5 represent normal vectors (nx, ny, nz).
+      // A unit normal vector has length squared approx 1.0 (nx^2 + ny^2 + nz^2 ~ 1.0).
+      if (arr.length >= 24 && arr.length % 8 === 0) {
+        const lenSq = arr[3]*arr[3] + arr[4]*arr[4] + arr[5]*arr[5];
+        if (Math.abs(lenSq - 1.0) < 0.25) {
+          stride = 8;
+          hasNormals = true;
+          hasUVs = true;
+        }
+      }
+      if (stride === 3 && arr.length >= 18 && arr.length % 6 === 0) {
+        const lenSq = arr[3]*arr[3] + arr[4]*arr[4] + arr[5]*arr[5];
+        if (Math.abs(lenSq - 1.0) < 0.25) {
+          stride = 6;
+          hasNormals = true;
+        }
+      }
+      if (stride === 3 && arr.length >= 15 && arr.length % 5 === 0) {
+        const u = arr[3], v = arr[4];
+        if (u >= -0.5 && u <= 1.5 && v >= -0.5 && v <= 1.5) {
+          stride = 5;
+          hasUVs = true;
+        }
       }
 
       const submeshVStart = globalVOffset;
@@ -487,7 +485,7 @@
 
       objText += `g submesh_${c + 1}\n`;
 
-      for (let i = 0; i < arr.length; i += stride) {
+      for (let i = 0; i < arr.length - 2; i += stride) {
         const x = Number(arr[i]).toFixed(5);
         const y = Number(arr[i + 1]).toFixed(5);
         const z = Number(arr[i + 2]).toFixed(5);
@@ -496,7 +494,7 @@
           submeshVCount++;
           globalVOffset++;
 
-          if (hasNormals) {
+          if (hasNormals && i + 5 < arr.length) {
             const nx = Number(arr[i + 3]).toFixed(5);
             const ny = Number(arr[i + 4]).toFixed(5);
             const nz = Number(arr[i + 5]).toFixed(5);
@@ -506,18 +504,30 @@
 
           if (hasUVs) {
             const uOffset = hasNormals ? 6 : 3;
-            const u = Number(arr[i + uOffset]).toFixed(5);
-            const v = Number(arr[i + uOffset + 1]).toFixed(5);
-            objText += `vt ${u} ${v}\n`;
-            globalVtOffset++;
+            if (i + uOffset + 1 < arr.length) {
+              const u = Number(arr[i + uOffset]).toFixed(5);
+              const v = Number(arr[i + uOffset + 1]).toFixed(5);
+              objText += `vt ${u} ${v}\n`;
+              globalVtOffset++;
+            }
           }
         }
       }
 
       if (submeshVCount === 0) continue;
 
-      // Match corresponding index chunk if available, or sequential faces
-      const matchingIdx = idxChunks[c];
+      // Find matching index chunk if available
+      let matchingIdx = null;
+      for (const idx of idxChunks) {
+        if (!idx || !idx.data) continue;
+        let fits = true;
+        const testCount = Math.min(idx.data.length, 30);
+        for (let t = 0; t < testCount; t++) {
+          if (idx.data[t] >= submeshVCount) { fits = false; break; }
+        }
+        if (fits) { matchingIdx = idx; break; }
+      }
+
       if (matchingIdx && matchingIdx.data) {
         const iarr = matchingIdx.data;
         for (let j = 0; j < iarr.length - 2; j += 3) {

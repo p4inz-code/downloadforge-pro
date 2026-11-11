@@ -1461,8 +1461,29 @@
         return false;
       }
       if (message.type === "DF_GET_CACHED_OBJ") {
-        sendResponse({ ok: true, objData: lastCapturedObj ? lastCapturedObj.objData : null });
-        return false;
+        if (lastCapturedObj && lastCapturedObj.objData) {
+          sendResponse({ ok: true, objData: lastCapturedObj.objData, title: lastCapturedObj.title });
+          return false;
+        }
+        let replied = false;
+        const onRipData = (event) => {
+          if (!replied && event.data && event.data.type === "DF_WEBGL_RIP_DATA" && event.data.objData) {
+            replied = true;
+            window.removeEventListener("message", onRipData);
+            lastCapturedObj = { objData: event.data.objData, title: event.data.title, time: Date.now() };
+            sendResponse({ ok: true, objData: event.data.objData, title: event.data.title });
+          }
+        };
+        window.addEventListener("message", onRipData);
+        window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+        setTimeout(() => {
+          if (!replied) {
+            replied = true;
+            window.removeEventListener("message", onRipData);
+            sendResponse({ ok: true, objData: lastCapturedObj ? lastCapturedObj.objData : null });
+          }
+        }, 1e3);
+        return true;
       }
     });
     window.addEventListener("message", (event) => {

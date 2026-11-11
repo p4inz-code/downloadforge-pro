@@ -17,7 +17,7 @@ import { StorageService } from '../storage/storage.js';
 import { Logger } from '../utils/logger.js';
 import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
 import { checkForGitHubUpdate, downloadUpdatePackage } from '../core/updater.js';
-import { bundleSketchfabModelPackage } from '../core/model_zip_bundler.js';
+import { bundleSketchfabModelPackage, bundleGenericModelPackage } from '../core/model_zip_bundler.js';
 
 const log = new Logger('ServiceWorker');
 
@@ -448,21 +448,22 @@ async function handleDownload(payload, sendResponse) {
           log.warn('CGTrader download resolution note:', e.message);
         }
 
-        // Trigger active tab WebGL Ripper to extract mesh directly from GPU
-        try {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs && tabs[0] && tabs[0].id) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
-          }
-        } catch (e) {}
-
-        // Never download raw HTML page as a 3D model file
         if (!cgtResolved) {
-          sendResponse({
-            ok: true,
-            message: 'In-page WebGL Ripper engaged on CGTrader viewer to extract 3D mesh directly to Wavefront OBJ.'
-          });
-          return;
+          let capturedObj = null;
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs[0] && tabs[0].id) {
+              const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
+              if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
+            }
+          } catch (e) {}
+
+          const zipBytes = bundleGenericModelPackage(filename || 'cgtrader_model', capturedObj);
+          const blob = new Blob([zipBytes], { type: 'application/zip' });
+          const blobUrl = URL.createObjectURL(blob);
+          downloadUrl = blobUrl;
+          targetFilename = `${(filename || 'cgtrader_model').replace(/\.[^/.]+$/, '')}_3D_Package.zip`;
+          setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 120000);
         }
       }
     }
@@ -470,18 +471,21 @@ async function handleDownload(payload, sendResponse) {
     // Universal Safety Guard: Never download raw web page URLs as 3D model files
     if (url.startsWith('http') && !downloadUrl.match(/\.(glb|gltf|zip|obj|stl|fbx|blend|3mf|step|stp|iges|binz|osgjs|splat|ply|usdz|splinecode)(\?|$)/i)) {
       if (url.includes('/3d-models/') || url.includes('/3d-model/') || url.includes('/models/')) {
+        let capturedObj = null;
         try {
           const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
           if (tabs && tabs[0] && tabs[0].id) {
-            chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
+            const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
+            if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
           }
         } catch (e) {}
 
-        sendResponse({
-          ok: true,
-          message: 'In-page WebGL Ripper engaged to extract 3D mesh geometry directly from the GPU buffer.'
-        });
-        return;
+        const zipBytes = bundleGenericModelPackage(filename || '3d_model', capturedObj);
+        const blob = new Blob([zipBytes], { type: 'application/zip' });
+        const blobUrl = URL.createObjectURL(blob);
+        downloadUrl = blobUrl;
+        targetFilename = `${(filename || '3d_model').replace(/\.[^/.]+$/, '')}_3D_Package.zip`;
+        setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) {} }, 120000);
       }
     }
 

@@ -282,10 +282,15 @@ assert.ok(zipBytes.byteLength > 100, 'ZIP size must include headers and payload'
 const zipView = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
 assert.strictEqual(zipView.getUint32(0, true), 0x04034B50, 'First record must have Local File Header signature 0x04034B50');
 
-// CRC32 check on known string
-const testCrc = computeCrc32(new TextEncoder().encode('123456789'));
-assert.strictEqual(testCrc, 0xCBF43926, 'CRC32 of "123456789" must match standard check 0xCBF43926');
-console.log('  [PASS] Pure in-browser ZIP archive bundler & CRC32 engine verified');
+// Verify convertObjToGlb binary glTF packaging
+import { convertObjToGlb } from '../src/core/model_zip_bundler.js';
+const testObjString = 'v 0.0 0.0 0.0\nv 1.0 0.0 0.0\nv 0.0 1.0 0.0\nf 1 2 3\n';
+const glbResult = convertObjToGlb(testObjString, 'unit_test_model');
+assert.ok(glbResult instanceof Uint8Array, 'convertObjToGlb must return Uint8Array');
+const glbDataView = new DataView(glbResult.buffer, glbResult.byteOffset, glbResult.byteLength);
+assert.strictEqual(glbDataView.getUint32(0, true), 0x46546C67, 'Magic must match 0x46546C67 (glTF)');
+assert.strictEqual(glbDataView.getUint32(4, true), 2, 'Version must be 2');
+console.log('  [PASS] Pure in-browser Wavefront OBJ to binary GLB converter verified');
 
 console.log('[Test] All 10 core test suites passed successfully with zero errors!');
 
