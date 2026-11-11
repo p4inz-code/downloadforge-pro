@@ -93,14 +93,21 @@ assert.strictEqual(view.getUint32(0, true), 0x46546C67, 'Magic must match 0x4654
 assert.strictEqual(view.getUint32(4, true), 2, 'glTF Version must be 2');
 console.log('  [PASS] 3D Model glTF-to-GLB packager binary structure verified');
 
-// 7. 3D Model Categorization
+// 7. 3D Model Categorization & Platform Adaptations
 import { inferCategory } from '../src/core/classifier.js';
 import { CATEGORY } from '../src/shared/constants.js';
 assert.strictEqual(inferCategory('https://example.com/asset.glb', null, 'glb'), CATEGORY.MODEL_3D, 'glb should be model_3d');
 assert.strictEqual(inferCategory('https://example.com/mesh.obj', null, 'obj'), CATEGORY.MODEL_3D, 'obj should be model_3d');
 assert.strictEqual(inferCategory('https://example.com/scan.splat', null, 'splat'), CATEGORY.MODEL_3D, 'splat should be model_3d');
+assert.strictEqual(inferCategory('https://example.com/print.3mf', null, '3mf'), CATEGORY.MODEL_3D, '3mf should be model_3d');
+assert.strictEqual(inferCategory('https://example.com/model.step', null, 'step'), CATEGORY.MODEL_3D, 'step should be model_3d');
+assert.strictEqual(inferCategory('https://example.com/scene.blend', null, 'blend'), CATEGORY.MODEL_3D, 'blend should be model_3d');
+assert.strictEqual(inferCategory('https://sketchfab.com/i/models/4a0d8e87900b46d0a7a7bbcb358249ad', null, null), CATEGORY.MODEL_3D, 'sketchfab model API should be model_3d');
+assert.strictEqual(inferCategory('https://media.sketchfab.com/models/4a0d/file.osgjs.gz', null, 'gz'), CATEGORY.MODEL_3D, 'sketchfab media should be model_3d');
+assert.strictEqual(inferCategory('https://models.readyplayer.me/avatar.glb', null, 'glb'), CATEGORY.MODEL_3D, 'readyplayer.me should be model_3d');
+assert.strictEqual(inferCategory('https://prod.spline.design/scene.splinecode', null, 'splinecode'), CATEGORY.MODEL_3D, 'splinecode should be model_3d');
 assert.strictEqual(inferCategory('https://example.com/model', 'model/gltf-binary', null), CATEGORY.MODEL_3D, 'model/gltf-binary should be model_3d');
-console.log('  [PASS] 3D Model Classifier & Spatial asset taxonomy verified');
+console.log('  [PASS] 3D Model Classifier & Famous Platforms Taxonomy (Sketchfab, Spline, RPM, 3MF) verified');
 
 // 8. In-Browser Audio Transcoder & RIFF WAV Encoder
 import { audioBufferToWavBlob } from '../src/core/audio_converter.js';

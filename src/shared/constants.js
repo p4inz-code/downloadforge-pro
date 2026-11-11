@@ -68,6 +68,10 @@ export const EXT_MAP = {
   glb: CATEGORY.MODEL_3D, gltf: CATEGORY.MODEL_3D, obj: CATEGORY.MODEL_3D,
   mtl: CATEGORY.MODEL_3D, fbx: CATEGORY.MODEL_3D,  stl: CATEGORY.MODEL_3D,
   usdz: CATEGORY.MODEL_3D, splat: CATEGORY.MODEL_3D, ply: CATEGORY.MODEL_3D,
+  '3mf': CATEGORY.MODEL_3D, dae: CATEGORY.MODEL_3D, blend: CATEGORY.MODEL_3D,
+  step: CATEGORY.MODEL_3D, stp: CATEGORY.MODEL_3D, iges: CATEGORY.MODEL_3D,
+  osgjs: CATEGORY.MODEL_3D, binz: CATEGORY.MODEL_3D, splinecode: CATEGORY.MODEL_3D,
+  drc: CATEGORY.MODEL_3D,
 };
 
 // ── MIME type → category map ─────────────────────────────────
@@ -122,8 +126,11 @@ export const MIME_MAP = {
   'model/gltf+json':              CATEGORY.MODEL_3D,
   'model/obj':                    CATEGORY.MODEL_3D,
   'model/stl':                    CATEGORY.MODEL_3D,
+  'model/3mf':                    CATEGORY.MODEL_3D,
+  'model/step':                   CATEGORY.MODEL_3D,
   'model/vnd.usdz+zip':           CATEGORY.MODEL_3D,
   'application/octet-stream-splat': CATEGORY.MODEL_3D,
+  'application/x-tgif':           CATEGORY.MODEL_3D,
 };
 
 // ── Category UI Config ───────────────────────────────────────
@@ -227,6 +234,12 @@ export const DEFAULT_SETTINGS = {
   enableVideoOverlay:   true,            // floating in-video download pill
   concurrencyMode:      'turbo',         // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
   directDiskStream:     true,            // zero-RAM direct streaming via File System Access API
+  sniff3d:              true,            // detect and extract 3D spatial models
+  packGltf:             true,            // bundle glTF into standalone .glb
+  audioDefaultFormat:   'mp4',           // 'mp4' | 'video_only' | 'm4a' | 'wav' | 'mp3'
+  audioDefaultGain:     0,               // 0, 3, 6, 12 dB
+  autoHealErrors:       true,            // self-healing 403 / CDN errors
+  recordModeFramerate:  60,              // 60 fps lossless capture
   companionEnabled:     false,
   companionHost:        'com.P4inz Interactive Labs.downloadforge',
   debugMode:            false,

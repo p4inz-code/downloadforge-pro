@@ -307,33 +307,88 @@ function renderRules(rules) {
 async function loadSettings() {
   const settings = await StorageService.getSettings();
 
-  // Populate toggles
-  const boolKeys = ['autoScan','deduplicateUrls','showImages','showDocuments','showArchives','showStreams','enableVideoOverlay','directDiskStream','defaultSaveAs','showBadge','debugMode'];
-  for (const key of boolKeys) {
-    const el = $(`s-${key}`);
-    if (el) el.checked = settings[key] ?? false;
+  // Subtab switching
+  const subnav = $('settings-subnav');
+  if (subnav) {
+    subnav.addEventListener('click', (e) => {
+      const btn = e.target.closest('.subtab-btn');
+      if (!btn) return;
+      document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const secName = btn.dataset.sec;
+      document.querySelectorAll('.settings-section').forEach(sec => {
+        sec.style.display = 'none';
+        sec.classList.remove('active');
+      });
+      const activeSec = $(`sec-${secName}`);
+      if (activeSec) {
+        activeSec.style.display = 'flex';
+        activeSec.classList.add('active');
+      }
+    });
   }
 
-  const concurrencyEl = $('s-concurrencyMode');
-  if (concurrencyEl) concurrencyEl.value = settings.concurrencyMode || 'turbo';
+  // Populate toggles
+  const boolKeys = [
+    'autoScan', 'deduplicateUrls', 'showImages', 'showDocuments',
+    'showArchives', 'showStreams', 'enableVideoOverlay', 'directDiskStream',
+    'defaultSaveAs', 'showBadge', 'debugMode', 'sniff3d', 'packGltf',
+    'enable3dOverlay', 'autoHealErrors'
+  ];
+
+  for (const key of boolKeys) {
+    const el = $(`s-${key}`);
+    if (el) el.checked = settings[key] ?? true;
+  }
+
+  // Selects
+  const selectKeys = [
+    { id: 's-concurrencyMode',     key: 'concurrencyMode',     default: 'turbo' },
+    { id: 's-recordModeFramerate', key: 'recordModeFramerate', default: '60' },
+    { id: 's-audioDefaultFormat',  key: 'audioDefaultFormat',  default: 'mp4' },
+    { id: 's-audioDefaultGain',    key: 'audioDefaultGain',    default: '0' },
+  ];
+
+  for (const item of selectKeys) {
+    const el = $(item.id);
+    if (el) el.value = String(settings[item.key] ?? item.default);
+  }
 
   const minSize = $('s-minFileSizeBytes');
   if (minSize) minSize.value = settings.minFileSizeBytes ?? 1024;
 
-  // Save
+  // Save Settings
   $('btn-save-settings')?.addEventListener('click', async () => {
     const updated = {};
     for (const key of boolKeys) {
       const el = $(`s-${key}`);
       if (el) updated[key] = el.checked;
     }
-    if (concurrencyEl) updated.concurrencyMode = concurrencyEl.value;
+    for (const item of selectKeys) {
+      const el = $(item.id);
+      if (el) updated[item.key] = el.value;
+    }
 
     const minSizeVal = parseInt($('s-minFileSizeBytes')?.value || '0', 10);
     if (!isNaN(minSizeVal)) updated.minFileSizeBytes = minSizeVal;
 
     await StorageService.saveSettings(updated);
-    showToast('Settings saved');
+    showToast('Settings saved successfully');
+  });
+
+  // Reset to Defaults
+  $('btn-reset-defaults')?.addEventListener('click', async () => {
+    const ok = await showCustomConfirm(
+      'Reset Settings',
+      'Reset all settings to default factory values?',
+      'Reset Defaults',
+      false
+    );
+    if (!ok) return;
+    await StorageService.saveSettings(DEFAULT_SETTINGS);
+    showToast('Settings reset to defaults');
+    await loadSettings();
   });
 
   // Clear all data
@@ -348,6 +403,58 @@ async function loadSettings() {
     await StorageService.clearAll();
     showToast('All data cleared');
     await loadSettings();
+  });
+
+  // Software Update Actions
+  let latestUpdateData = null;
+  const updateRow = $('update-action-row');
+  const updateTitle = $('update-status-title');
+  const updateDesc = $('update-status-desc');
+
+  $('btn-check-updates-now')?.addEventListener('click', async () => {
+    showToast('Checking for GitHub updates...');
+    try {
+      chrome.runtime.sendMessage({ type: MSG.CHECK_FOR_UPDATES }, (res) => {
+        if (res && res.hasUpdate) {
+          latestUpdateData = res;
+          if (updateRow) updateRow.style.display = 'flex';
+          if (updateTitle) updateTitle.textContent = `Update Ready: v${res.latestVersion}`;
+          if (updateDesc) updateDesc.textContent = res.releaseName ? `${res.releaseName} is available for installation.` : 'New release package is available.';
+          showToast(`v${res.latestVersion} update available!`);
+        } else {
+          showToast('DownloadForge is up to date!');
+          if (updateRow) updateRow.style.display = 'none';
+        }
+      });
+    } catch (e) {
+      showToast('Update check failed');
+    }
+  });
+
+  $('btn-download-update-now')?.addEventListener('click', () => {
+    if (latestUpdateData?.zipUrl) {
+      chrome.runtime.sendMessage({
+        type: MSG.APPLY_UPDATE,
+        payload: { zipUrl: latestUpdateData.zipUrl, version: latestUpdateData.latestVersion }
+      }, (res) => {
+        if (res?.ok) {
+          showToast('Update package downloaded. Click Reload Extension to apply.');
+        }
+      });
+    } else if (latestUpdateData?.releaseUrl) {
+      chrome.tabs.create({ url: latestUpdateData.releaseUrl });
+    }
+  });
+
+  $('btn-reload-runtime-now')?.addEventListener('click', () => {
+    showToast('Reloading DownloadForge runtime...');
+    setTimeout(() => {
+      if (chrome?.runtime?.reload) {
+        chrome.runtime.reload();
+      } else {
+        window.location.reload();
+      }
+    }, 400);
   });
 }
 

@@ -465,12 +465,27 @@ export function init3DOverlay() {
     pill.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      const src = el.getAttribute('src') || el.src || el.getAttribute('url');
-      if (src) {
-        const filename = src.split('/').pop().split('?')[0] || 'model.glb';
+
+      let targetUrl = el.getAttribute('src') || el.src || el.getAttribute('url');
+      let targetTitle = (document.title || '3D_Model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
+
+      // Check if Sketchfab model
+      const loc = window.location.href;
+      const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) ||
+                      (el.getAttribute('data-model-id') ? [null, el.getAttribute('data-model-id')] : null) ||
+                      (el.src && el.src.match(/models\/([0-9a-f]{32})/i));
+
+      if (sfMatch && sfMatch[1]) {
+        targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
+        targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, '').trim();
+      }
+
+      if (targetUrl) {
+        const ext = targetUrl.split('.').pop().split('?')[0] || 'glb';
+        const filename = `${targetTitle || 'model'}.${ext.length <= 4 ? ext : 'glb'}`;
         chrome.runtime.sendMessage({
           type: MSG.DOWNLOAD_ITEM,
-          payload: { url: src, filename }
+          payload: { url: targetUrl, filename }
         });
       } else {
         const found = detectedMediaList.find((m) => m.category === 'model_3d');
@@ -489,10 +504,20 @@ export function init3DOverlay() {
 
   function scan3D() {
     try {
+      // 1. Web Components
       document.querySelectorAll('model-viewer, spline-viewer').forEach(attachOverlayTo3D);
+
+      // 2. Sketchfab Canvas & Containers
+      document.querySelectorAll('.c-viewer, canvas.viewer, #sketchfab-viewer, div[data-model-id], div[data-uid]').forEach(attachOverlayTo3D);
+
+      // 3. Sketchfab Embed Iframes
+      document.querySelectorAll('iframe[src*="sketchfab.com"]').forEach(attachOverlayTo3D);
+
+      // 4. Three.js / Babylon / WebGL Canvases
+      document.querySelectorAll('canvas[data-engine], div.three-container, div.babylon-container').forEach(attachOverlayTo3D);
     } catch (e) {}
   }
 
   scan3D();
-  setInterval(scan3D, 2500);
+  setInterval(scan3D, 2000);
 }

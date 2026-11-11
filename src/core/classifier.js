@@ -21,14 +21,22 @@ export function inferCategory(url, mimeType, ext) {
     if (base.startsWith('application/')) return CATEGORY.DOCUMENT;
   }
 
-  // 2. File extension
-  if (ext && EXT_MAP[ext]) return EXT_MAP[ext];
-
-  // 3. URL pattern hints
+  // 2. Specialized 3D Platform & Media Stream URL hints (takes precedence over generic .gz / .bin)
   if (url) {
     const lower = url.toLowerCase();
     if (lower.includes('.m3u8') || lower.includes('.m3u') || lower.includes('.mpd')) return CATEGORY.STREAM;
-    if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
+    if (lower.includes('sketchfab.com/i/models') || lower.includes('media.sketchfab.com/models') || lower.includes('sketchfab.com/3d-models')) return CATEGORY.MODEL_3D;
+    if (lower.includes('models.readyplayer.me') || lower.includes('prod.spline.design') || lower.includes('lumalabs.ai')) return CATEGORY.MODEL_3D;
+    if (lower.includes('googlevideo.com/videoplayback') || lower.includes('vimeocdn.com') || lower.includes('twimg.com/video') || lower.includes('tiktokcdn.com') || lower.includes('v.redd.it')) return CATEGORY.VIDEO;
+    if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply|3mf|dae|blend|step|stp|iges|osgjs|binz|splinecode|drc)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
+  }
+
+  // 3. File extension
+  if (ext && EXT_MAP[ext]) return EXT_MAP[ext];
+
+  // 4. Generic path hints
+  if (url) {
+    const lower = url.toLowerCase();
     if (lower.includes('/video/') || lower.includes('video=')) return CATEGORY.VIDEO;
     if (lower.includes('/audio/') || lower.includes('audio=')) return CATEGORY.AUDIO;
   }

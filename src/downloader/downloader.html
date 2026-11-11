@@ -45,128 +45,143 @@
           <button id="btnLoadStream" class="btn secondary">Analyze Stream</button>
         </div>
 
-        <!-- Settings Grid (Matching FetchV Parity) -->
-        <div class="config-grid">
-          <div class="config-item" id="variantRow" style="display: none;">
+        <!-- Primary Quick Controls (Minimalized) -->
+        <div class="primary-controls-bar">
+          <div class="config-item primary-item">
+            <label for="formatSelect">Output Track / Format:</label>
+            <div class="custom-select-wrap">
+              <select id="formatSelect">
+                <option value="mp4" selected>MP4 Video (Video + Audio)</option>
+                <option value="video_only">Video Only (Muted MP4)</option>
+                <option value="m4a">Audio Only: M4A / AAC (Direct Stream)</option>
+                <option value="wav">Audio Only: WAV (Lossless PCM Master)</option>
+                <option value="mp3">Audio Only: MP3 (Universal Audio)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="config-item primary-item" id="variantRow" style="display: none;">
             <label for="variantSelect">Quality / Track:</label>
             <div class="custom-select-wrap">
               <select id="variantSelect"></select>
             </div>
           </div>
 
-          <div class="config-item" id="audioTrackRow" style="display: none;">
-            <label for="audioTrackSelect">Audio Track / Language:</label>
-            <div class="custom-select-wrap">
-              <select id="audioTrackSelect"></select>
-            </div>
-          </div>
-
-          <div class="config-item" id="subtitleRow" style="display: none;">
-            <label for="subtitleSelect">Subtitles / Captions:</label>
-            <div class="subtitle-actions">
-              <div class="custom-select-wrap">
-                <select id="subtitleSelect"></select>
-              </div>
-              <button id="btnDownloadSubs" class="btn secondary sm">Download VTT</button>
-            </div>
-          </div>
-
-          <div class="config-item">
-            <label for="concurrencySelect">Parallel Worker Threads:</label>
-            <div class="custom-select-wrap">
-              <select id="concurrencySelect">
-                <option value="turbo" selected>Turbo Mode (8 Workers - Recommended)</option>
-                <option value="maximum">Maximum Mode (16 Workers)</option>
-                <option value="ultra">Ultra Mode (32 Workers - Multi-Gigabit)</option>
-                <option value="balanced">Balanced Mode (4 Workers - Low CPU)</option>
-                <option value="gentle">Gentle Mode (2 Workers)</option>
-                <option value="safe">Safe Mode (1 Worker - Strict Anti-Ban)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="config-item">
-            <label for="retrySelect">Retry Attempts on Failure:</label>
-            <div class="custom-select-wrap">
-              <select id="retrySelect">
-                <option value="3" selected>3 Retries (Standard)</option>
-                <option value="5">5 Retries (Unstable Connections)</option>
-                <option value="10">10 Retries (Aggressive Persistence)</option>
-                <option value="1">1 Retry (Fail Fast)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="config-item">
-            <label for="timeoutSelect">Segment Timeout:</label>
-            <div class="custom-select-wrap">
-              <select id="timeoutSelect">
-                <option value="15000" selected>15 Seconds (Standard)</option>
-                <option value="10000">10 Seconds (Fast CDNs)</option>
-                <option value="30000">30 Seconds (Slow CDNs)</option>
-                <option value="5000">5 Seconds (Very Fast)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="config-item">
-            <label for="formatSelect">Output Format / Track Extractor:</label>
-            <div class="custom-select-wrap">
-              <select id="formatSelect">
-                <option value="mp4" selected>MP4 Video (Video + Audio Synchronized)</option>
-                <option value="video_only">Video Only (Muted MP4 - Audio Stripped)</option>
-                <option value="m4a">Audio Only: M4A / AAC (Lossless Direct Stream)</option>
-                <option value="wav">Audio Only: WAV (Lossless PCM Studio Master)</option>
-                <option value="mp3">Audio Only: MP3 (Universal Compatible)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="config-item" id="audioTuningItem" style="display: none;">
-            <label for="audioGainSelect">Audio Volume Boost / Gain:</label>
+          <div class="config-item primary-item" id="audioTuningItem" style="display: none;">
+            <label for="audioGainSelect">Audio Volume Boost:</label>
             <div class="custom-select-wrap">
               <select id="audioGainSelect">
                 <option value="0" selected>Normal (0 dB - Original Level)</option>
                 <option value="3">+3 dB (Slight Boost)</option>
                 <option value="6">+6 dB (2x Volume Boost)</option>
-                <option value="12">+12 dB (Maximum - For Quiet Audio)</option>
+                <option value="12">+12 dB (Maximum Gain)</option>
               </select>
             </div>
           </div>
-
-          <div class="config-item">
-            <label for="customReferer">Custom Referer Header:</label>
-            <input type="text" id="customReferer" placeholder="Auto-detected from source tab..." />
-          </div>
         </div>
 
-        <!-- Time-Range Slicer Row -->
-        <div class="slicer-box">
-          <div class="slicer-header">
-            <span class="slicer-label">Time-Range Slicer (Optional):</span>
-            <span class="slicer-help">Download specific start and end timestamps</span>
-          </div>
-          <div class="slicer-inputs">
-            <input type="text" id="sliceStart" placeholder="From (e.g. 00:01:30)" />
-            <span class="slicer-sep">&rarr;</span>
-            <input type="text" id="sliceEnd" placeholder="To (e.g. 00:05:00)" />
-            <button id="btnClearSlice" class="btn secondary sm" style="display: none;">Clear</button>
-          </div>
+        <!-- Advanced Options Drawer Toggle -->
+        <div class="drawer-toggle-row">
+          <button type="button" id="btnToggleAdvanced" class="btn secondary sm drawer-toggle-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="advancedChevron">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            <span id="advancedToggleLabel">Advanced Stream Options &amp; Slicer</span>
+          </button>
         </div>
 
-        <!-- Toggles Row -->
-        <div class="toggles-row">
-          <label class="custom-checkbox-label">
-            <input type="checkbox" id="chkDirectDisk" checked />
-            <span class="checkbox-box"></span>
-            <span>Direct-to-Disk Stream (W3C File System Access API - 0% RAM bloat)</span>
-          </label>
+        <!-- Expandable Advanced Drawer -->
+        <div class="advanced-drawer" id="advancedDrawer" style="display: none;">
+          <div class="config-grid">
+            <div class="config-item" id="audioTrackRow" style="display: none;">
+              <label for="audioTrackSelect">Audio Track / Language:</label>
+              <div class="custom-select-wrap">
+                <select id="audioTrackSelect"></select>
+              </div>
+            </div>
 
-          <label class="custom-checkbox-label">
-            <input type="checkbox" id="chkSkipBroken" checked />
-            <span class="checkbox-box"></span>
-            <span>Skip Broken / 404 Segments (Prevent job abort on single missing chunk)</span>
-          </label>
+            <div class="config-item" id="subtitleRow" style="display: none;">
+              <label for="subtitleSelect">Subtitles / Captions:</label>
+              <div class="subtitle-actions">
+                <div class="custom-select-wrap">
+                  <select id="subtitleSelect"></select>
+                </div>
+                <button id="btnDownloadSubs" class="btn secondary sm">Download VTT</button>
+              </div>
+            </div>
+
+            <div class="config-item">
+              <label for="concurrencySelect">Parallel Worker Threads:</label>
+              <div class="custom-select-wrap">
+                <select id="concurrencySelect">
+                  <option value="turbo" selected>Turbo Mode (8 Workers - Recommended)</option>
+                  <option value="maximum">Maximum Mode (16 Workers)</option>
+                  <option value="ultra">Ultra Mode (32 Workers - Multi-Gigabit)</option>
+                  <option value="balanced">Balanced Mode (4 Workers - Low CPU)</option>
+                  <option value="gentle">Gentle Mode (2 Workers)</option>
+                  <option value="safe">Safe Mode (1 Worker - Strict Anti-Ban)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="config-item">
+              <label for="retrySelect">Retry Attempts on Failure:</label>
+              <div class="custom-select-wrap">
+                <select id="retrySelect">
+                  <option value="3" selected>3 Retries (Standard)</option>
+                  <option value="5">5 Retries (Unstable Connections)</option>
+                  <option value="10">10 Retries (Aggressive Persistence)</option>
+                  <option value="1">1 Retry (Fail Fast)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="config-item">
+              <label for="timeoutSelect">Segment Timeout:</label>
+              <div class="custom-select-wrap">
+                <select id="timeoutSelect">
+                  <option value="15000" selected>15 Seconds (Standard)</option>
+                  <option value="10000">10 Seconds (Fast CDNs)</option>
+                  <option value="30000">30 Seconds (Slow CDNs)</option>
+                  <option value="5000">5 Seconds (Very Fast)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="config-item">
+              <label for="customReferer">Custom Referer Header:</label>
+              <input type="text" id="customReferer" placeholder="Auto-detected from source tab..." />
+            </div>
+          </div>
+
+          <!-- Time-Range Slicer Row -->
+          <div class="slicer-box">
+            <div class="slicer-header">
+              <span class="slicer-label">Time-Range Slicer (Optional):</span>
+              <span class="slicer-help">Download specific start and end timestamps</span>
+            </div>
+            <div class="slicer-inputs">
+              <input type="text" id="sliceStart" placeholder="From (e.g. 00:01:30)" />
+              <span class="slicer-sep">&rarr;</span>
+              <input type="text" id="sliceEnd" placeholder="To (e.g. 00:05:00)" />
+              <button id="btnClearSlice" class="btn secondary sm" style="display: none;">Clear</button>
+            </div>
+          </div>
+
+          <!-- Toggles Row -->
+          <div class="toggles-row">
+            <label class="custom-checkbox-label">
+              <input type="checkbox" id="chkDirectDisk" checked />
+              <span class="checkbox-box"></span>
+              <span>Direct-to-Disk Stream (W3C File System Access API - 0% RAM bloat)</span>
+            </label>
+
+            <label class="custom-checkbox-label">
+              <input type="checkbox" id="chkSkipBroken" checked />
+              <span class="checkbox-box"></span>
+              <span>Skip Broken / 404 Segments (Prevent job abort on single missing chunk)</span>
+            </label>
+          </div>
         </div>
       </section>
 

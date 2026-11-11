@@ -82,7 +82,17 @@
     stl: CATEGORY.MODEL_3D,
     usdz: CATEGORY.MODEL_3D,
     splat: CATEGORY.MODEL_3D,
-    ply: CATEGORY.MODEL_3D
+    ply: CATEGORY.MODEL_3D,
+    "3mf": CATEGORY.MODEL_3D,
+    dae: CATEGORY.MODEL_3D,
+    blend: CATEGORY.MODEL_3D,
+    step: CATEGORY.MODEL_3D,
+    stp: CATEGORY.MODEL_3D,
+    iges: CATEGORY.MODEL_3D,
+    osgjs: CATEGORY.MODEL_3D,
+    binz: CATEGORY.MODEL_3D,
+    splinecode: CATEGORY.MODEL_3D,
+    drc: CATEGORY.MODEL_3D
   };
   var MIME_MAP = {
     "video/mp4": CATEGORY.VIDEO,
@@ -129,8 +139,11 @@
     "model/gltf+json": CATEGORY.MODEL_3D,
     "model/obj": CATEGORY.MODEL_3D,
     "model/stl": CATEGORY.MODEL_3D,
+    "model/3mf": CATEGORY.MODEL_3D,
+    "model/step": CATEGORY.MODEL_3D,
     "model/vnd.usdz+zip": CATEGORY.MODEL_3D,
-    "application/octet-stream-splat": CATEGORY.MODEL_3D
+    "application/octet-stream-splat": CATEGORY.MODEL_3D,
+    "application/x-tgif": CATEGORY.MODEL_3D
   };
   var CATEGORY_META = {
     [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
@@ -227,6 +240,18 @@
     // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
     directDiskStream: true,
     // zero-RAM direct streaming via File System Access API
+    sniff3d: true,
+    // detect and extract 3D spatial models
+    packGltf: true,
+    // bundle glTF into standalone .glb
+    audioDefaultFormat: "mp4",
+    // 'mp4' | 'video_only' | 'm4a' | 'wav' | 'mp3'
+    audioDefaultGain: 0,
+    // 0, 3, 6, 12 dB
+    autoHealErrors: true,
+    // self-healing 403 / CDN errors
+    recordModeFramerate: 60,
+    // 60 fps lossless capture
     companionEnabled: false,
     companionHost: "com.P4inz Interactive Labs.downloadforge",
     debugMode: false,
@@ -308,11 +333,17 @@
       if (base.startsWith("model/")) return CATEGORY.MODEL_3D;
       if (base.startsWith("application/")) return CATEGORY.DOCUMENT;
     }
-    if (ext && EXT_MAP[ext]) return EXT_MAP[ext];
     if (url) {
       const lower = url.toLowerCase();
       if (lower.includes(".m3u8") || lower.includes(".m3u") || lower.includes(".mpd")) return CATEGORY.STREAM;
-      if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
+      if (lower.includes("sketchfab.com/i/models") || lower.includes("media.sketchfab.com/models") || lower.includes("sketchfab.com/3d-models")) return CATEGORY.MODEL_3D;
+      if (lower.includes("models.readyplayer.me") || lower.includes("prod.spline.design") || lower.includes("lumalabs.ai")) return CATEGORY.MODEL_3D;
+      if (lower.includes("googlevideo.com/videoplayback") || lower.includes("vimeocdn.com") || lower.includes("twimg.com/video") || lower.includes("tiktokcdn.com") || lower.includes("v.redd.it")) return CATEGORY.VIDEO;
+      if (/\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply|3mf|dae|blend|step|stp|iges|osgjs|binz|splinecode|drc)(\?|$)/i.test(lower)) return CATEGORY.MODEL_3D;
+    }
+    if (ext && EXT_MAP[ext]) return EXT_MAP[ext];
+    if (url) {
+      const lower = url.toLowerCase();
       if (lower.includes("/video/") || lower.includes("video=")) return CATEGORY.VIDEO;
       if (lower.includes("/audio/") || lower.includes("audio=")) return CATEGORY.AUDIO;
     }
@@ -530,6 +561,42 @@
           status: STATUS.DOWNLOADABLE
         }));
       }
+    }
+    try {
+      const loc = window.location.href;
+      const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i);
+      if (sfMatch) {
+        const uid = sfMatch[1];
+        const title = (doc.title || "Sketchfab 3D Model").replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
+        items.push(buildResource({
+          url: `https://sketchfab.com/i/models/${uid}`,
+          category: CATEGORY.MODEL_3D,
+          ext: "glb",
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || "sketchfab_model"}.glb`,
+          mimeType: "model/gltf+json",
+          source: SOURCE.DOM_EMBED,
+          title: title || "Sketchfab 3D Model",
+          status: STATUS.DOWNLOADABLE
+        }));
+      }
+      const sfFrames = doc.querySelectorAll('iframe[src*="sketchfab.com"]');
+      for (const frame of sfFrames) {
+        const src = frame.src || frame.getAttribute("src");
+        const m = src ? src.match(/models\/([0-9a-f]{32})/i) : null;
+        if (m) {
+          items.push(buildResource({
+            url: `https://sketchfab.com/i/models/${m[1]}`,
+            category: CATEGORY.MODEL_3D,
+            ext: "glb",
+            filename: `sketchfab_${m[1].slice(0, 8)}.glb`,
+            mimeType: "model/gltf+json",
+            source: SOURCE.DOM_EMBED,
+            title: frame.getAttribute("title") || "Embedded Sketchfab Model",
+            status: STATUS.DOWNLOADABLE
+          }));
+        }
+      }
+    } catch (e) {
     }
     return items;
   }
@@ -1038,12 +1105,20 @@
       pill.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
-        const src = el.getAttribute("src") || el.src || el.getAttribute("url");
-        if (src) {
-          const filename = src.split("/").pop().split("?")[0] || "model.glb";
+        let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url");
+        let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
+        const loc = window.location.href;
+        const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) || (el.getAttribute("data-model-id") ? [null, el.getAttribute("data-model-id")] : null) || el.src && el.src.match(/models\/([0-9a-f]{32})/i);
+        if (sfMatch && sfMatch[1]) {
+          targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
+          targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
+        }
+        if (targetUrl) {
+          const ext = targetUrl.split(".").pop().split("?")[0] || "glb";
+          const filename = `${targetTitle || "model"}.${ext.length <= 4 ? ext : "glb"}`;
           chrome.runtime.sendMessage({
             type: MSG.DOWNLOAD_ITEM,
-            payload: { url: src, filename }
+            payload: { url: targetUrl, filename }
           });
         } else {
           const found = detectedMediaList.find((m) => m.category === "model_3d");
@@ -1061,11 +1136,14 @@
     function scan3D() {
       try {
         document.querySelectorAll("model-viewer, spline-viewer").forEach(attachOverlayTo3D);
+        document.querySelectorAll(".c-viewer, canvas.viewer, #sketchfab-viewer, div[data-model-id], div[data-uid]").forEach(attachOverlayTo3D);
+        document.querySelectorAll('iframe[src*="sketchfab.com"]').forEach(attachOverlayTo3D);
+        document.querySelectorAll("canvas[data-engine], div.three-container, div.babylon-container").forEach(attachOverlayTo3D);
       } catch (e) {
       }
     }
     scan3D();
-    setInterval(scan3D, 2500);
+    setInterval(scan3D, 2e3);
   }
 
   // src/storage/storage.js

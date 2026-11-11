@@ -290,12 +290,13 @@ function collectEmbedObjects(doc) {
 }
 
 /**
- * Collect 3D Web Viewers (<model-viewer>, <spline-viewer>).
+ * Collect 3D Web Viewers (<model-viewer>, <spline-viewer>, Sketchfab, Thingiverse, WebGL).
  */
 function collect3DViewerElements(doc) {
   const items = [];
-  const viewers = doc.querySelectorAll('model-viewer, spline-viewer');
 
+  // 1. Standard HTML5 3D Web Components
+  const viewers = doc.querySelectorAll('model-viewer, spline-viewer');
   for (const el of viewers) {
     const src = el.getAttribute('src') || el.src || el.getAttribute('url');
     const url = resolveUrl(src, doc);
@@ -328,6 +329,45 @@ function collect3DViewerElements(doc) {
       }));
     }
   }
+
+  // 2. Sketchfab In-Page Model & Embed Scanner
+  try {
+    const loc = window.location.href;
+    const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i);
+    if (sfMatch) {
+      const uid = sfMatch[1];
+      const title = (doc.title || 'Sketchfab 3D Model').replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, '').trim();
+      items.push(buildResource({
+        url: `https://sketchfab.com/i/models/${uid}`,
+        category: CATEGORY.MODEL_3D,
+        ext: 'glb',
+        filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'sketchfab_model'}.glb`,
+        mimeType: 'model/gltf+json',
+        source: SOURCE.DOM_EMBED,
+        title: title || 'Sketchfab 3D Model',
+        status: STATUS.DOWNLOADABLE,
+      }));
+    }
+
+    // Embed iframes on other pages
+    const sfFrames = doc.querySelectorAll('iframe[src*="sketchfab.com"]');
+    for (const frame of sfFrames) {
+      const src = frame.src || frame.getAttribute('src');
+      const m = src ? src.match(/models\/([0-9a-f]{32})/i) : null;
+      if (m) {
+        items.push(buildResource({
+          url: `https://sketchfab.com/i/models/${m[1]}`,
+          category: CATEGORY.MODEL_3D,
+          ext: 'glb',
+          filename: `sketchfab_${m[1].slice(0, 8)}.glb`,
+          mimeType: 'model/gltf+json',
+          source: SOURCE.DOM_EMBED,
+          title: frame.getAttribute('title') || 'Embedded Sketchfab Model',
+          status: STATUS.DOWNLOADABLE,
+        }));
+      }
+    }
+  } catch (e) {}
 
   return items;
 }

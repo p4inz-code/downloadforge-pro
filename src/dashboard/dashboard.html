@@ -160,105 +160,196 @@
       <button class="btn-primary" id="btn-save-settings">Save Settings</button>
     </div>
 
-    <div class="settings-grid">
+    <!-- Categorized Settings Sub-Navigation -->
+    <div class="settings-subnav" id="settings-subnav">
+      <button class="subtab-btn active" data-sec="general">General &amp; Sniffer</button>
+      <button class="subtab-btn" data-sec="stream">Stream Studio</button>
+      <button class="subtab-btn" data-sec="model3d">3D Spatial Ripper</button>
+      <button class="subtab-btn" data-sec="audio">Audio Studio</button>
+      <button class="subtab-btn" data-sec="updates">Updates &amp; Maintenance</button>
+    </div>
 
+    <!-- 1. GENERAL & SNIFFER SETTINGS -->
+    <div class="settings-section active" id="sec-general">
       <div class="card">
-        <h3 class="card-title">Detection</h3>
+        <h3 class="card-title">Sniffer &amp; Detection Behavior</h3>
         <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Auto-scan on page load</div><div class="setting-desc">Automatically scan when you navigate to a page</div></div>
+          <div class="setting-info"><div class="setting-label">Auto-scan on page load</div><div class="setting-desc">Automatically inspect active page when navigation settles</div></div>
           <label class="toggle"><input type="checkbox" id="s-autoScan"/><span class="toggle-track"></span></label>
         </div>
         <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Deduplicate URLs</div><div class="setting-desc">Hide duplicate resource URLs</div></div>
+          <div class="setting-info"><div class="setting-label">Deduplicate identical URLs</div><div class="setting-desc">Filter duplicate resource occurrences into single entries</div></div>
           <label class="toggle"><input type="checkbox" id="s-deduplicateUrls"/><span class="toggle-track"></span></label>
         </div>
         <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Show images</div><div class="setting-desc">Include image files in results</div></div>
-          <label class="toggle"><input type="checkbox" id="s-showImages"/><span class="toggle-track"></span></label>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Show documents</div><div class="setting-desc">Include PDF, DOCX, XLSX etc.</div></div>
-          <label class="toggle"><input type="checkbox" id="s-showDocuments"/><span class="toggle-track"></span></label>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Show archives</div><div class="setting-desc">Include ZIP, RAR, 7Z etc.</div></div>
-          <label class="toggle"><input type="checkbox" id="s-showArchives"/><span class="toggle-track"></span></label>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Show stream manifests</div><div class="setting-desc">Show non-DRM HLS streams (m3u8)</div></div>
-          <label class="toggle"><input type="checkbox" id="s-showStreams"/><span class="toggle-track"></span></label>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Floating video overlay</div><div class="setting-desc">Render quick 1-click download pill over web video players</div></div>
+          <div class="setting-info"><div class="setting-label">Floating video download overlay</div><div class="setting-desc">Attach 1-click download pill on web video players</div></div>
           <label class="toggle"><input type="checkbox" id="s-enableVideoOverlay"/><span class="toggle-track"></span></label>
         </div>
-      </div>
-
-      <div class="card">
-        <h3 class="card-title">Stream Studio & Acceleration</h3>
         <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Speed concurrency profile</div><div class="setting-desc">Simultaneous download connections for HLS/DASH streams</div></div>
-          <select class="input input-sm" id="s-concurrencyMode">
-            <option value="turbo">Turbo (8 Threads - Recommended)</option>
-            <option value="maximum">Maximum Aggression (16 Threads)</option>
-            <option value="balanced">Balanced Mode (4 Threads)</option>
-          </select>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Zero-RAM direct streaming</div><div class="setting-desc">Stream 1-2GB+ videos directly to SSD via File System Access API</div></div>
-          <label class="toggle"><input type="checkbox" id="s-directDiskStream"/><span class="toggle-track"></span></label>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="card-title">Downloads</h3>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Always show Save As dialog</div><div class="setting-desc">Prompt for save location on every download</div></div>
-          <label class="toggle"><input type="checkbox" id="s-defaultSaveAs"/><span class="toggle-track"></span></label>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Show badge count</div><div class="setting-desc">Show resource count on extension icon</div></div>
+          <div class="setting-info"><div class="setting-label">Show badge count on extension icon</div><div class="setting-desc">Real-time counter badge over extension toolbar icon</div></div>
           <label class="toggle"><input type="checkbox" id="s-showBadge"/><span class="toggle-track"></span></label>
         </div>
         <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Always show Save As dialog</div><div class="setting-desc">Prompt for local file destination on every single download</div></div>
+          <label class="toggle"><input type="checkbox" id="s-defaultSaveAs"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">Min file size (bytes)</div>
-            <div class="setting-desc">Skip resources smaller than this (avoids tiny tracking pixels)</div>
+            <div class="setting-label">Minimum asset filter size (bytes)</div>
+            <div class="setting-desc">Ignore tiny tracking beacons and 1x1 pixels (default 1024 bytes)</div>
           </div>
           <input type="number" class="input input-sm" id="s-minFileSizeBytes" min="0" step="512"/>
         </div>
+      </div>
+
       <div class="card">
-        <h3 class="card-title">3D Models &amp; Spatial Assets</h3>
+        <h3 class="card-title">Active Categories Filter</h3>
         <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">3D Model Ripper &amp; Sniffer</div>
-            <div class="setting-desc">Detect and extract GLTF, GLB, OBJ, STL, USDZ, and 3D Gaussian Splats</div>
-          </div>
-          <label class="toggle"><input type="checkbox" id="s-sniff3d" checked/><span class="toggle-track"></span></label>
+          <div class="setting-info"><div class="setting-label">Capture image files</div><div class="setting-desc">Include JPG, PNG, WEBP, AVIF, SVG</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showImages"/><span class="toggle-track"></span></label>
         </div>
         <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Auto-package GLTF to standalone GLB</div>
-            <div class="setting-desc">Bundle fragmented .gltf, .bin buffers, and image textures into a single drag-and-drop .glb</div>
-          </div>
-          <label class="toggle"><input type="checkbox" id="s-packGltf" checked/><span class="toggle-track"></span></label>
+          <div class="setting-info"><div class="setting-label">Capture document files</div><div class="setting-desc">Include PDF, DOCX, XLSX, PPTX, TXT</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showDocuments"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Capture archive containers</div><div class="setting-desc">Include ZIP, RAR, 7Z, TAR, GZ</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showArchives"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Capture stream playlists</div><div class="setting-desc">Include HLS (.m3u8) and MPEG-DASH (.mpd) manifests</div></div>
+          <label class="toggle"><input type="checkbox" id="s-showStreams"/><span class="toggle-track"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. STREAM STUDIO & ENGINE SETTINGS -->
+    <div class="settings-section" id="sec-stream" style="display: none;">
+      <div class="card">
+        <h3 class="card-title">HLS / MPEG-DASH Acceleration</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Default parallel worker concurrency</div><div class="setting-desc">Simultaneous segment download threads</div></div>
+          <select class="input input-sm" id="s-concurrencyMode">
+            <option value="turbo">Turbo (8 Threads - Recommended)</option>
+            <option value="maximum">Maximum Mode (16 Threads)</option>
+            <option value="ultra">Ultra Mode (32 Threads - Multi-Gigabit)</option>
+            <option value="balanced">Balanced Mode (4 Threads)</option>
+            <option value="safe">Safe Mode (1 Thread - Strict Anti-Ban)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Direct-to-Disk Zero-RAM streaming</div><div class="setting-desc">Stream multi-gigabyte videos directly to disk via W3C File System Access API</div></div>
+          <label class="toggle"><input type="checkbox" id="s-directDiskStream"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Automated error self-healing</div><div class="setting-desc">Auto-inject origin Referer and auto-retry on HTTP 403 hotlink protection</div></div>
+          <label class="toggle"><input type="checkbox" id="s-autoHealErrors"/><span class="toggle-track"></span></label>
         </div>
       </div>
 
       <div class="card">
-        <h3 class="card-title">Privacy & Data</h3>
+        <h3 class="card-title">Live In-Page Recording Engine</h3>
         <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Debug mode</div><div class="setting-desc">Verbose console logging for troubleshooting</div></div>
+          <div class="setting-info"><div class="setting-label">Recording framerate capture</div><div class="setting-desc">Target playback capture rate for canvas &amp; MSE buffer recording</div></div>
+          <select class="input input-sm" id="s-recordModeFramerate">
+            <option value="60">60 FPS (Ultra Smooth)</option>
+            <option value="30">30 FPS (Balanced Resource)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 3D MODELS & SPATIAL ASSETS SETTINGS -->
+    <div class="settings-section" id="sec-model3d" style="display: none;">
+      <div class="card">
+        <h3 class="card-title">3D Engine &amp; Spatial Assets</h3>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Deep 3D model sniffer &amp; WebGL hook</div>
+            <div class="setting-desc">Intercept and extract Sketchfab, Thingiverse, Printables, Spline, GLTF, GLB, OBJ, STL, USDZ, and Gaussian Splats</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s-sniff3d"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Auto-package GLTF into standalone GLB</div>
+            <div class="setting-desc">Automatically fetch external .bin buffers and textures to pack a self-contained .glb</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s-packGltf"/><span class="toggle-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">3D Rip hover badges on 3D viewers</div>
+            <div class="setting-desc">Attach interactive 3D Rip pill over Sketchfab, Model-Viewer, Spline, and Three.js canvases</div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="s-enable3dOverlay" checked/><span class="toggle-track"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. AUDIO STUDIO & TRANSCODING SETTINGS -->
+    <div class="settings-section" id="sec-audio" style="display: none;">
+      <div class="card">
+        <h3 class="card-title">Audio Studio Defaults</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Default audio extraction format</div><div class="setting-desc">Default output format when extracting audio tracks from stream studio</div></div>
+          <select class="input input-sm" id="s-audioDefaultFormat">
+            <option value="mp4">MP4 Video (Video + Audio)</option>
+            <option value="video_only">Video Only (Muted MP4)</option>
+            <option value="m4a">Lossless M4A / AAC Stream</option>
+            <option value="wav">Studio Master WAV (16-bit PCM)</option>
+            <option value="mp3">Universal MP3 Audio</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Default volume boost gain</div><div class="setting-desc">Hardware-calculated PCM gain boost applied to quiet streams</div></div>
+          <select class="input input-sm" id="s-audioDefaultGain">
+            <option value="0">Normal (0 dB)</option>
+            <option value="3">+3 dB (Slight Boost)</option>
+            <option value="6">+6 dB (2x Boost)</option>
+            <option value="12">+12 dB (Maximum Gain)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. UPDATES & MAINTENANCE SETTINGS -->
+    <div class="settings-section" id="sec-updates" style="display: none;">
+      <div class="card">
+        <h3 class="card-title">Software Updates</h3>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Current installed version</div>
+            <div class="setting-desc" id="settingsVersionText">DownloadForge Pro v1.2.0 (Official GitHub Release)</div>
+          </div>
+          <button class="btn-secondary" id="btn-check-updates-now">Check for Updates</button>
+        </div>
+        <div class="setting-row" id="update-action-row" style="display: none;">
+          <div class="setting-info">
+            <div class="setting-label" id="update-status-title">New version available!</div>
+            <div class="setting-desc" id="update-status-desc">Click below to download package and reload extension runtime.</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-primary" id="btn-download-update-now">Download Package</button>
+            <button class="btn-secondary" id="btn-reload-runtime-now">Reload Extension</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Diagnostics &amp; Data Maintenance</h3>
+        <div class="setting-row">
+          <div class="setting-info"><div class="setting-label">Debug logging</div><div class="setting-desc">Emit verbose diagnostics logs in extension console</div></div>
           <label class="toggle"><input type="checkbox" id="s-debugMode"/><span class="toggle-track"></span></label>
         </div>
         <div class="privacy-note">
-          <strong>Privacy:</strong> DownloadForge stores all data locally on your device. No browsing data is sent to any server. No account required.
+          <strong>Privacy:</strong> DownloadForge operates 100% locally on your machine. Zero tracking, zero telemetry, zero analytics, zero external proxies.
         </div>
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn-secondary btn-danger" id="btn-clear-all-data">Clear All Data</button>
+          <button class="btn-secondary" id="btn-reset-defaults">Reset to Defaults</button>
         </div>
       </div>
-
     </div>
   </div>
 

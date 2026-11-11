@@ -22,10 +22,10 @@
     delete document.documentElement.dataset.dfSnifferToken;
   }
 
-  const MEDIA_REGEX = /\.(m3u8|mpd|mp4|webm|ts|m4s|f4m|flv)(\?|$)/i;
+  const MEDIA_REGEX = /\.(m3u8|mpd|mp4|webm|ts|m4s|f4m|flv|mov|m4v|m4a|aac|opus|wav)(\?|$)|(googlevideo\.com\/videoplayback|vimeocdn\.com|video\.twimg\.com|tiktokcdn\.com|v\.redd\.it)/i;
   const MIME_REGEX = /(mpegurl|x-mpegurl|video\/|audio\/|dash\+xml)/i;
-  const MODEL_3D_REGEX = /\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply)(\?|$)/i;
-  const MODEL_3D_MIME_REGEX = /(model\/|gltf|usdz|octet-stream-splat)/i;
+  const MODEL_3D_REGEX = /\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply|3mf|dae|blend|step|stp|iges|osgjs|binz|splinecode|drc)(\?|$)|(sketchfab\.com\/(?:i\/models|3d-models)|media\.sketchfab\.com\/models|models\.readyplayer\.me|prod\.spline\.design|lumalabs\.ai)/i;
+  const MODEL_3D_MIME_REGEX = /(model\/|gltf|usdz|octet-stream-splat|3mf|step|stl)/i;
 
   function extractFilename(url) {
     try {
@@ -445,11 +445,130 @@
           checkObj(parsed);
         } catch (e) {}
       }
+
+      // F. YouTube / Vimeo / Platform Player Configs
+      if (window.ytplayer && window.ytplayer.config) {
+        try {
+          const cfg = window.ytplayer.config;
+          const args = cfg.args || {};
+          if (args.raw_player_response && args.raw_player_response.streamingData) {
+            const sd = args.raw_player_response.streamingData;
+            if (sd.hlsManifestUrl) {
+              notifyDetected({
+                url: sd.hlsManifestUrl,
+                category: 'stream',
+                title: document.title,
+                method: 'TIER_3_PLAYER_CONFIG',
+                initiator: 'youtube-hls'
+              });
+            }
+          }
+        } catch (e) {}
+      }
+
+      // G. Dedicated Sketchfab Adapter
+      detectSketchfabModel();
+
+      // H. Dedicated 3D Sites Adapter (Thingiverse, Printables, Cults3D, Spline)
+      detectFamous3DPlatforms();
+
     } catch (err) {}
   }
 
+  // ── 9. Specialized Sketchfab 3D Model Adapter ────────────────
+  function detectSketchfabModel() {
+    try {
+      const loc = window.location.href;
+      // Sketchfab URL pattern: /3d-models/<slug>-<32-hex-uid> or /models/<32-hex-uid>/embed
+      const m = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i);
+      const uid = m ? m[1] : null;
+
+      if (uid) {
+        let title = document.title || 'Sketchfab 3D Model';
+        title = title.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, '').trim();
+
+        let thumbnail = '';
+        const ogImg = document.querySelector('meta[property="og:image"]');
+        if (ogImg) thumbnail = ogImg.getAttribute('content') || '';
+
+        notifyDetected({
+          url: `https://sketchfab.com/i/models/${uid}`,
+          category: 'model_3d',
+          title: title || `Sketchfab Model (${uid.slice(0, 8)})`,
+          mimeType: 'model/gltf+json',
+          preview: thumbnail,
+          method: 'TIER_3_PLAYER_CONFIG',
+          initiator: 'sketchfab-adapter'
+        });
+      }
+
+      // Check for Sketchfab embed iframes
+      document.querySelectorAll('iframe[src*="sketchfab.com"]').forEach(frame => {
+        const src = frame.src || frame.getAttribute('src');
+        if (src) {
+          const match = src.match(/models\/([0-9a-f]{32})/i);
+          if (match) {
+            notifyDetected({
+              url: `https://sketchfab.com/i/models/${match[1]}`,
+              category: 'model_3d',
+              title: (frame.getAttribute('title') || document.title || 'Embedded Sketchfab Model').slice(0, 100),
+              method: 'TIER_2_DOM_TAG',
+              initiator: 'sketchfab-embed'
+            });
+          }
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ── 10. Dedicated Famous 3D Platforms Adapter ────────────────
+  function detectFamous3DPlatforms() {
+    try {
+      const href = window.location.href;
+
+      // Thingiverse
+      if (href.includes('thingiverse.com/thing:')) {
+        const thingId = href.split('thing:')[1].split('/')[0].split('?')[0];
+        notifyDetected({
+          url: `https://www.thingiverse.com/thing:${thingId}/files`,
+          category: 'model_3d',
+          title: document.title.replace(/\s*-\s*Thingiverse.*$/i, '').trim() || 'Thingiverse 3D Model',
+          method: 'TIER_3_PLAYER_CONFIG',
+          initiator: 'thingiverse-adapter'
+        });
+      }
+
+      // Printables
+      if (href.includes('printables.com/model/')) {
+        notifyDetected({
+          url: href,
+          category: 'model_3d',
+          title: document.title.replace(/\s*\|\s*Printables.*$/i, '').trim() || 'Printables 3D Model',
+          method: 'TIER_3_PLAYER_CONFIG',
+          initiator: 'printables-adapter'
+        });
+      }
+
+      // Spline Viewer URL / code
+      document.querySelectorAll('spline-viewer').forEach(el => {
+        const url = el.getAttribute('url');
+        if (url) {
+          notifyDetected({
+            url,
+            category: 'model_3d',
+            title: extractFilename(url) || 'Spline 3D Scene',
+            method: 'TIER_2_DOM_TAG',
+            initiator: 'spline-adapter'
+          });
+        }
+      });
+    } catch (e) {}
+  }
+
   // Run Tier 3 extraction on load and shortly after
-  setTimeout(extractFromPlayerConfigs, 800);
-  setTimeout(extractFromPlayerConfigs, 2500);
+  setTimeout(extractFromPlayerConfigs, 500);
+  setTimeout(extractFromPlayerConfigs, 1500);
+  setTimeout(extractFromPlayerConfigs, 3500);
 
 })();
+

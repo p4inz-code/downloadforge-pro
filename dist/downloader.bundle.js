@@ -8040,7 +8040,17 @@
     stl: CATEGORY.MODEL_3D,
     usdz: CATEGORY.MODEL_3D,
     splat: CATEGORY.MODEL_3D,
-    ply: CATEGORY.MODEL_3D
+    ply: CATEGORY.MODEL_3D,
+    "3mf": CATEGORY.MODEL_3D,
+    dae: CATEGORY.MODEL_3D,
+    blend: CATEGORY.MODEL_3D,
+    step: CATEGORY.MODEL_3D,
+    stp: CATEGORY.MODEL_3D,
+    iges: CATEGORY.MODEL_3D,
+    osgjs: CATEGORY.MODEL_3D,
+    binz: CATEGORY.MODEL_3D,
+    splinecode: CATEGORY.MODEL_3D,
+    drc: CATEGORY.MODEL_3D
   };
   var MIME_MAP = {
     "video/mp4": CATEGORY.VIDEO,
@@ -8087,8 +8097,11 @@
     "model/gltf+json": CATEGORY.MODEL_3D,
     "model/obj": CATEGORY.MODEL_3D,
     "model/stl": CATEGORY.MODEL_3D,
+    "model/3mf": CATEGORY.MODEL_3D,
+    "model/step": CATEGORY.MODEL_3D,
     "model/vnd.usdz+zip": CATEGORY.MODEL_3D,
-    "application/octet-stream-splat": CATEGORY.MODEL_3D
+    "application/octet-stream-splat": CATEGORY.MODEL_3D,
+    "application/x-tgif": CATEGORY.MODEL_3D
   };
   var CATEGORY_META = {
     [CATEGORY.VIDEO]: { label: "Videos", icon: "video", color: "#f97316" },
@@ -8122,6 +8135,18 @@
     // 'turbo' (8x) | 'maximum' (16x) | 'balanced' (4x)
     directDiskStream: true,
     // zero-RAM direct streaming via File System Access API
+    sniff3d: true,
+    // detect and extract 3D spatial models
+    packGltf: true,
+    // bundle glTF into standalone .glb
+    audioDefaultFormat: "mp4",
+    // 'mp4' | 'video_only' | 'm4a' | 'wav' | 'mp3'
+    audioDefaultGain: 0,
+    // 0, 3, 6, 12 dB
+    autoHealErrors: true,
+    // self-healing 403 / CDN errors
+    recordModeFramerate: 60,
+    // 60 fps lossless capture
     companionEnabled: false,
     companionHost: "com.P4inz Interactive Labs.downloadforge",
     debugMode: false,
@@ -9930,6 +9955,15 @@
       else if (val === "mp3") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp3");
       else if (val === "m4a") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".m4a");
       else targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp4");
+      const startLabelMap = {
+        mp4: "Start Download",
+        video_only: "Extract Video (Muted MP4)",
+        m4a: "Extract Audio (M4A)",
+        wav: "Transcode & Export (WAV Master)",
+        mp3: "Extract Audio (MP3)"
+      };
+      const startSpan = btnStart?.querySelector("span");
+      if (startSpan) startSpan.textContent = startLabelMap[val] || "Start Download";
       if (btnSave) {
         const labelMap = {
           mp4: "Save MP4 File",
@@ -9940,6 +9974,19 @@
         };
         const span = btnSave.querySelector("span");
         if (span) span.textContent = labelMap[val] || "Save File";
+      }
+    });
+  }
+  var btnToggleAdvanced = document.getElementById("btnToggleAdvanced");
+  var advancedDrawer = document.getElementById("advancedDrawer");
+  var advancedChevron = document.getElementById("advancedChevron");
+  if (btnToggleAdvanced && advancedDrawer) {
+    btnToggleAdvanced.addEventListener("click", () => {
+      const isHidden = advancedDrawer.style.display === "none";
+      advancedDrawer.style.display = isHidden ? "block" : "none";
+      if (advancedChevron) {
+        advancedChevron.style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+        advancedChevron.style.transition = "transform 0.2s ease";
       }
     });
   }

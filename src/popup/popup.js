@@ -564,14 +564,24 @@ function setupEventListeners() {
         if (banner) banner.style.display = 'flex';
         if (verEl) verEl.textContent = `v${res.latestVersion} Ready`;
         if (actBtn) {
+          let hasDownloaded = false;
           actBtn.addEventListener('click', () => {
-            if (res.zipUrl) {
+            if (!hasDownloaded && res.zipUrl) {
               chrome.runtime.sendMessage({
                 type: MSG.APPLY_UPDATE,
                 payload: { zipUrl: res.zipUrl, version: res.latestVersion }
+              }, () => {
+                hasDownloaded = true;
+                actBtn.textContent = 'Reload Runtime';
+                actBtn.style.background = 'var(--accent, #5b9bff)';
+                actBtn.style.color = '#fff';
               });
-            } else if (res.releaseUrl) {
-              chrome.tabs.create({ url: res.releaseUrl });
+            } else {
+              if (chrome?.runtime?.reload) {
+                chrome.runtime.reload();
+              } else if (res.releaseUrl) {
+                chrome.tabs.create({ url: res.releaseUrl });
+              }
             }
           });
         }

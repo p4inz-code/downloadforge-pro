@@ -759,6 +759,16 @@ if (formatSelect) {
     else if (val === 'm4a') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.m4a');
     else targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp4');
 
+    const startLabelMap = {
+      mp4: 'Start Download',
+      video_only: 'Extract Video (Muted MP4)',
+      m4a: 'Extract Audio (M4A)',
+      wav: 'Transcode & Export (WAV Master)',
+      mp3: 'Extract Audio (MP3)',
+    };
+    const startSpan = btnStart?.querySelector('span');
+    if (startSpan) startSpan.textContent = startLabelMap[val] || 'Start Download';
+
     if (btnSave) {
       const labelMap = {
         mp4: 'Save MP4 File',
@@ -773,4 +783,21 @@ if (formatSelect) {
   });
 }
 
+// ── 14. Advanced Options Drawer ──────────────────────────────
+const btnToggleAdvanced = document.getElementById('btnToggleAdvanced');
+const advancedDrawer = document.getElementById('advancedDrawer');
+const advancedChevron = document.getElementById('advancedChevron');
+
+if (btnToggleAdvanced && advancedDrawer) {
+  btnToggleAdvanced.addEventListener('click', () => {
+    const isHidden = advancedDrawer.style.display === 'none';
+    advancedDrawer.style.display = isHidden ? 'block' : 'none';
+    if (advancedChevron) {
+      advancedChevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+      advancedChevron.style.transition = 'transform 0.2s ease';
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', initFromUrl);
+
