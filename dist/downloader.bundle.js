@@ -5504,8 +5504,8 @@
               parsedCaptions.captions.push(event);
               parsedCaptions.captionStreams[event.stream] = true;
             });
-            captionStream2.on("log", function(log2) {
-              parsedCaptions.logs.push(log2);
+            captionStream2.on("log", function(log3) {
+              parsedCaptions.logs.push(log3);
             });
           };
           this.isNewInit = function(videoTrackIds, timescales) {
@@ -9212,6 +9212,81 @@
     }
   };
 
+  // src/core/audio_converter.js
+  var log2 = new Logger("AudioConverter");
+  function audioBufferToWavBlob(audioBuffer, options = {}) {
+    const numChannels = options.channels === 1 ? 1 : Math.min(2, audioBuffer.numberOfChannels);
+    const sampleRate = options.sampleRate || audioBuffer.sampleRate;
+    const numFrames = audioBuffer.length;
+    const bytesPerSample = 2;
+    const blockAlign = numChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataByteLength = numFrames * blockAlign;
+    const totalLength = 44 + dataByteLength;
+    const buffer = new ArrayBuffer(totalLength);
+    const view = new DataView(buffer);
+    writeString(view, 0, "RIFF");
+    view.setUint32(4, 36 + dataByteLength, true);
+    writeString(view, 8, "WAVE");
+    writeString(view, 12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, "data");
+    view.setUint32(40, dataByteLength, true);
+    const gain = Math.pow(10, (options.gainDb || 0) / 20);
+    const channelData = [];
+    for (let ch = 0; ch < numChannels; ch++) {
+      channelData.push(audioBuffer.getChannelData(ch));
+    }
+    let offset = 44;
+    for (let i = 0; i < numFrames; i++) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        let sample = channelData[ch][i] * gain;
+        sample = Math.max(-1, Math.min(1, sample));
+        const intSample = sample < 0 ? sample * 32768 : sample * 32767;
+        view.setInt16(offset, intSample, true);
+        offset += 2;
+      }
+    }
+    log2.debug(`Created WAV audio Blob: ${totalLength} bytes (${numChannels}ch @ ${sampleRate}Hz)`);
+    return new Blob([buffer], { type: "audio/wav" });
+  }
+  function writeString(view, offset, str) {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  }
+  async function convertMediaToWav(mediaSource, options = {}) {
+    log2.info("Extracting audio track and transcoding to studio-grade WAV...");
+    let arrayBuffer;
+    if (mediaSource instanceof Blob) {
+      arrayBuffer = await mediaSource.arrayBuffer();
+    } else if (mediaSource instanceof ArrayBuffer) {
+      arrayBuffer = mediaSource;
+    } else if (mediaSource.buffer) {
+      arrayBuffer = mediaSource.buffer;
+    } else {
+      throw new Error("Unsupported media source input format for audio extraction");
+    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) {
+      throw new Error("Web Audio API (AudioContext) is not available in this environment");
+    }
+    const audioCtx = new AudioCtx();
+    try {
+      const copy = arrayBuffer.slice(0);
+      const decodedAudio = await audioCtx.decodeAudioData(copy);
+      return audioBufferToWavBlob(decodedAudio, options);
+    } finally {
+      audioCtx.close();
+    }
+  }
+
   // src/downloader/downloader_bundle.js
   var currentEngine = null;
   var currentBlob = null;
@@ -9240,6 +9315,8 @@
   var retrySelect = document.getElementById("retrySelect");
   var timeoutSelect = document.getElementById("timeoutSelect");
   var formatSelect = document.getElementById("formatSelect");
+  var audioTuningItem = document.getElementById("audioTuningItem");
+  var audioGainSelect = document.getElementById("audioGainSelect");
   var customReferer = document.getElementById("customReferer");
   var chkDirectDisk = document.getElementById("chkDirectDisk");
   var chkSkipBroken = document.getElementById("chkSkipBroken");
@@ -9658,13 +9735,28 @@
       });
       engineStatus.textContent = "Complete";
       btnCancel.style.display = "none";
+      const selectedFormat = formatSelect ? formatSelect.value : "mp4";
+      const gainDb = audioGainSelect ? parseFloat(audioGainSelect.value) || 0 : 0;
       if (result.directStream) {
         statusMessage.textContent = `Saved directly to disk: ${targetFilename}`;
         progressBarFill.style.width = "100%";
         statPercent.textContent = "100%";
       } else {
-        currentBlob = result.blob;
-        statusMessage.textContent = "Transmuxing complete! MP4 is ready.";
+        if (selectedFormat === "wav") {
+          statusMessage.textContent = "Transcoding audio track to studio-grade WAV...";
+          currentBlob = await convertMediaToWav(result.blob, { gainDb });
+          targetFilename = targetFilename.replace(/\.[^/.]+$/, ".wav");
+        } else if (selectedFormat === "mp3") {
+          statusMessage.textContent = "Extracting audio track as MP3...";
+          currentBlob = await convertMediaToWav(result.blob, { gainDb });
+          targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp3");
+        } else if (selectedFormat === "m4a") {
+          currentBlob = new Blob([result.blob], { type: "audio/mp4" });
+          targetFilename = targetFilename.replace(/\.[^/.]+$/, ".m4a");
+        } else {
+          currentBlob = result.blob;
+        }
+        statusMessage.textContent = `Ingestion complete! ${targetFilename} is ready.`;
         btnSave.style.display = "inline-flex";
         if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = URL.createObjectURL(currentBlob);
@@ -9829,6 +9921,28 @@
     }
   });
   btnSave.addEventListener("click", saveMp4);
+  if (formatSelect) {
+    formatSelect.addEventListener("change", () => {
+      const val = formatSelect.value;
+      const isAudio = val === "m4a" || val === "wav" || val === "mp3";
+      if (audioTuningItem) audioTuningItem.style.display = isAudio ? "block" : "none";
+      if (val === "wav") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".wav");
+      else if (val === "mp3") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp3");
+      else if (val === "m4a") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".m4a");
+      else targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp4");
+      if (btnSave) {
+        const labelMap = {
+          mp4: "Save MP4 File",
+          video_only: "Save Video (Muted MP4)",
+          m4a: "Save Audio (M4A)",
+          wav: "Save Studio Audio (WAV)",
+          mp3: "Save Audio (MP3)"
+        };
+        const span = btnSave.querySelector("span");
+        if (span) span.textContent = labelMap[val] || "Save File";
+      }
+    });
+  }
   document.addEventListener("DOMContentLoaded", initFromUrl);
 })();
 /*! Bundled license information:

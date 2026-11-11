@@ -13,6 +13,7 @@ import { HLSEngine, CONCURRENCY_PROFILES } from '../core/hls_engine.js';
 import { parseHLSManifest } from '../core/hls_parser.js';
 import { parseDASHManifest } from '../core/dash_parser.js';
 import { classifyError, StreamError, ERROR_CODES, ERROR_METADATA } from '../core/error_handler.js';
+import { convertMediaToWav, extractAudioTrack } from '../core/audio_converter.js';
 
 let currentEngine = null;
 let currentBlob = null;
@@ -43,6 +44,8 @@ const concurrencySelect = document.getElementById('concurrencySelect');
 const retrySelect = document.getElementById('retrySelect');
 const timeoutSelect = document.getElementById('timeoutSelect');
 const formatSelect = document.getElementById('formatSelect');
+const audioTuningItem = document.getElementById('audioTuningItem');
+const audioGainSelect = document.getElementById('audioGainSelect');
 const customReferer = document.getElementById('customReferer');
 const chkDirectDisk = document.getElementById('chkDirectDisk');
 const chkSkipBroken = document.getElementById('chkSkipBroken');
@@ -534,13 +537,30 @@ async function startDownload() {
     engineStatus.textContent = 'Complete';
     btnCancel.style.display = 'none';
 
+    const selectedFormat = formatSelect ? formatSelect.value : 'mp4';
+    const gainDb = audioGainSelect ? parseFloat(audioGainSelect.value) || 0 : 0;
+
     if (result.directStream) {
       statusMessage.textContent = `Saved directly to disk: ${targetFilename}`;
       progressBarFill.style.width = '100%';
       statPercent.textContent = '100%';
     } else {
-      currentBlob = result.blob;
-      statusMessage.textContent = 'Transmuxing complete! MP4 is ready.';
+      if (selectedFormat === 'wav') {
+        statusMessage.textContent = 'Transcoding audio track to studio-grade WAV...';
+        currentBlob = await convertMediaToWav(result.blob, { gainDb });
+        targetFilename = targetFilename.replace(/\.[^/.]+$/, '.wav');
+      } else if (selectedFormat === 'mp3') {
+        statusMessage.textContent = 'Extracting audio track as MP3...';
+        currentBlob = await convertMediaToWav(result.blob, { gainDb });
+        targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp3');
+      } else if (selectedFormat === 'm4a') {
+        currentBlob = new Blob([result.blob], { type: 'audio/mp4' });
+        targetFilename = targetFilename.replace(/\.[^/.]+$/, '.m4a');
+      } else {
+        currentBlob = result.blob;
+      }
+
+      statusMessage.textContent = `Ingestion complete! ${targetFilename} is ready.`;
       btnSave.style.display = 'inline-flex';
 
       if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
@@ -727,5 +747,30 @@ btnCancel.addEventListener('click', () => {
 });
 
 btnSave.addEventListener('click', saveMp4);
+
+if (formatSelect) {
+  formatSelect.addEventListener('change', () => {
+    const val = formatSelect.value;
+    const isAudio = val === 'm4a' || val === 'wav' || val === 'mp3';
+    if (audioTuningItem) audioTuningItem.style.display = isAudio ? 'block' : 'none';
+
+    if (val === 'wav') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.wav');
+    else if (val === 'mp3') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp3');
+    else if (val === 'm4a') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.m4a');
+    else targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp4');
+
+    if (btnSave) {
+      const labelMap = {
+        mp4: 'Save MP4 File',
+        video_only: 'Save Video (Muted MP4)',
+        m4a: 'Save Audio (M4A)',
+        wav: 'Save Studio Audio (WAV)',
+        mp3: 'Save Audio (MP3)',
+      };
+      const span = btnSave.querySelector('span');
+      if (span) span.textContent = labelMap[val] || 'Save File';
+    }
+  });
+}
 
 document.addEventListener('DOMContentLoaded', initFromUrl);

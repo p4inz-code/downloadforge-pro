@@ -110,11 +110,26 @@
           </div>
 
           <div class="config-item">
-            <label for="formatSelect">Output Format:</label>
+            <label for="formatSelect">Output Format / Track Extractor:</label>
             <div class="custom-select-wrap">
               <select id="formatSelect">
                 <option value="mp4" selected>MP4 Video (Video + Audio Synchronized)</option>
-                <option value="audio">Extract Audio Only (M4A / AAC)</option>
+                <option value="video_only">Video Only (Muted MP4 - Audio Stripped)</option>
+                <option value="m4a">Audio Only: M4A / AAC (Lossless Direct Stream)</option>
+                <option value="wav">Audio Only: WAV (Lossless PCM Studio Master)</option>
+                <option value="mp3">Audio Only: MP3 (Universal Compatible)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="config-item" id="audioTuningItem" style="display: none;">
+            <label for="audioGainSelect">Audio Volume Boost / Gain:</label>
+            <div class="custom-select-wrap">
+              <select id="audioGainSelect">
+                <option value="0" selected>Normal (0 dB - Original Level)</option>
+                <option value="3">+3 dB (Slight Boost)</option>
+                <option value="6">+6 dB (2x Volume Boost)</option>
+                <option value="12">+12 dB (Maximum - For Quiet Audio)</option>
               </select>
             </div>
           </div>

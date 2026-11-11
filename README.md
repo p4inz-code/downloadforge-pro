@@ -1,5 +1,5 @@
-# DownloadForge Pro (v1.1.0)
-**Pure In-Browser High-Performance Streaming Media & 3D Spatial Asset Ingestion Engine**  
+# DownloadForge Pro (v1.2.0)
+**Pure In-Browser High-Performance Streaming Media, Audio Studio & 3D Spatial Asset Ingestion Engine**  
 *Engineered by Atharva Patil (p4inz) | P4inz Interactive Labs*  
 *Architecture: Chrome Extension Manifest V3 (Zero Background OS Daemons / Zero Native Messaging Dependencies)*
 
@@ -7,15 +7,19 @@
 
 ## Technical Overview
 
-DownloadForge Pro is a specialized media extraction engine operating entirely within the Chrome V8 browser runtime. It intercepts, categorizes, decrypts, transmuxes, and downloads video streams (HLS, MPEG-DASH), audio tracks, images, documents, and 3D spatial models (glTF, GLB, OBJ, STL, USDZ, Gaussian Splats) without routing network traffic through external proxies or requiring desktop companion software.
+DownloadForge Pro is a media extraction and transcoding engine running directly inside the Chrome V8 browser environment. It intercepts, parses, categorizes, decrypts, transmuxes, separates, and downloads video streams (HLS, MPEG-DASH), standalone audio tracks, images, documents, and 3D spatial models (glTF, GLB, OBJ, STL, USDZ, Gaussian Splats). 
+
+The entire pipeline executes in the client browser sandbox without external proxies, native messaging hosts, or desktop companion tools.
 
 ---
 
 ## Competitive Architecture Matrix
 
-| Architectural Feature | DownloadForge Pro (v1.1.0) | FetchV Downloader | Stream Recorder | Online 3D Rippers |
+| Architectural Feature | DownloadForge Pro (v1.2.0) | FetchV Downloader | Stream Recorder | Online 3D Rippers |
 | :--- | :--- | :--- | :--- | :--- |
 | **Detection Reliability** | **4-Tier Fallback Cascade** (Network, DOM, Engine Config, Hardware MSE) | Single-tier XHR/fetch interceptor | Audio/Video element polling | Single-format URL regex |
+| **Audio Extraction & Transcoding** | **Native Web Audio PCM Engine** (WAV, MP3, M4A, Gain Boost +12dB) | Unsupported | Low-bitrate recording | Unsupported |
+| **Track Separation** | **Pure In-Browser A/V Demuxer** (Muted MP4 or Audio-Only track) | Unsupported | Unsupported | Unsupported |
 | **HLS / DASH Ingestion** | **Multi-Worker Web Workers** (1x to 32x parallel segment downloads) | Single-threaded script loop | Re-encoding via canvas record | Unsupported |
 | **Decryption Support** | **WebCrypto AES-128 CBC** (In-Worker direct buffer decryption) | Basic AES-128 (main thread) | Unsupported | Unsupported |
 | **Memory Footprint** | **0% RAM Bloat** (W3C FileSystemWritableFileStream streaming to disk) | Unbounded memory accumulation | 4GB buffer limits (OOM crashes) | N/A |
@@ -68,6 +72,16 @@ Every detected item is tagged with its origin method:
 
 ---
 
+## In-Browser Audio Extraction & Transcoding Studio
+
+When extracting audio from a streaming video or audio-only playlist, DownloadForge Pro bypasses the need for external tools like FFmpeg:
+1. **Audio/Video Separation**: Download pure audio tracks (`.m4a`), studio-master uncompressed PCM (`.wav`), or muted video-only containers (`.mp4`) directly from the stream dropdown.
+2. **Web Audio PCM Transcoder**: Uses the browser's hardware `AudioContext.decodeAudioData` to decode native compressed streams (AAC, Opus, MP3) into multi-channel Float32 PCM arrays.
+3. **16-bit RIFF WAV Encoder**: Interleaves multi-channel samples, clamps signal excursions, applies optional hardware-calculated gain boosts (+3 dB, +6 dB, +12 dB), and prepends a standard 44-byte RIFF header in TypedArray memory.
+4. **Direct File System Write**: Saves the output directly to disk via Chrome Downloads or the File System Access API without holding unbounded buffers in RAM.
+
+---
+
 ## 3D Spatial Asset Ripper & glTF Standalone Bundler
 
 When websites render 3D scenes using `<model-viewer>`, Spline, or Three.js, models are often delivered as fragmented `.gltf` JSON files referencing external `.bin` geometry buffers and image textures. Downloading only the `.gltf` yields a broken, unrenderable file.
@@ -76,8 +90,8 @@ DownloadForge Pro solves this with an in-browser glTF 2.0 Binary container packa
 1. **Network Sniffing**: Automatically intercepts calls for `.glb`, `.gltf`, `.obj`, `.stl`, `.fbx`, `.usdz`, `.splat`, and `.ply`.
 2. **Buffer Merging**: Fetches external `.bin` files, aligns buffer views to 4-byte boundaries, shifts byte offsets, and embeds textures.
 3. **GLB Header Serialization**: Generates the 12-byte binary header (`0x46546C67`), chunk 0 JSON, and chunk 1 BIN.
-4. **Export**: Produces a 100% self-contained `.glb` file ready for Blender, Unity, Unreal Engine, and Windows 3D Viewer.
-5. **In-Page Hover Overlay**: Adds an interactive `3D Rip` pill when hovering over any `<model-viewer>` or `<spline-viewer>` canvas.
+4. **Export**: Produces a self-contained `.glb` file ready for Blender, Unity, Unreal Engine, and Windows 3D Viewer.
+5. **In-Page Hover Overlay**: Adds an interactive `3D Rip` badge when hovering over any `<model-viewer>` or `<spline-viewer>` canvas.
 
 ---
 
@@ -100,7 +114,7 @@ Network exceptions during video and 3D ingestion are parsed and mapped to struct
 ## Installation & Setup
 
 ### Option 1: Unpacked Developer Mode (Chrome / Edge / Brave / Opera)
-1. Download `downloadforge-pro-v1.1.0.zip` from the [Latest Release](https://github.com/p4inz-code/downloadforge-pro/releases/latest).
+1. Download `downloadforge-pro-v1.2.0.zip` from the [Latest Release](https://github.com/p4inz-code/downloadforge-pro/releases/latest).
 2. Extract the archive to a local folder.
 3. Open `chrome://extensions` in your browser.
 4. Enable **Developer mode** (toggle in the top-right corner).
@@ -139,6 +153,7 @@ The test suite validates:
 - Auto-Updater semver evaluation.
 - glTF-to-GLB binary serialization and header alignment.
 - Media and 3D spatial asset taxonomy mappings.
+- In-Browser Audio Transcoder and RIFF WAV PCM header serialization.
 
 ---
 

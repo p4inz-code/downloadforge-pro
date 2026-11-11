@@ -102,4 +102,40 @@ assert.strictEqual(inferCategory('https://example.com/scan.splat', null, 'splat'
 assert.strictEqual(inferCategory('https://example.com/model', 'model/gltf-binary', null), CATEGORY.MODEL_3D, 'model/gltf-binary should be model_3d');
 console.log('  [PASS] 3D Model Classifier & Spatial asset taxonomy verified');
 
-console.log('[Test] All 7 core test suites passed successfully with zero errors!');
+// 8. In-Browser Audio Transcoder & RIFF WAV Encoder
+import { audioBufferToWavBlob } from '../src/core/audio_converter.js';
+const mockAudioBuffer = {
+  numberOfChannels: 2,
+  sampleRate: 44100,
+  length: 441, // 10ms of audio
+  getChannelData: () => {
+    const data = new Float32Array(441);
+    for (let i = 0; i < 441; i++) {
+      data[i] = Math.sin((2 * Math.PI * 440 * i) / 44100);
+    }
+    return data;
+  }
+};
+const wavBlob = audioBufferToWavBlob(mockAudioBuffer, { gainDb: 3 });
+assert.strictEqual(wavBlob.type, 'audio/wav', 'WAV blob type must be audio/wav');
+const expectedByteLength = 44 + (441 * 2 * 2); // 44-byte RIFF header + 1764 bytes PCM
+assert.strictEqual(wavBlob.size, expectedByteLength, `WAV blob size must be ${expectedByteLength} bytes`);
+
+const wavArrayBuffer = await wavBlob.arrayBuffer();
+const wavView = new DataView(wavArrayBuffer);
+const riffMarker = String.fromCharCode(wavView.getUint8(0), wavView.getUint8(1), wavView.getUint8(2), wavView.getUint8(3));
+const waveMarker = String.fromCharCode(wavView.getUint8(8), wavView.getUint8(9), wavView.getUint8(10), wavView.getUint8(11));
+const fmtMarker  = String.fromCharCode(wavView.getUint8(12), wavView.getUint8(13), wavView.getUint8(14), wavView.getUint8(15));
+const dataMarker = String.fromCharCode(wavView.getUint8(36), wavView.getUint8(37), wavView.getUint8(38), wavView.getUint8(39));
+assert.strictEqual(riffMarker, 'RIFF', 'WAV header must contain RIFF');
+assert.strictEqual(waveMarker, 'WAVE', 'WAV header must contain WAVE');
+assert.strictEqual(fmtMarker, 'fmt ', 'WAV header must contain fmt ');
+assert.strictEqual(dataMarker, 'data', 'WAV header must contain data');
+assert.strictEqual(wavView.getUint16(20, true), 1, 'AudioFormat must be 1 (PCM)');
+assert.strictEqual(wavView.getUint16(22, true), 2, 'NumChannels must be 2');
+assert.strictEqual(wavView.getUint32(24, true), 44100, 'SampleRate must be 44100');
+assert.strictEqual(wavView.getUint16(34, true), 16, 'BitsPerSample must be 16');
+console.log('  [PASS] In-Browser Audio Transcoder & RIFF WAV Encoder binary structure verified');
+
+console.log('[Test] All 8 core test suites passed successfully with zero errors!');
+
