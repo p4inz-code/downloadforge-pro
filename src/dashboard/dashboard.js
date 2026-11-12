@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initTheme();
   initUpdateNotifier();
   setupNavigation();
+  init3DViewport();
   await loadView('history');
   $('diag-version').textContent = APP.VERSION;
 });
@@ -569,5 +570,242 @@ function showCustomConfirm(title, message, confirmText = 'Confirm', isDanger = f
     btnClose?.addEventListener('click', onCancel);
     document.addEventListener('keydown', onKeyDown);
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Ninja Ripper — 3D Model Viewport Controller
+// ─────────────────────────────────────────────────────────────
+const preview3DState = {
+  wireframe: false,
+  mesh: null,
+  rotX: 0.3,
+  rotY: 0.6,
+  zoom: 1.0,
+  animId: null
+};
+
+function init3DViewport() {
+  const canvas = $('df-3d-preview-canvas');
+  if (!canvas) return;
+
+  const btnWire = $('btn-toggle-wireframe');
+  const btnReset = $('btn-reset-3d-camera');
+
+  if (btnWire) {
+    btnWire.addEventListener('click', () => {
+      preview3DState.wireframe = !preview3DState.wireframe;
+      btnWire.textContent = preview3DState.wireframe ? 'Shaded View' : 'Toggle Wireframe';
+      render3DPreview();
+    });
+  }
+
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      preview3DState.rotX = 0.3;
+      preview3DState.rotY = 0.6;
+      preview3DState.zoom = 1.0;
+      render3DPreview();
+    });
+  }
+
+  let isDragging = false;
+  let lastX = 0, lastY = 0;
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+
+  window.addEventListener('mouseup', () => { isDragging = false; });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    preview3DState.rotY += dx * 0.015;
+    preview3DState.rotX += dy * 0.015;
+    render3DPreview();
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    preview3DState.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
+    preview3DState.zoom = Math.max(0.1, Math.min(8.0, preview3DState.zoom));
+    render3DPreview();
+  }, { passive: false });
+
+  // Load cached OBJ from active tab if available
+  chrome.tabs?.query({ active: true, currentWindow: true }).then(tabs => {
+    if (tabs && tabs[0] && tabs[0].id) {
+      chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' }).then(res => {
+        if (res && res.objData) {
+          loadObjToPreview(res.objData, res.title || 'Extracted Model');
+        }
+      }).catch(() => {});
+    }
+  }).catch(() => {});
+}
+
+function loadObjToPreview(objText, title = '3D Model') {
+  if (!objText || typeof objText !== 'string') return;
+  const lines = objText.split('\n');
+  const verts = [];
+  const faces = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('v ')) {
+      const p = trimmed.split(/\s+/).slice(1).map(Number);
+      if (p.length >= 3 && !isNaN(p[0])) verts.push(p[0], p[1], p[2]);
+    } else if (trimmed.startsWith('f ')) {
+      const p = trimmed.split(/\s+/).slice(1);
+      const fIdx = [];
+      for (const item of p) {
+        const idx = parseInt(item.split('/')[0], 10);
+        if (!isNaN(idx)) fIdx.push(idx > 0 ? idx - 1 : (verts.length / 3) + idx);
+      }
+      for (let t = 1; t < fIdx.length - 1; t++) {
+        faces.push(fIdx[0], fIdx[t], fIdx[t + 1]);
+      }
+    }
+  }
+
+  if (verts.length < 9) return;
+
+  // Center and normalize bounding box
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (let i = 0; i < verts.length; i += 3) {
+    const x = verts[i], y = verts[i + 1], z = verts[i + 2];
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  }
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const cz = (minZ + maxZ) / 2;
+  const maxDim = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1.0;
+  const scale = 2.0 / maxDim;
+
+  const normVerts = new Float32Array(verts.length);
+  for (let i = 0; i < verts.length; i += 3) {
+    normVerts[i] = (verts[i] - cx) * scale;
+    normVerts[i + 1] = (verts[i + 1] - cy) * scale;
+    normVerts[i + 2] = (verts[i + 2] - cz) * scale;
+  }
+
+  preview3DState.mesh = {
+    vertices: normVerts,
+    faces: new Uint32Array(faces),
+    vCount: verts.length / 3,
+    fCount: faces.length / 3,
+    title
+  };
+
+  const hint = $('df-3d-empty-hint');
+  if (hint) hint.style.display = 'none';
+
+  const stats = $('df-3d-mesh-stats');
+  if (stats) {
+    stats.textContent = `${title} | ${(verts.length / 3).toLocaleString()} vertices | ${(faces.length / 3).toLocaleString()} faces`;
+  }
+
+  render3DPreview();
+}
+
+function render3DPreview() {
+  const canvas = $('df-3d-preview-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const w = (canvas.width = canvas.clientWidth || 600);
+  const h = (canvas.height = canvas.clientHeight || 320);
+
+  ctx.fillStyle = '#090a0f';
+  ctx.fillRect(0, 0, w, h);
+
+  const mesh = preview3DState.mesh;
+  if (!mesh || !mesh.vertices) return;
+
+  const { vertices, faces } = mesh;
+  const rx = preview3DState.rotX;
+  const ry = preview3DState.rotY;
+  const zoom = preview3DState.zoom * Math.min(w, h) * 0.42;
+
+  const cosX = Math.cos(rx), sinX = Math.sin(rx);
+  const cosY = Math.cos(ry), sinY = Math.sin(ry);
+
+  // Projected 2D points
+  const p2d = new Float32Array((vertices.length / 3) * 2);
+  const pZ = new Float32Array(vertices.length / 3);
+
+  for (let i = 0; i < vertices.length; i += 3) {
+    let x = vertices[i];
+    let y = -vertices[i + 1];
+    let z = vertices[i + 2];
+
+    // Y rotation
+    const x1 = x * cosY + z * sinY;
+    const z1 = -x * sinY + z * cosY;
+
+    // X rotation
+    const y2 = y * cosX - z1 * sinX;
+    const z2 = y * sinX + z1 * cosX;
+
+    const vIdx = i / 3;
+    const pers = 1.0 / (3.5 + z2 * 0.4);
+    p2d[vIdx * 2] = w / 2 + x1 * zoom * pers;
+    p2d[vIdx * 2 + 1] = h / 2 + y2 * zoom * pers;
+    pZ[vIdx] = z2;
+  }
+
+  if (preview3DState.wireframe) {
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    const step = faces.length > 30000 ? 3 : 1;
+    for (let f = 0; f < faces.length; f += 3 * step) {
+      const i1 = faces[f] * 2, i2 = faces[f + 1] * 2, i3 = faces[f + 2] * 2;
+      ctx.moveTo(p2d[i1], p2d[i1 + 1]);
+      ctx.lineTo(p2d[i2], p2d[i2 + 1]);
+      ctx.lineTo(p2d[i3], p2d[i3 + 1]);
+      ctx.lineTo(p2d[i1], p2d[i1 + 1]);
+    }
+    ctx.stroke();
+  } else {
+    // Shaded face rendering with directional light
+    ctx.fillStyle = '#1e1b4b';
+    ctx.strokeStyle = '#312e81';
+    ctx.lineWidth = 0.5;
+
+    const step = faces.length > 50000 ? 2 : 1;
+    for (let f = 0; f < faces.length; f += 3 * step) {
+      const idx1 = faces[f], idx2 = faces[f + 1], idx3 = faces[f + 2];
+      const i1 = idx1 * 2, i2 = idx2 * 2, i3 = idx3 * 2;
+
+      // Backface culling
+      const ax = p2d[i2] - p2d[i1], ay = p2d[i2 + 1] - p2d[i1 + 1];
+      const bx = p2d[i3] - p2d[i1], by = p2d[i3 + 1] - p2d[i1 + 1];
+      const cross = ax * by - ay * bx;
+      if (cross > 0) continue; // culled
+
+      // Depth shading
+      const avgZ = (pZ[idx1] + pZ[idx2] + pZ[idx3]) / 3;
+      const shade = Math.floor(Math.max(30, Math.min(230, 140 - avgZ * 60)));
+      ctx.fillStyle = `rgb(${Math.floor(shade * 0.4)}, ${Math.floor(shade * 0.4)}, ${shade})`;
+
+      ctx.beginPath();
+      ctx.moveTo(p2d[i1], p2d[i1 + 1]);
+      ctx.lineTo(p2d[i2], p2d[i2 + 1]);
+      ctx.lineTo(p2d[i3], p2d[i3 + 1]);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
 }
 

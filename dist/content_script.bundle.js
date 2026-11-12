@@ -1185,10 +1185,20 @@
         setTimeout(() => toast.remove(), 300);
       }, 4e3);
     }
+    let currentTelemetry = null;
     window.addEventListener("message", (e) => {
-      if (e.data && e.data.type === "DF_WEBGL_RIP_SUCCESS") {
+      if (!e.data) return;
+      if (e.data.type === "DF_WEBGL_TELEMETRY" && e.data.data) {
+        currentTelemetry = e.data.data;
+        document.querySelectorAll(".df-3d-pill-btn .df-telemetry-tag").forEach((tag) => {
+          const vCount = currentTelemetry.vertexCount || 0;
+          const vText = vCount >= 1e6 ? `${(vCount / 1e6).toFixed(1)}M v` : vCount >= 1e3 ? `${(vCount / 1e3).toFixed(0)}k v` : vCount > 0 ? `${vCount} v` : currentTelemetry.drawCalls ? `${currentTelemetry.drawCalls} parts` : "Active";
+          tag.textContent = vText;
+          tag.style.display = "inline-block";
+        });
+      } else if (e.data.type === "DF_WEBGL_RIP_SUCCESS") {
         show3DToast(`DownloadForge: 3D Mesh & Geometry extracted successfully`);
-      } else if (e.data && e.data.type === "DF_WEBGL_RIP_FAIL") {
+      } else if (e.data.type === "DF_WEBGL_RIP_FAIL") {
         if (!window.location.href.includes("sketchfab.com") && !window.location.href.includes("cgtrader.com")) {
           show3DToast(e.data.reason || "No 3D buffer captured yet", true);
         }
@@ -1209,7 +1219,7 @@
       overlay.className = "df-video-overlay-wrap df-3d-overlay-wrap";
       const pill = document.createElement("button");
       pill.className = "df-pill-btn df-3d-pill-btn";
-      pill.title = "Rip & Download 3D Model with DownloadForge Pro";
+      pill.title = "Rip & Download 3D Model with DownloadForge Pro (Ninja Ripper Engine)";
       pill.innerHTML = `
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -1217,6 +1227,7 @@
         <line x1="12" y1="22.08" x2="12" y2="12"/>
       </svg>
       <span>3D Rip</span>
+      <span class="df-quality-tag df-telemetry-tag" style="display:none;">Ready</span>
     `;
       pill.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1225,6 +1236,13 @@
         const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) || (el.getAttribute("data-model-id") ? [null, el.getAttribute("data-model-id")] : null) || el.src && el.src.match(/models\/([0-9a-f]{32})/i);
         let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url");
         let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
+        window.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
+        document.querySelectorAll("iframe").forEach((ifr) => {
+          try {
+            ifr.contentWindow.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
+          } catch (err) {
+          }
+        });
         if (sfMatch && sfMatch[1]) {
           targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
           targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
@@ -1485,6 +1503,7 @@
           }
         };
         window.addEventListener("message", onRipData);
+        window.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
         window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
         setTimeout(() => {
           if (!replied) {
@@ -1492,13 +1511,23 @@
             window.removeEventListener("message", onRipData);
             sendResponse({ ok: true, objData: lastCapturedObj ? lastCapturedObj.objData : null });
           }
-        }, 1e3);
+        }, 1200);
         return true;
       }
     });
     window.addEventListener("message", (event) => {
-      if (event.data && event.data.type === "DF_WEBGL_RIP_DATA" && event.data.objData) {
-        lastCapturedObj = { objData: event.data.objData, title: event.data.title, time: Date.now() };
+      if (!event.data) return;
+      if (event.data.type === "DF_WEBGL_RIP_DATA" && event.data.objData) {
+        lastCapturedObj = {
+          objData: event.data.objData,
+          title: event.data.title,
+          drawCalls: event.data.drawCalls || 0,
+          vertexCount: event.data.vertexCount || 0,
+          faceCount: event.data.faceCount || 0,
+          time: Date.now()
+        };
+      } else if (event.data.type === "DF_WEBGL_TELEMETRY" && event.data.data) {
+        window.__df_last_telemetry = event.data.data;
       }
     });
   }

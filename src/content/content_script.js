@@ -189,6 +189,7 @@ function setupMessageListener() {
       };
 
       window.addEventListener('message', onRipData);
+      window.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*');
       window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
 
       setTimeout(() => {
@@ -197,14 +198,24 @@ function setupMessageListener() {
           window.removeEventListener('message', onRipData);
           sendResponse({ ok: true, objData: lastCapturedObj ? lastCapturedObj.objData : null });
         }
-      }, 1000);
+      }, 1200);
       return true; // Keep message channel open for async response
     }
   });
 
   window.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'DF_WEBGL_RIP_DATA' && event.data.objData) {
-      lastCapturedObj = { objData: event.data.objData, title: event.data.title, time: Date.now() };
+    if (!event.data) return;
+    if (event.data.type === 'DF_WEBGL_RIP_DATA' && event.data.objData) {
+      lastCapturedObj = {
+        objData: event.data.objData,
+        title: event.data.title,
+        drawCalls: event.data.drawCalls || 0,
+        vertexCount: event.data.vertexCount || 0,
+        faceCount: event.data.faceCount || 0,
+        time: Date.now()
+      };
+    } else if (event.data.type === 'DF_WEBGL_TELEMETRY' && event.data.data) {
+      window.__df_last_telemetry = event.data.data;
     }
   });
 }

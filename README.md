@@ -1,5 +1,5 @@
-# DownloadForge Pro (v1.2.2)
-**Pure In-Browser High-Performance Streaming Media, Audio Studio & 3D Spatial Asset Ingestion Engine**  
+# DownloadForge Pro (v1.3.0)
+**Pure In-Browser High-Performance Streaming Media, Audio Studio & Ninja Ripper 3D Asset Engine**  
 *Engineered by Atharva Patil (p4inz) | P4inz Interactive Labs*  
 *Architecture: Chrome Extension Manifest V3 (Zero Background OS Daemons / Zero Native Messaging Dependencies)*
 
@@ -7,7 +7,7 @@
 
 ## Technical Overview
 
-DownloadForge Pro is a media extraction and transcoding engine running directly inside the Chrome V8 browser environment. It intercepts, parses, categorizes, decrypts, transmuxes, separates, and downloads video streams (HLS, MPEG-DASH), standalone audio tracks, images, documents, and 3D spatial models (glTF, GLB, OBJ, STL, USDZ, Gaussian Splats). 
+DownloadForge Pro is a media extraction, audio studio, and 3D spatial ripping engine running directly inside the Chrome V8 browser environment. It intercepts, parses, categorizes, decrypts, transmuxes, separates, and downloads video streams (HLS, MPEG-DASH), standalone audio tracks, images, documents, and 3D spatial models (glTF, GLB, OBJ, STL, USDZ, Gaussian Splats). 
 
 The entire pipeline executes in the client browser sandbox without external proxies, native messaging hosts, or desktop companion tools.
 
@@ -15,9 +15,11 @@ The entire pipeline executes in the client browser sandbox without external prox
 
 ## Competitive Architecture Matrix
 
-| Architectural Feature | DownloadForge Pro (v1.2.2) | FetchV Downloader | Stream Recorder | Online 3D Rippers |
+| Architectural Feature | DownloadForge Pro (v1.3.0) | FetchV Downloader | Stream Recorder | Online 3D Rippers |
 | :--- | :--- | :--- | :--- | :--- |
 | **Detection Reliability** | **4-Tier Fallback Cascade** (Network, DOM, Engine Config, Hardware MSE) | Single-tier XHR/fetch interceptor | Audio/Video element polling | Single-format URL regex |
+| **3D Asset Extraction** | **In-Browser Ninja Ripper Engine** (WebGL 1/2 draw calls, MVP matrix, VAO, PBR textures, OBJ/GLB) | Unsupported | Unsupported | Broken external .bin files / distorted mesh |
+| **3D Live Inspection** | **Integrated 3D Viewport** (OrbitControls, wireframe toggle, live telemetry) | Unsupported | Unsupported | Unsupported |
 | **Audio Extraction & Transcoding** | **Native Web Audio PCM Engine** (WAV, MP3, M4A, Gain Boost +12dB) | Unsupported | Low-bitrate recording | Unsupported |
 | **Track Separation** | **Pure In-Browser A/V Demuxer** (Muted MP4 or Audio-Only track) | Unsupported | Unsupported | Unsupported |
 | **HLS / DASH Ingestion** | **Multi-Worker Web Workers** (1x to 32x parallel segment downloads) | Single-threaded script loop | Re-encoding via canvas record | Unsupported |
@@ -26,7 +28,6 @@ The entire pipeline executes in the client browser sandbox without external prox
 | **Error Intelligence** | **7-Code Error Taxonomy** + Automated Self-Healing Referer Ingestion | Generic error string | Silent stall | HTTP 403 failure |
 | **Live Stream Capture** | **Sliding-Window DVR Engine** with deduplicated chunk streaming | Unsupported | Lossy Canvas Record | Unsupported |
 | **Record Mode Quality** | **Lossless MSE Capture** (moof/mdat bitstream grab + Chrono-Pacer) | Screen re-encoding loss (30-40%) | Playback speedup stutter | N/A |
-| **3D Asset Extraction** | **Deep WebGL / Three.js Hook** + Auto-Bundling .gltf into single .glb | Unsupported | Unsupported | Broken external .bin files |
 | **Interface Aesthetics** | **Custom Outlinedesk Design** (Zero OS-native dialogues, Light & Dark modes) | Generic Chrome UI | Legacy popup | Web forms with ads |
 | **Update Mechanism** | **Automated GitHub Release Checker** (4h interval background alerts) | Chrome Web Store only | Manual download | N/A |
 

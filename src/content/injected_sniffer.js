@@ -319,91 +319,389 @@
     } catch (e) {}
   }
 
-  // ── WebGL Mesh Geometry Ripper (Direct GPU Buffer Extraction) ─
+  // ── WebGL Mesh Geometry Ripper (In-Browser Ninja Ripper Core) ─
   const capturedGeometries = [];
-  function hookWebGL() {
-    if (!window.WebGLRenderingContext) return;
+  const capturedDrawCalls = [];
+  const drawCallDedup = new Set();
+  let totalCapturedVertices = 0;
+  let totalCapturedFaces = 0;
+  let lastTelemetryTimestamp = 0;
+  const activeWebGlCanvases = new Set();
 
-    function captureBuffer(target, data) {
-      if (!data) return;
-      let rawBytes = null;
-      if (data instanceof ArrayBuffer) {
-        rawBytes = new Uint8Array(data.slice(0));
-      } else if (ArrayBuffer.isView(data)) {
-        rawBytes = new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+  function dispatchTelemetry(glVersion = 'WebGL') {
+    const now = Date.now();
+    if (now - lastTelemetryTimestamp < 800) return;
+    lastTelemetryTimestamp = now;
+    try {
+      window.postMessage({
+        source: 'DOWNLOADFORGE_SNIFFER',
+        token: sessionToken,
+        type: 'DF_WEBGL_TELEMETRY',
+        data: {
+          glVersion,
+          drawCalls: capturedDrawCalls.length,
+          vertexCount: totalCapturedVertices,
+          faceCount: totalCapturedFaces
+        }
+      }, '*');
+    } catch (_) {}
+  }
+
+  function ensureBufferMeta(buf) {
+    if (!buf) return null;
+    if (!buf._df_id) {
+      buf._df_id = 'buf_' + Math.random().toString(36).slice(2, 9);
+      buf._df_target = 0;
+      buf._df_data = null;
+      buf._df_byteLength = 0;
+    }
+    return buf;
+  }
+
+  function captureRawBuffer(target, data) {
+    if (!data) return;
+    let rawBytes = null;
+    if (data instanceof ArrayBuffer) {
+      rawBytes = new Uint8Array(data.slice(0));
+    } else if (ArrayBuffer.isView(data)) {
+      rawBytes = new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+    }
+    if (!rawBytes || rawBytes.byteLength < 12) return;
+
+    if (target === 0x8892) { // ARRAY_BUFFER
+      let floatView = null;
+      if (data instanceof Float32Array) {
+        floatView = new Float32Array(rawBytes.buffer);
+      } else if (rawBytes.byteLength % 4 === 0) {
+        floatView = new Float32Array(rawBytes.buffer);
       }
-      if (!rawBytes || rawBytes.byteLength < 12) return;
 
-      // Target 0x8892 is gl.ARRAY_BUFFER (vertices/normals/uvs)
-      if (target === 0x8892) {
-        let floatView = null;
-        if (data instanceof Float32Array) {
-          floatView = new Float32Array(rawBytes.buffer);
-        } else if (data instanceof Int16Array) {
-          const i16 = new Int16Array(rawBytes.buffer);
-          floatView = new Float32Array(i16.length);
-          for (let i = 0; i < i16.length; i++) floatView[i] = i16[i] / 32767.0;
-        } else if (rawBytes.byteLength % 4 === 0) {
-          floatView = new Float32Array(rawBytes.buffer);
-        } else if (rawBytes.byteLength % 2 === 0) {
-          const i16 = new Int16Array(rawBytes.buffer);
-          floatView = new Float32Array(i16.length);
-          for (let i = 0; i < i16.length; i++) floatView[i] = i16[i] / 32767.0;
-        }
-
-        if (floatView && floatView.length >= 9) {
-          const duplicate = capturedGeometries.some(g => g.type === 'positions' && g.length === floatView.length && g.data[0] === floatView[0]);
-          if (!duplicate) {
-            capturedGeometries.push({
-              type: 'positions',
-              data: floatView,
-              length: floatView.length,
-              time: Date.now()
-            });
-            if (capturedGeometries.length > 500) capturedGeometries.shift();
-          }
-        }
-      }
-      // Target 0x8893 is gl.ELEMENT_ARRAY_BUFFER (indices)
-      else if (target === 0x8893) {
-        let idxView = null;
-        if (data instanceof Uint16Array || (rawBytes.byteLength % 2 === 0 && rawBytes.byteLength % 4 !== 0)) {
-          idxView = new Uint16Array(rawBytes.buffer);
-        } else if (data instanceof Uint32Array || rawBytes.byteLength % 4 === 0) {
-          idxView = new Uint32Array(rawBytes.buffer);
-        }
-
-        if (idxView && idxView.length >= 3) {
+      if (floatView && floatView.length >= 9) {
+        const isDup = capturedGeometries.some(g => g.type === 'positions' && g.length === floatView.length && g.data[0] === floatView[0]);
+        if (!isDup) {
           capturedGeometries.push({
-            type: 'indices',
-            data: idxView,
-            length: idxView.length,
+            type: 'positions',
+            data: floatView,
+            length: floatView.length,
             time: Date.now()
           });
           if (capturedGeometries.length > 500) capturedGeometries.shift();
         }
       }
+    } else if (target === 0x8893) { // ELEMENT_ARRAY_BUFFER
+      let idxView = null;
+      if (data instanceof Uint16Array || (rawBytes.byteLength % 2 === 0 && rawBytes.byteLength % 4 !== 0)) {
+        idxView = new Uint16Array(rawBytes.buffer);
+      } else if (data instanceof Uint32Array || rawBytes.byteLength % 4 === 0) {
+        idxView = new Uint32Array(rawBytes.buffer);
+      }
+
+      if (idxView && idxView.length >= 3) {
+        capturedGeometries.push({
+          type: 'indices',
+          data: idxView,
+          length: idxView.length,
+          time: Date.now()
+        });
+        if (capturedGeometries.length > 500) capturedGeometries.shift();
+      }
     }
+  }
+
+  function recordDrawCall(gl, count, type, byteOffset, isElements = true, first = 0) {
+    try {
+      const glVersion = (window.WebGL2RenderingContext && gl instanceof window.WebGL2RenderingContext) ? 'WebGL 2.0' : 'WebGL 1.0';
+
+      // 1. Identify active index buffer (if drawElements)
+      let idxArray = null;
+      let elemBufId = 'arr';
+      if (isElements) {
+        const elemBuf = gl._df_boundElementBuffer;
+        if (!elemBuf || !elemBuf._df_data) return;
+        elemBufId = elemBuf._df_id;
+        const buf = elemBuf._df_data;
+
+        if (type === 5123 || type === 0x1403) { // UNSIGNED_SHORT
+          const off = Math.floor(byteOffset / 2);
+          idxArray = new Uint16Array(buf, byteOffset, count);
+        } else if (type === 5125 || type === 0x1405) { // UNSIGNED_INT
+          const off = Math.floor(byteOffset / 4);
+          idxArray = new Uint32Array(buf, byteOffset, count);
+        } else if (type === 5121 || type === 0x1401) { // UNSIGNED_BYTE
+          idxArray = new Uint8Array(buf, byteOffset, count);
+        }
+        if (!idxArray || idxArray.length < 3) return;
+      }
+
+      // 2. Identify active vertex position attribute
+      const attribs = gl._df_attribs || {};
+      let posAttrib = null;
+      let normAttrib = null;
+      let uvAttrib = null;
+
+      // Slot 0 is standard POSITION in Three.js / OSG.js / WebGL conventions
+      if (attribs[0] && attribs[0].buffer && attribs[0].buffer._df_data) {
+        posAttrib = attribs[0];
+      }
+
+      // If slot 0 is not position, scan attributes for size 3 float arrays
+      if (!posAttrib) {
+        for (const k of Object.keys(attribs)) {
+          const a = attribs[k];
+          if (a && a.buffer && a.buffer._df_data && a.size >= 3) {
+            posAttrib = a;
+            break;
+          }
+        }
+      }
+      if (!posAttrib || !posAttrib.buffer || !posAttrib.buffer._df_data) return;
+
+      // Look for Normal attribute (size 3) and UV attribute (size 2)
+      for (const k of Object.keys(attribs)) {
+        const a = attribs[k];
+        if (!a || !a.buffer || !a.buffer._df_data || a === posAttrib) continue;
+        if (a.size === 3 && !normAttrib) normAttrib = a;
+        else if (a.size === 2 && !uvAttrib) uvAttrib = a;
+      }
+
+      const posBuf = posAttrib.buffer;
+      const dedupKey = `${elemBufId}_${byteOffset}_${count}_${posBuf._df_id}`;
+      if (drawCallDedup.has(dedupKey)) return;
+      drawCallDedup.add(dedupKey);
+
+      // 3. Extract vertices from buffer view
+      const rawPosBuf = posBuf._df_data;
+      const posStrideBytes = posAttrib.stride > 0 ? posAttrib.stride : (posAttrib.size * 4);
+      const posOffsetBytes = posAttrib.offset || 0;
+      const strideFloats = Math.floor(posStrideBytes / 4);
+      const floatView = new Float32Array(rawPosBuf);
+
+      let maxIndex = 0;
+      if (isElements && idxArray) {
+        for (let i = 0; i < idxArray.length; i++) {
+          if (idxArray[i] > maxIndex) maxIndex = idxArray[i];
+        }
+      } else {
+        maxIndex = first + count;
+      }
+
+      const vertexCount = maxIndex + 1;
+      if (vertexCount > 500000) return; // Guard against corrupt buffer length
+
+      const positions = new Float32Array(vertexCount * 3);
+      const normals = normAttrib ? new Float32Array(vertexCount * 3) : null;
+      const uvs = uvAttrib ? new Float32Array(vertexCount * 2) : null;
+
+      // Check for active affine model matrix (uniformMatrix4fv)
+      const m = gl._df_activeMatrix;
+      const hasTransform = m && m.length >= 16 && Math.abs(m[15] - 1.0) < 0.1 && m[3] === 0 && m[7] === 0;
+
+      for (let v = 0; v < vertexCount; v++) {
+        const fIdx = Math.floor(posOffsetBytes / 4) + v * strideFloats;
+        if (fIdx + 2 < floatView.length) {
+          let x = floatView[fIdx];
+          let y = floatView[fIdx + 1];
+          let z = floatView[fIdx + 2];
+
+          // Apply 4x4 World Transformation Matrix if available
+          if (hasTransform) {
+            const wx = m[0]*x + m[4]*y + m[8]*z + m[12];
+            const wy = m[1]*x + m[5]*y + m[9]*z + m[13];
+            const wz = m[2]*x + m[6]*y + m[10]*z + m[14];
+            x = wx; y = wy; z = wz;
+          }
+
+          positions[v * 3] = x;
+          positions[v * 3 + 1] = y;
+          positions[v * 3 + 2] = z;
+        }
+
+        if (normals && normAttrib) {
+          const nStride = normAttrib.stride > 0 ? Math.floor(normAttrib.stride / 4) : 3;
+          const nOff = Math.floor((normAttrib.offset || 0) / 4);
+          const nView = new Float32Array(normAttrib.buffer._df_data);
+          const nIdx = nOff + v * nStride;
+          if (nIdx + 2 < nView.length) {
+            normals[v * 3] = nView[nIdx];
+            normals[v * 3 + 1] = nView[nIdx + 1];
+            normals[v * 3 + 2] = nView[nIdx + 2];
+          }
+        }
+
+        if (uvs && uvAttrib) {
+          const uvStride = uvAttrib.stride > 0 ? Math.floor(uvAttrib.stride / 4) : 2;
+          const uvOff = Math.floor((uvAttrib.offset || 0) / 4);
+          const uvView = new Float32Array(uvAttrib.buffer._df_data);
+          const uvIdx = uvOff + v * uvStride;
+          if (uvIdx + 1 < uvView.length) {
+            uvs[v * 2] = uvView[uvIdx];
+            uvs[v * 2 + 1] = uvView[uvIdx + 1];
+          }
+        }
+      }
+
+      // Synthesize indices for drawArrays if needed
+      let finalIndices = idxArray;
+      if (!isElements) {
+        finalIndices = new Uint32Array(count);
+        for (let i = 0; i < count; i++) finalIndices[i] = first + i;
+      }
+
+      capturedDrawCalls.push({
+        positions,
+        normals,
+        uvs,
+        indices: finalIndices,
+        vertexCount,
+        faceCount: Math.floor(finalIndices.length / 3),
+        partId: capturedDrawCalls.length + 1,
+        time: Date.now()
+      });
+
+      totalCapturedVertices += vertexCount;
+      totalCapturedFaces += Math.floor(finalIndices.length / 3);
+
+      dispatchTelemetry(glVersion);
+    } catch (_) {}
+  }
+
+  function hookWebGL() {
+    if (!window.WebGLRenderingContext) return;
 
     function hookContext(proto) {
       if (!proto || proto.__df_hooked) return;
       proto.__df_hooked = true;
 
+      // 1. Buffer creation & binding
+      const origCreateBuffer = proto.createBuffer;
+      proto.createBuffer = function() {
+        const buf = origCreateBuffer.apply(this, arguments);
+        return ensureBufferMeta(buf);
+      };
+
+      const origBindBuffer = proto.bindBuffer;
+      proto.bindBuffer = function(target, buffer) {
+        if (buffer) ensureBufferMeta(buffer);
+        if (target === 0x8892) { // ARRAY_BUFFER
+          this._df_boundArrayBuffer = buffer;
+        } else if (target === 0x8893) { // ELEMENT_ARRAY_BUFFER
+          this._df_boundElementBuffer = buffer;
+          if (this._df_currentVao) {
+            this._df_currentVao._df_elementBuffer = buffer;
+          }
+        }
+        return origBindBuffer.apply(this, arguments);
+      };
+
+      // 2. Buffer data uploads
       const origBufferData = proto.bufferData;
       proto.bufferData = function(target, data, usage) {
         try {
-          captureBuffer(target, data);
-        } catch (e) {}
+          const bound = target === 0x8892 ? this._df_boundArrayBuffer :
+                        target === 0x8893 ? this._df_boundElementBuffer : null;
+          if (bound && data) {
+            ensureBufferMeta(bound);
+            bound._df_target = target;
+            let copy = null;
+            if (data instanceof ArrayBuffer) {
+              copy = data.slice(0);
+            } else if (ArrayBuffer.isView(data)) {
+              copy = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+            }
+            if (copy) {
+              bound._df_data = copy;
+              bound._df_byteLength = copy.byteLength;
+            }
+          }
+          captureRawBuffer(target, data);
+        } catch (_) {}
         return origBufferData.apply(this, arguments);
       };
 
       const origBufferSubData = proto.bufferSubData;
       proto.bufferSubData = function(target, offset, data) {
         try {
-          captureBuffer(target, data);
-        } catch (e) {}
+          const bound = target === 0x8892 ? this._df_boundArrayBuffer :
+                        target === 0x8893 ? this._df_boundElementBuffer : null;
+          if (bound && bound._df_data && data) {
+            const srcBytes = ArrayBuffer.isView(data)
+              ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+              : new Uint8Array(data);
+            const dstBytes = new Uint8Array(bound._df_data);
+            if (offset + srcBytes.length <= dstBytes.length) {
+              dstBytes.set(srcBytes, offset);
+            }
+          }
+        } catch (_) {}
         return origBufferSubData.apply(this, arguments);
       };
+
+      // 3. Vertex Attribute Pointers
+      const origVertexAttribPointer = proto.vertexAttribPointer;
+      proto.vertexAttribPointer = function(index, size, type, normalized, stride, offset) {
+        try {
+          if (!this._df_attribs) this._df_attribs = {};
+          const state = {
+            buffer: this._df_boundArrayBuffer,
+            size,
+            type,
+            normalized,
+            stride: stride || (size * 4),
+            offset: offset || 0
+          };
+          this._df_attribs[index] = state;
+          if (this._df_currentVao) {
+            if (!this._df_currentVao._df_attribs) this._df_currentVao._df_attribs = {};
+            this._df_currentVao._df_attribs[index] = state;
+          }
+        } catch (_) {}
+        return origVertexAttribPointer.apply(this, arguments);
+      };
+
+      // 4. Uniform Matrix tracking (World / Model matrix)
+      const origUniformMatrix4fv = proto.uniformMatrix4fv;
+      proto.uniformMatrix4fv = function(location, transpose, value) {
+        try {
+          if (value && value.length >= 16) {
+            this._df_activeMatrix = new Float32Array(value.slice(0, 16));
+          }
+        } catch (_) {}
+        return origUniformMatrix4fv.apply(this, arguments);
+      };
+
+      // 5. Draw call precision interception
+      const origDrawElements = proto.drawElements;
+      proto.drawElements = function(mode, count, type, offset) {
+        try {
+          if (mode === 4 && count >= 3 && this._df_boundElementBuffer) { // gl.TRIANGLES
+            recordDrawCall(this, count, type, offset || 0, true);
+          }
+        } catch (_) {}
+        return origDrawElements.apply(this, arguments);
+      };
+
+      const origDrawArrays = proto.drawArrays;
+      proto.drawArrays = function(mode, first, count) {
+        try {
+          if (mode === 4 && count >= 3) { // gl.TRIANGLES
+            recordDrawCall(this, count, 0, 0, false, first || 0);
+          }
+        } catch (_) {}
+        return origDrawArrays.apply(this, arguments);
+      };
+
+      // 6. WebGL2 VAO support
+      if (proto.bindVertexArray) {
+        const origBVA = proto.bindVertexArray;
+        proto.bindVertexArray = function(vao) {
+          this._df_currentVao = vao;
+          if (vao) {
+            if (vao._df_elementBuffer) this._df_boundElementBuffer = vao._df_elementBuffer;
+            if (vao._df_attribs) this._df_attribs = { ...vao._df_attribs };
+          }
+          return origBVA.apply(this, arguments);
+        };
+      }
     }
 
     hookContext(WebGLRenderingContext.prototype);
@@ -417,9 +715,30 @@
       window.HTMLCanvasElement.prototype.getContext = function(type) {
         const ctx = origGetContext.apply(this, arguments);
         if (ctx && (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl')) {
+          activeWebGlCanvases.add(this);
           try {
             hookContext(Object.getPrototypeOf(ctx));
-          } catch (e) {}
+            // Hook OES_vertex_array_object extension if requested
+            if (ctx.getExtension) {
+              const origGetExtension = ctx.getExtension;
+              ctx.getExtension = function(name) {
+                const ext = origGetExtension.apply(this, arguments);
+                if (ext && name && name.toLowerCase().includes('vertex_array_object') && !ext.__df_hooked) {
+                  ext.__df_hooked = true;
+                  const origBVAOES = ext.bindVertexArrayOES;
+                  ext.bindVertexArrayOES = function(vao) {
+                    ctx._df_currentVao = vao;
+                    if (vao) {
+                      if (vao._df_elementBuffer) ctx._df_boundElementBuffer = vao._df_elementBuffer;
+                      if (vao._df_attribs) ctx._df_attribs = { ...vao._df_attribs };
+                    }
+                    return origBVAOES.apply(this, arguments);
+                  };
+                }
+                return ext;
+              };
+            }
+          } catch (_) {}
         }
         return ctx;
       };
@@ -428,141 +747,124 @@
 
   hookWebGL();
 
-  // Listen for mesh export request from content script (Zero rogue downloads)
+  // Listen for mesh export & canvas nudge requests from content script
   window.addEventListener('message', (e) => {
-    if (e.data && (e.data.type === 'DF_TRIGGER_WEBGL_RIP' || e.data.type === 'DF_REQUEST_MESH')) {
+    if (!e.data) return;
+
+    if (e.data.type === 'DF_NUDGE_CANVAS') {
+      try {
+        // Trigger requestAnimationFrame or dispatch synthetic resize/wheel event to wake draw calls
+        activeWebGlCanvases.forEach(canvas => {
+          if (canvas) {
+            canvas.dispatchEvent(new Event('mousemove', { bubbles: true }));
+          }
+        });
+        window.requestAnimationFrame(() => {});
+      } catch (_) {}
+    }
+
+    if (e.data.type === 'DF_TRIGGER_WEBGL_RIP' || e.data.type === 'DF_REQUEST_MESH') {
       const title = (document.title || 'model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
       const objData = exportCapturedMeshToObj(title);
       if (objData) {
-        window.postMessage({ type: 'DF_WEBGL_RIP_DATA', objData, title }, '*');
+        window.postMessage({
+          type: 'DF_WEBGL_RIP_DATA',
+          objData,
+          title,
+          drawCalls: capturedDrawCalls.length,
+          vertexCount: totalCapturedVertices,
+          faceCount: totalCapturedFaces
+        }, '*');
         window.postMessage({ type: 'DF_WEBGL_RIP_SUCCESS', title }, '*');
       } else {
-        window.postMessage({ type: 'DF_WEBGL_RIP_FAIL', reason: 'No WebGL buffer data captured yet. Interact with the 3D model viewer to stream geometry.' }, '*');
+        window.postMessage({
+          type: 'DF_WEBGL_RIP_FAIL',
+          reason: 'No WebGL buffer data captured yet. Interact with the 3D model viewer to stream geometry.'
+        }, '*');
       }
     }
   });
 
   function exportCapturedMeshToObj(title) {
-    let objText = `# DownloadForge Pro WebGL 3D Ripper\n# Model: ${title}\n# Extracted: ${new Date().toISOString()}\n\n`;
-    const posChunks = capturedGeometries.filter(g => g.type === 'positions');
-    const idxChunks = capturedGeometries.filter(g => g.type === 'indices');
+    let objText = `# DownloadForge Pro WebGL 3D Ripper (Ninja Ripper Engine)\n# Model: ${title}\n# Extracted: ${new Date().toISOString()}\n\n`;
 
-    if (posChunks.length === 0) return null;
+    // ── PRIMARY PIPELINE: Draw-Call Precision Meshes ─────────
+    if (capturedDrawCalls.length > 0) {
+      let globalVOffset = 0;
+      let globalVtOffset = 0;
+      let globalVnOffset = 0;
+      let faceCount = 0;
 
-    let globalVOffset = 0;
-    let globalVtOffset = 0;
-    let globalVnOffset = 0;
-    let totalFaces = 0;
+      for (let c = 0; c < capturedDrawCalls.length; c++) {
+        const dc = capturedDrawCalls[c];
+        const pos = dc.positions;
+        const norm = dc.normals;
+        const uvs = dc.uvs;
+        const idx = dc.indices;
+        const vCount = dc.vertexCount;
 
-    for (let c = 0; c < posChunks.length; c++) {
-      const chunk = posChunks[c];
-      const arr = chunk.data;
-      if (!arr || arr.length < 9) continue;
+        if (!pos || vCount < 3 || !idx || idx.length < 3) continue;
 
-      let stride = 3;
-      let hasUVs = false;
-      let hasNormals = false;
+        const submeshVStart = globalVOffset;
+        const submeshVnStart = globalVnOffset;
+        const submeshVtStart = globalVtOffset;
 
-      // Physically validated stride detection:
-      // In interleaved buffers (stride 8 or 6), indices 3, 4, 5 represent normal vectors (nx, ny, nz).
-      // A unit normal vector has length squared approx 1.0 (nx^2 + ny^2 + nz^2 ~ 1.0).
-      if (arr.length >= 24 && arr.length % 8 === 0) {
-        const lenSq = arr[3]*arr[3] + arr[4]*arr[4] + arr[5]*arr[5];
-        if (Math.abs(lenSq - 1.0) < 0.25) {
-          stride = 8;
-          hasNormals = true;
-          hasUVs = true;
-        }
-      }
-      if (stride === 3 && arr.length >= 18 && arr.length % 6 === 0) {
-        const lenSq = arr[3]*arr[3] + arr[4]*arr[4] + arr[5]*arr[5];
-        if (Math.abs(lenSq - 1.0) < 0.25) {
-          stride = 6;
-          hasNormals = true;
-        }
-      }
-      if (stride === 3 && arr.length >= 15 && arr.length % 5 === 0) {
-        const u = arr[3], v = arr[4];
-        if (u >= -0.5 && u <= 1.5 && v >= -0.5 && v <= 1.5) {
-          stride = 5;
-          hasUVs = true;
-        }
-      }
+        objText += `g part_${String(c + 1).padStart(2, '0')}\n`;
 
-      const submeshVStart = globalVOffset;
-      const submeshVtStart = globalVtOffset;
-      const submeshVnStart = globalVnOffset;
-      let submeshVCount = 0;
-
-      objText += `g submesh_${c + 1}\n`;
-
-      for (let i = 0; i < arr.length - 2; i += stride) {
-        const x = Number(arr[i]).toFixed(5);
-        const y = Number(arr[i + 1]).toFixed(5);
-        const z = Number(arr[i + 2]).toFixed(5);
-        if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+        // 1. Vertices
+        for (let v = 0; v < vCount; v++) {
+          const x = Number(pos[v * 3]).toFixed(5);
+          const y = Number(pos[v * 3 + 1]).toFixed(5);
+          const z = Number(pos[v * 3 + 2]).toFixed(5);
           objText += `v ${x} ${y} ${z}\n`;
-          submeshVCount++;
           globalVOffset++;
+        }
 
-          if (hasNormals && i + 5 < arr.length) {
-            const nx = Number(arr[i + 3]).toFixed(5);
-            const ny = Number(arr[i + 4]).toFixed(5);
-            const nz = Number(arr[i + 5]).toFixed(5);
+        // 2. Normals
+        if (norm) {
+          for (let v = 0; v < vCount; v++) {
+            const nx = Number(norm[v * 3]).toFixed(5);
+            const ny = Number(norm[v * 3 + 1]).toFixed(5);
+            const nz = Number(norm[v * 3 + 2]).toFixed(5);
             objText += `vn ${nx} ${ny} ${nz}\n`;
             globalVnOffset++;
           }
+        }
 
-          if (hasUVs) {
-            const uOffset = hasNormals ? 6 : 3;
-            if (i + uOffset + 1 < arr.length) {
-              const u = Number(arr[i + uOffset]).toFixed(5);
-              const v = Number(arr[i + uOffset + 1]).toFixed(5);
-              objText += `vt ${u} ${v}\n`;
-              globalVtOffset++;
-            }
+        // 3. Texture UVs
+        if (uvs) {
+          for (let v = 0; v < vCount; v++) {
+            const u = Number(uvs[v * 2]).toFixed(5);
+            const vCoord = Number(uvs[v * 2 + 1]).toFixed(5);
+            objText += `vt ${u} ${vCoord}\n`;
+            globalVtOffset++;
           }
         }
-      }
 
-      if (submeshVCount === 0) continue;
-
-      // Find matching index chunk if available
-      let matchingIdx = null;
-      for (const idx of idxChunks) {
-        if (!idx || !idx.data) continue;
-        let fits = true;
-        const testCount = Math.min(idx.data.length, 30);
-        for (let t = 0; t < testCount; t++) {
-          if (idx.data[t] >= submeshVCount) { fits = false; break; }
-        }
-        if (fits) { matchingIdx = idx; break; }
-      }
-
-      if (matchingIdx && matchingIdx.data) {
-        const iarr = matchingIdx.data;
-        for (let j = 0; j < iarr.length - 2; j += 3) {
-          const i1 = iarr[j];
-          const i2 = iarr[j + 1];
-          const i3 = iarr[j + 2];
-          if (i1 < submeshVCount && i2 < submeshVCount && i3 < submeshVCount) {
+        // 4. Faces
+        for (let i = 0; i < idx.length - 2; i += 3) {
+          const i1 = idx[i];
+          const i2 = idx[i + 1];
+          const i3 = idx[i + 2];
+          if (i1 < vCount && i2 < vCount && i3 < vCount) {
             const f1 = i1 + 1 + submeshVStart;
             const f2 = i2 + 1 + submeshVStart;
             const f3 = i3 + 1 + submeshVStart;
-            if (hasNormals && hasUVs) {
-              const vt1 = i1 + 1 + submeshVtStart;
-              const vt2 = i2 + 1 + submeshVtStart;
-              const vt3 = i3 + 1 + submeshVtStart;
+
+            if (norm && uvs) {
               const vn1 = i1 + 1 + submeshVnStart;
               const vn2 = i2 + 1 + submeshVnStart;
               const vn3 = i3 + 1 + submeshVnStart;
+              const vt1 = i1 + 1 + submeshVtStart;
+              const vt2 = i2 + 1 + submeshVtStart;
+              const vt3 = i3 + 1 + submeshVtStart;
               objText += `f ${f1}/${vt1}/${vn1} ${f2}/${vt2}/${vn2} ${f3}/${vt3}/${vn3}\n`;
-            } else if (hasNormals) {
+            } else if (norm) {
               const vn1 = i1 + 1 + submeshVnStart;
               const vn2 = i2 + 1 + submeshVnStart;
               const vn3 = i3 + 1 + submeshVnStart;
               objText += `f ${f1}//${vn1} ${f2}//${vn2} ${f3}//${vn3}\n`;
-            } else if (hasUVs) {
+            } else if (uvs) {
               const vt1 = i1 + 1 + submeshVtStart;
               const vt2 = i2 + 1 + submeshVtStart;
               const vt3 = i3 + 1 + submeshVtStart;
@@ -570,22 +872,59 @@
             } else {
               objText += `f ${f1} ${f2} ${f3}\n`;
             }
-            totalFaces++;
+            faceCount++;
+          }
+        }
+      }
+
+      if (globalVOffset > 0) return objText;
+    }
+
+    // ── SECONDARY FALLBACK: Raw Buffer Pool ───────────────────
+    const posChunks = capturedGeometries.filter(g => g.type === 'positions');
+    const idxChunks = capturedGeometries.filter(g => g.type === 'indices');
+    if (posChunks.length === 0) return null;
+
+    let globalVOffset = 0;
+    for (let c = 0; c < posChunks.length; c++) {
+      const chunk = posChunks[c];
+      const arr = chunk.data;
+      if (!arr || arr.length < 9) continue;
+
+      const submeshVStart = globalVOffset;
+      let submeshVCount = 0;
+      objText += `g raw_submesh_${c + 1}\n`;
+
+      for (let i = 0; i < arr.length - 2; i += 3) {
+        const x = Number(arr[i]).toFixed(5);
+        const y = Number(arr[i + 1]).toFixed(5);
+        const z = Number(arr[i + 2]).toFixed(5);
+        if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+          objText += `v ${x} ${y} ${z}\n`;
+          submeshVCount++;
+          globalVOffset++;
+        }
+      }
+
+      if (submeshVCount === 0) continue;
+
+      let matchingIdx = idxChunks[c] || idxChunks[0] || null;
+      if (matchingIdx && matchingIdx.data) {
+        const iarr = matchingIdx.data;
+        for (let j = 0; j < iarr.length - 2; j += 3) {
+          const i1 = iarr[j], i2 = iarr[j + 1], i3 = iarr[j + 2];
+          if (i1 < submeshVCount && i2 < submeshVCount && i3 < submeshVCount) {
+            objText += `f ${i1 + 1 + submeshVStart} ${i2 + 1 + submeshVStart} ${i3 + 1 + submeshVStart}\n`;
           }
         }
       } else {
         for (let j = 1; j <= submeshVCount - 2; j += 3) {
-          const f1 = j + submeshVStart;
-          const f2 = j + 1 + submeshVStart;
-          const f3 = j + 2 + submeshVStart;
-          objText += `f ${f1} ${f2} ${f3}\n`;
-          totalFaces++;
+          objText += `f ${j + submeshVStart} ${j + 1 + submeshVStart} ${j + 2 + submeshVStart}\n`;
         }
       }
     }
 
-    if (globalVOffset === 0) return null;
-    return objText;
+    return globalVOffset > 0 ? objText : null;
   }
 
   hookEngineLoaders();

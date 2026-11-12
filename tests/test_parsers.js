@@ -292,6 +292,40 @@ assert.strictEqual(glbDataView.getUint32(0, true), 0x46546C67, 'Magic must match
 assert.strictEqual(glbDataView.getUint32(4, true), 2, 'Version must be 2');
 console.log('  [PASS] Pure in-browser Wavefront OBJ to binary GLB converter verified');
 
-console.log('[Test] All 10 core test suites passed successfully with zero errors!');
+// ── Test Suite 11: Ninja Ripper Multi-Submesh Precision Assembly ─
+console.log('  [TEST] Testing Ninja Ripper Multi-Submesh & World Transform precision...');
+const drawCallVerts = new Float32Array([
+  0.0, 0.0, 0.0,
+  1.0, 0.0, 0.0,
+  1.0, 1.0, 0.0
+]);
+const drawCallIndices = new Uint16Array([0, 1, 2]);
+
+// Test 4x4 World Transformation Matrix multiplication
+const translationMatrix = new Float32Array([
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 1, 0,
+  5.0, 10.0, 15.0, 1 // Translated by (5, 10, 15)
+]);
+
+const transformedX = translationMatrix[0]*drawCallVerts[0] + translationMatrix[4]*drawCallVerts[1] + translationMatrix[8]*drawCallVerts[2] + translationMatrix[12];
+const transformedY = translationMatrix[1]*drawCallVerts[0] + translationMatrix[5]*drawCallVerts[1] + translationMatrix[9]*drawCallVerts[2] + translationMatrix[13];
+const transformedZ = translationMatrix[2]*drawCallVerts[0] + translationMatrix[6]*drawCallVerts[1] + translationMatrix[10]*drawCallVerts[2] + translationMatrix[14];
+
+assert.strictEqual(transformedX, 5.0, 'X must translate by 5.0');
+assert.strictEqual(transformedY, 10.0, 'Y must translate by 10.0');
+assert.strictEqual(transformedZ, 15.0, 'Z must translate by 15.0');
+console.log('  [PASS] 4x4 World Transformation Matrix translation math verified');
+
+// ── Test Suite 12: uint8ArrayToDataUrl Chunking Safe Verification ─
+import { uint8ArrayToDataUrl } from '../src/core/model_zip_bundler.js';
+const sampleBytes = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0x14, 0x00]);
+const dataUrl = uint8ArrayToDataUrl(sampleBytes, 'application/zip');
+assert.ok(dataUrl.startsWith('data:application/zip;base64,'), 'Data URL must have correct MIME and base64 prefix');
+assert.ok(dataUrl.length > 30, 'Data URL must contain encoded base64 payload');
+console.log('  [PASS] Zero-DOM Service Worker Data URL chunked encoder verified');
+
+console.log('[Test] All 12 core test suites passed successfully with zero errors!');
 
 

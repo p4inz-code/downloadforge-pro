@@ -466,12 +466,24 @@ export function init3DOverlay() {
     }, 4000);
   }
 
-  // Listen for WebGL Ripper feedback
+  let currentTelemetry = null;
+
+  // Listen for WebGL Ripper feedback & telemetry
   window.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'DF_WEBGL_RIP_SUCCESS') {
+    if (!e.data) return;
+    if (e.data.type === 'DF_WEBGL_TELEMETRY' && e.data.data) {
+      currentTelemetry = e.data.data;
+      document.querySelectorAll('.df-3d-pill-btn .df-telemetry-tag').forEach(tag => {
+        const vCount = currentTelemetry.vertexCount || 0;
+        const vText = vCount >= 1000000 ? `${(vCount / 1000000).toFixed(1)}M v` :
+                      vCount >= 1000 ? `${(vCount / 1000).toFixed(0)}k v` :
+                      vCount > 0 ? `${vCount} v` : (currentTelemetry.drawCalls ? `${currentTelemetry.drawCalls} parts` : 'Active');
+        tag.textContent = vText;
+        tag.style.display = 'inline-block';
+      });
+    } else if (e.data.type === 'DF_WEBGL_RIP_SUCCESS') {
       show3DToast(`DownloadForge: 3D Mesh & Geometry extracted successfully`);
-    } else if (e.data && e.data.type === 'DF_WEBGL_RIP_FAIL') {
-      // Only show error if not on a dedicated platform where bundle download is already running
+    } else if (e.data.type === 'DF_WEBGL_RIP_FAIL') {
       if (!window.location.href.includes('sketchfab.com') && !window.location.href.includes('cgtrader.com')) {
         show3DToast(e.data.reason || 'No 3D buffer captured yet', true);
       }
@@ -498,7 +510,7 @@ export function init3DOverlay() {
 
     const pill = document.createElement('button');
     pill.className = 'df-pill-btn df-3d-pill-btn';
-    pill.title = 'Rip & Download 3D Model with DownloadForge Pro';
+    pill.title = 'Rip & Download 3D Model with DownloadForge Pro (Ninja Ripper Engine)';
     pill.innerHTML = `
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -506,6 +518,7 @@ export function init3DOverlay() {
         <line x1="12" y1="22.08" x2="12" y2="12"/>
       </svg>
       <span>3D Rip</span>
+      <span class="df-quality-tag df-telemetry-tag" style="display:none;">Ready</span>
     `;
 
     pill.addEventListener('click', (e) => {
@@ -520,6 +533,12 @@ export function init3DOverlay() {
 
       let targetUrl = el.getAttribute('src') || el.src || el.getAttribute('url');
       let targetTitle = (document.title || '3D_Model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
+
+      // Trigger canvas wake nudge
+      window.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*');
+      document.querySelectorAll('iframe').forEach(ifr => {
+        try { ifr.contentWindow.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*'); } catch (err) {}
+      });
 
       if (sfMatch && sfMatch[1]) {
         targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
