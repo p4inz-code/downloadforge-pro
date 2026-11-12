@@ -318,7 +318,7 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
       }
     }
 
-    // B. Model Geometry: Both .glb and .obj+.mtl are bundled into package
+    // B. Model Geometry: Package exactly ONE primary 3D model asset
     let activeObj = (capturedObjMesh && capturedObjMesh.length > 50) ? capturedObjMesh : null;
 
     if (!activeObj) {
@@ -345,50 +345,51 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
       ].join('\n');
     }
 
-    // 1. Add Wavefront OBJ
-    zipFiles.push({
-      name: `${modelName}.obj`,
-      data: activeObj
-    });
-
-    // 2. Add Material MTL
-    let mtlContent = `# DownloadForge Pro Material Library\n# Model: ${modelName}\n\n`;
-    if (textureNames.length > 0) {
-      mtlContent += `newmtl Material_Main\n`;
-      mtlContent += `Ka 1.000 1.000 1.000\n`;
-      mtlContent += `Kd 1.000 1.000 1.000\n`;
-      mtlContent += `Ks 0.500 0.500 0.500\n`;
-      mtlContent += `Ns 250.000\n`;
-      mtlContent += `illum 2\n`;
-
-      const diffuseTex = textureNames.find(n => !n.includes('_nrm') && !n.includes('_a') && !n.includes('refl')) || textureNames[0];
-      if (diffuseTex) {
-        mtlContent += `map_Kd textures/${diffuseTex}\n`;
-      }
-      const normalTex = textureNames.find(n => n.includes('_nrm') || n.includes('normal'));
-      if (normalTex) {
-        mtlContent += `map_Bump textures/${normalTex}\n`;
-      }
-    } else {
-      mtlContent += `newmtl Material_Default\nKd 0.8 0.8 0.8\n`;
+    let glbBytes = null;
+    try {
+      glbBytes = convertObjToGlb(activeObj, modelName);
+    } catch (glbErr) {
+      log.warn('GLB container packaging fallback:', glbErr.message);
     }
 
-    zipFiles.push({
-      name: `${modelName}.mtl`,
-      data: mtlContent
-    });
+    if (glbBytes && glbBytes.length > 50) {
+      // Universal binary 3D container (single asset)
+      zipFiles.push({
+        name: `${modelName}.glb`,
+        data: glbBytes
+      });
+    } else {
+      // Fallback single asset: Wavefront OBJ + Material MTL
+      zipFiles.push({
+        name: `${modelName}.obj`,
+        data: activeObj
+      });
 
-    // 3. Add GLB binary container
-    try {
-      const glbBytes = convertObjToGlb(activeObj, modelName);
-      if (glbBytes && glbBytes.length > 50) {
-        zipFiles.push({
-          name: `${modelName}.glb`,
-          data: glbBytes
-        });
+      let mtlContent = `# DownloadForge Pro Material Library\n# Model: ${modelName}\n\n`;
+      if (textureNames.length > 0) {
+        mtlContent += `newmtl Material_Main\n`;
+        mtlContent += `Ka 1.000 1.000 1.000\n`;
+        mtlContent += `Kd 1.000 1.000 1.000\n`;
+        mtlContent += `Ks 0.500 0.500 0.500\n`;
+        mtlContent += `Ns 250.000\n`;
+        mtlContent += `illum 2\n`;
+
+        const diffuseTex = textureNames.find(n => !n.includes('_nrm') && !n.includes('_a') && !n.includes('refl')) || textureNames[0];
+        if (diffuseTex) {
+          mtlContent += `map_Kd textures/${diffuseTex}\n`;
+        }
+        const normalTex = textureNames.find(n => n.includes('_nrm') || n.includes('normal'));
+        if (normalTex) {
+          mtlContent += `map_Bump textures/${normalTex}\n`;
+        }
+      } else {
+        mtlContent += `newmtl Material_Default\nKd 0.8 0.8 0.8\n`;
       }
-    } catch (glbErr) {
-      log.warn('GLB container packaging skipped:', glbErr.message);
+
+      zipFiles.push({
+        name: `${modelName}.mtl`,
+        data: mtlContent
+      });
     }
 
     // C. Binary stream geometry fallback (.binz / .osgjs)
@@ -463,15 +464,18 @@ export function bundleGenericModelPackage(title, objMesh, textures = []) {
     `f 1 2 3\nf 1 3 4\n`
   ].join('');
 
-  zipFiles.push({ name: `${modelName}.obj`, data: activeObj });
-  zipFiles.push({ name: `${modelName}.mtl`, data: `newmtl Material_Main\nKd 0.8 0.8 0.8\n` });
-
+  let glbBytes = null;
   try {
-    const glbBytes = convertObjToGlb(activeObj, modelName);
-    if (glbBytes) {
-      zipFiles.push({ name: `${modelName}.glb`, data: glbBytes });
-    }
+    glbBytes = convertObjToGlb(activeObj, modelName);
   } catch (e) {}
+
+  if (glbBytes && glbBytes.length > 50) {
+    // Keep exactly ONE primary 3D model asset
+    zipFiles.push({ name: `${modelName}.glb`, data: glbBytes });
+  } else {
+    zipFiles.push({ name: `${modelName}.obj`, data: activeObj });
+    zipFiles.push({ name: `${modelName}.mtl`, data: `newmtl Material_Main\nKd 0.8 0.8 0.8\n` });
+  }
 
   if (Array.isArray(textures)) {
     for (const tex of textures) {
@@ -487,4 +491,87 @@ export function bundleGenericModelPackage(title, objMesh, textures = []) {
   });
 
   return buildZipArchive(zipFiles);
+}
+
+/**
+ * Poly Haven 3D Asset ZIP Bundler
+ * Downloads glTF / blend models and all PBR textures from Poly Haven API.
+ * @param {string} assetId
+ * @param {string} [requestedTitle]
+ * @returns {Promise<{ ok: boolean, zipBytes?: Uint8Array, filename: string, error?: string }>}
+ */
+export async function bundlePolyHavenModelPackage(assetId, requestedTitle) {
+  try {
+    log.info(`Bundling Poly Haven model ${assetId}...`);
+    const modelName = (requestedTitle || assetId || 'polyhaven_model')
+      .replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 100);
+
+    const filesRes = await fetch(`https://api.polyhaven.com/files/${assetId}`);
+    if (!filesRes.ok) throw new Error(`Poly Haven API returned HTTP ${filesRes.status}`);
+    const filesJson = await filesRes.json();
+
+    const zipFiles = [];
+    const gltfSection = filesJson.gltf;
+    const resLevel = (gltfSection && (gltfSection['1k'] || gltfSection['2k'] || gltfSection['4k'])) || null;
+
+    if (resLevel && resLevel.gltf) {
+      const gltfObj = resLevel.gltf;
+      // 1. Fetch main .gltf file
+      if (gltfObj.url) {
+        const gltfRes = await fetch(gltfObj.url);
+        if (gltfRes.ok) {
+          zipFiles.push({
+            name: `${modelName}.gltf`,
+            data: await gltfRes.text()
+          });
+        }
+      }
+
+      // 2. Fetch includes (.bin buffer & textures)
+      if (gltfObj.include && typeof gltfObj.include === 'object') {
+        for (const [incPath, incInfo] of Object.entries(gltfObj.include)) {
+          if (incInfo && incInfo.url) {
+            try {
+              const incRes = await fetch(incInfo.url);
+              if (incRes.ok) {
+                const incBuf = await incRes.arrayBuffer();
+                zipFiles.push({
+                  name: incPath,
+                  data: new Uint8Array(incBuf)
+                });
+              }
+            } catch (incErr) {
+              log.warn(`Failed to fetch Poly Haven include ${incPath}:`, incErr.message);
+            }
+          }
+        }
+      }
+    }
+
+    zipFiles.push({
+      name: 'README.txt',
+      data: [
+        `DownloadForge Pro — Poly Haven 3D Asset Package`,
+        `==============================================`,
+        `Asset Name : ${modelName}`,
+        `Source     : https://polyhaven.com/a/${assetId}`,
+        `License    : CC0 (Public Domain)`,
+        `Extracted  : ${new Date().toISOString()}`,
+        ``,
+        `Import Instructions:`,
+        `1. Open Blender -> File -> Import -> glTF 2.0 (.gltf)`,
+        `2. Select ${modelName}.gltf (it automatically references textures/ and .bin)`
+      ].join('\n')
+    });
+
+    const zipBytes = buildZipArchive(zipFiles);
+    return {
+      ok: true,
+      zipBytes,
+      filename: `${modelName}_PolyHaven_Package.zip`
+    };
+  } catch (err) {
+    log.error('Failed to bundle Poly Haven model package:', err.message);
+    return { ok: false, error: err.message, filename: `${requestedTitle || assetId}.zip` };
+  }
 }

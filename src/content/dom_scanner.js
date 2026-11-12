@@ -333,8 +333,9 @@ function collect3DViewerElements(doc) {
   // 2. Sketchfab In-Page Model & Embed Scanner
   try {
     const loc = window.location.href;
-    const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i);
-    if (sfMatch) {
+    const sfMatch = loc.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) ||
+                    (loc.includes('sketchfab.com') ? loc.match(/([0-9a-f]{32})/i) : null);
+    if (sfMatch && sfMatch[1]) {
       const uid = sfMatch[1];
       const title = (doc.title || 'Sketchfab 3D Model').replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, '').trim();
       items.push(buildResource({
@@ -353,8 +354,8 @@ function collect3DViewerElements(doc) {
     const sfFrames = doc.querySelectorAll('iframe[src*="sketchfab.com"]');
     for (const frame of sfFrames) {
       const src = frame.src || frame.getAttribute('src');
-      const m = src ? src.match(/models\/([0-9a-f]{32})/i) : null;
-      if (m) {
+      const m = src ? src.match(/(?:models\/|i\/models\/)([0-9a-f]{32})/i) : null;
+      if (m && m[1]) {
         items.push(buildResource({
           url: `https://sketchfab.com/i/models/${m[1]}`,
           category: CATEGORY.MODEL_3D,
@@ -366,6 +367,44 @@ function collect3DViewerElements(doc) {
           status: STATUS.DOWNLOADABLE,
         }));
       }
+    }
+  } catch (e) {}
+
+  // 2b. Poly Haven Scanner
+  try {
+    const loc = window.location.href;
+    const polyMatch = loc.match(/polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i);
+    if (polyMatch && polyMatch[1]) {
+      const assetId = polyMatch[1];
+      const title = (doc.title || 'Poly Haven 3D Model').replace(/\s*Model\s*•\s*Poly\s*Haven.*$/i, '').trim();
+      items.push(buildResource({
+        url: loc,
+        category: CATEGORY.MODEL_3D,
+        ext: 'gltf',
+        filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || assetId}.gltf`,
+        mimeType: 'model/gltf+json',
+        source: SOURCE.DOM_EMBED,
+        title: title || 'Poly Haven 3D Asset',
+        status: STATUS.DOWNLOADABLE,
+      }));
+    }
+  } catch (e) {}
+
+  // 2c. TurboSquid Scanner
+  try {
+    const loc = window.location.href;
+    if (loc.includes('turbosquid.com/3d-models/')) {
+      const title = (doc.title || 'TurboSquid 3D Model').replace(/\s*\|\s*TurboSquid.*$/i, '').trim();
+      items.push(buildResource({
+        url: loc,
+        category: CATEGORY.MODEL_3D,
+        ext: 'glb',
+        filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_') || 'turbosquid_model'}.glb`,
+        mimeType: 'model/gltf-binary',
+        source: SOURCE.DOM_EMBED,
+        title: title || 'TurboSquid 3D Model',
+        status: STATUS.DOWNLOADABLE,
+      }));
     }
   } catch (e) {}
 

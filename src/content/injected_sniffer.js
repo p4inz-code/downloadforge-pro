@@ -625,41 +625,68 @@
 
       // 2. Buffer data uploads
       const origBufferData = proto.bufferData;
-      proto.bufferData = function(target, data, usage) {
+      proto.bufferData = function(target, data, usage, srcOffset, length) {
         try {
           const bound = target === 0x8892 ? this._df_boundArrayBuffer :
                         target === 0x8893 ? this._df_boundElementBuffer : null;
-          if (bound && data) {
+          if (bound) {
             ensureBufferMeta(bound);
             bound._df_target = target;
-            let copy = null;
-            if (data instanceof ArrayBuffer) {
-              copy = data.slice(0);
-            } else if (ArrayBuffer.isView(data)) {
-              copy = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-            }
-            if (copy) {
-              bound._df_data = copy;
-              bound._df_byteLength = copy.byteLength;
+            if (typeof data === 'number' && data > 0) {
+              bound._df_data = new ArrayBuffer(data);
+              bound._df_byteLength = data;
+            } else if (data) {
+              let copy = null;
+              if (data instanceof ArrayBuffer) {
+                const bOffset = srcOffset || 0;
+                const bLen = length !== undefined ? length : (data.byteLength - bOffset);
+                copy = data.slice(bOffset, bOffset + bLen);
+              } else if (ArrayBuffer.isView(data)) {
+                const elemSize = data.BYTES_PER_ELEMENT || 1;
+                const viewElemOffset = (srcOffset || 0);
+                const viewElemCount = length !== undefined ? length : (data.length - viewElemOffset);
+                const startByte = data.byteOffset + viewElemOffset * elemSize;
+                const totalBytes = Math.max(0, viewElemCount * elemSize);
+                copy = data.buffer.slice(startByte, startByte + totalBytes);
+              }
+              if (copy) {
+                bound._df_data = copy;
+                bound._df_byteLength = copy.byteLength;
+              }
             }
           }
-          captureRawBuffer(target, data);
+          if (data && typeof data !== 'number') {
+            captureRawBuffer(target, data);
+          }
         } catch (_) {}
         return origBufferData.apply(this, arguments);
       };
 
       const origBufferSubData = proto.bufferSubData;
-      proto.bufferSubData = function(target, offset, data) {
+      proto.bufferSubData = function(target, dstByteOffset, data, srcOffset, length) {
         try {
           const bound = target === 0x8892 ? this._df_boundArrayBuffer :
                         target === 0x8893 ? this._df_boundElementBuffer : null;
           if (bound && bound._df_data && data) {
-            const srcBytes = ArrayBuffer.isView(data)
-              ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-              : new Uint8Array(data);
-            const dstBytes = new Uint8Array(bound._df_data);
-            if (offset + srcBytes.length <= dstBytes.length) {
-              dstBytes.set(srcBytes, offset);
+            let srcBytes = null;
+            if (ArrayBuffer.isView(data)) {
+              const elemSize = data.BYTES_PER_ELEMENT || 1;
+              const viewElemOffset = (srcOffset || 0);
+              const viewElemCount = length !== undefined ? length : (data.length - viewElemOffset);
+              const startByte = data.byteOffset + viewElemOffset * elemSize;
+              const totalBytes = Math.max(0, viewElemCount * elemSize);
+              srcBytes = new Uint8Array(data.buffer, startByte, totalBytes);
+            } else if (data instanceof ArrayBuffer) {
+              const bOffset = srcOffset || 0;
+              const bLen = length !== undefined ? length : (data.byteLength - bOffset);
+              srcBytes = new Uint8Array(data, bOffset, bLen);
+            }
+            if (srcBytes) {
+              const dstBytes = new Uint8Array(bound._df_data);
+              const off = dstByteOffset || 0;
+              if (off + srcBytes.length <= dstBytes.length) {
+                dstBytes.set(srcBytes, off);
+              }
             }
           }
         } catch (_) {}
@@ -797,14 +824,21 @@
       const title = (document.title || 'model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
       const objData = exportCapturedMeshToObj(title);
       if (objData) {
-        window.postMessage({
+        const ripMsg = {
           type: 'DF_WEBGL_RIP_DATA',
           objData,
           title,
           drawCalls: capturedDrawCalls.length,
           vertexCount: totalCapturedVertices,
           faceCount: totalCapturedFaces
-        }, '*');
+        };
+        window.postMessage(ripMsg, '*');
+        if (window.parent && window.parent !== window) {
+          try { window.parent.postMessage(ripMsg, '*'); } catch (_) {}
+        }
+        if (window.top && window.top !== window && window.top !== window.parent) {
+          try { window.top.postMessage(ripMsg, '*'); } catch (_) {}
+        }
         window.postMessage({ type: 'DF_WEBGL_RIP_SUCCESS', title }, '*');
       } else {
         window.postMessage({

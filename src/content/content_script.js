@@ -214,6 +214,17 @@ function setupMessageListener() {
         faceCount: event.data.faceCount || 0,
         time: Date.now()
       };
+      try {
+        chrome.runtime.sendMessage({
+          type: 'DF_STORE_CACHED_OBJ',
+          payload: {
+            objData: event.data.objData,
+            title: event.data.title,
+            vertexCount: event.data.vertexCount || 0,
+            faceCount: event.data.faceCount || 0
+          }
+        }).catch(() => {});
+      } catch (_) {}
     } else if (event.data.type === 'DF_WEBGL_TELEMETRY' && event.data.data) {
       window.__df_last_telemetry = event.data.data;
     }

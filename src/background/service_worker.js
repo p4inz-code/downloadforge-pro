@@ -17,9 +17,12 @@ import { StorageService } from '../storage/storage.js';
 import { Logger } from '../utils/logger.js';
 import { startNetworkObserver, stopNetworkObserver, isObserverActive } from './network_observer.js';
 import { checkForGitHubUpdate, downloadUpdatePackage } from '../core/updater.js';
-import { bundleSketchfabModelPackage, bundleGenericModelPackage, uint8ArrayToDataUrl } from '../core/model_zip_bundler.js';
+import { bundleSketchfabModelPackage, bundleGenericModelPackage, bundlePolyHavenModelPackage, uint8ArrayToDataUrl } from '../core/model_zip_bundler.js';
 
 const log = new Logger('ServiceWorker');
+
+// ── In-memory cache for live GPU WebGL mesh rips ─────────────
+let bgCached3DMesh = null;
 
 // ── Per-tab resource store ───────────────────────────────────
 // Map<tabId, { resources: [], scannedAt: timestamp, scanning: bool }>
@@ -198,6 +201,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .then((downloadId) => sendResponse({ ok: true, downloadId }))
         .catch((err) => sendResponse({ ok: false, error: err.message }));
       return true;
+
+    // ── Content Script → SW: store live WebGL ripped mesh ───
+    case 'DF_STORE_CACHED_OBJ':
+      if (payload && payload.objData) {
+        bgCached3DMesh = {
+          objData: payload.objData,
+          title: payload.title || '3D_Model',
+          time: Date.now()
+        };
+      }
+      sendResponse({ ok: true });
+      return false;
 
     default:
       log.warn(`Unknown message type: ${type}`);
@@ -390,41 +405,55 @@ async function handleDownload(payload, sendResponse) {
     let downloadUrl = url;
     let targetFilename = filename || extractFilenameFromUrl(url);
 
-    // Sketchfab 3D Asset Package (Model + Textures + Materials ZIP)
-    if (url.includes('sketchfab.com/i/models/') || url.includes('/models/')) {
-      const sfMatch = url.match(/models\/([0-9a-f]{32})/i);
-      if (sfMatch) {
-        const uid = sfMatch[1];
-        try {
-          // Query active tab for any live in-page WebGL mesh extraction
-          let capturedObjMesh = null;
+    // 1. Sketchfab 3D Asset Package (Model + Textures + Materials ZIP)
+    const sfMatch = url.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) ||
+                    (url.includes('sketchfab.com') ? url.match(/([0-9a-f]{32})/i) : null);
+    if (sfMatch && sfMatch[1]) {
+      const uid = sfMatch[1];
+      try {
+        let capturedObjMesh = bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null;
+        if (!capturedObjMesh) {
           try {
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tabs && tabs[0] && tabs[0].id) {
               const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
               if (tabRes && tabRes.objData) {
                 capturedObjMesh = tabRes.objData;
-              } else {
-                chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_TRIGGER_WEBGL_RIP' }).catch(() => {});
               }
             }
           } catch (e) {}
+        }
 
-          const bundle = await bundleSketchfabModelPackage(uid, filename, capturedObjMesh);
-          if (bundle.officialUrl) {
-            downloadUrl = bundle.officialUrl;
-            targetFilename = bundle.filename;
-          } else if (bundle.zipBytes) {
+        const bundle = await bundleSketchfabModelPackage(uid, filename, capturedObjMesh);
+        if (bundle.officialUrl) {
+          downloadUrl = bundle.officialUrl;
+          targetFilename = bundle.filename;
+        } else if (bundle.zipBytes) {
+          downloadUrl = uint8ArrayToDataUrl(bundle.zipBytes, 'application/zip');
+          targetFilename = bundle.filename;
+        }
+      } catch (e) {
+        log.warn('Sketchfab bundle resolution note:', e.message);
+      }
+    }
+
+    // 2. Poly Haven 3D Asset Package (Model + Textures ZIP)
+    if (url.includes('polyhaven.com/a/')) {
+      const polyMatch = url.match(/polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i);
+      if (polyMatch && polyMatch[1]) {
+        try {
+          const bundle = await bundlePolyHavenModelPackage(polyMatch[1], filename);
+          if (bundle.zipBytes) {
             downloadUrl = uint8ArrayToDataUrl(bundle.zipBytes, 'application/zip');
             targetFilename = bundle.filename;
           }
         } catch (e) {
-          log.warn('Sketchfab bundle resolution note:', e.message);
+          log.warn('Poly Haven bundle resolution note:', e.message);
         }
       }
     }
 
-    // CGTrader direct download resolution
+    // 3. CGTrader direct download resolution or GPU WebGL Rip Package
     if (url.includes('cgtrader.com/')) {
       if (url.includes('/3d-models/') && !url.match(/\.(glb|gltf|zip|obj|stl|fbx|blend)(\?|$)/i)) {
         let cgtResolved = false;
@@ -444,7 +473,29 @@ async function handleDownload(payload, sendResponse) {
         }
 
         if (!cgtResolved) {
-          let capturedObj = null;
+          let capturedObj = bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null;
+          if (!capturedObj) {
+            try {
+              const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+              if (tabs && tabs[0] && tabs[0].id) {
+                const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
+                if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
+              }
+            } catch (e) {}
+          }
+
+          const zipBytes = bundleGenericModelPackage(filename || 'cgtrader_model', capturedObj);
+          downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
+          targetFilename = `${(filename || 'cgtrader_model').replace(/\.[^/.]+$/, '')}_CGTrader_Package.zip`;
+        }
+      }
+    }
+
+    // 4. TurboSquid 3D Asset Package (Hardware GPU Mesh + Textures ZIP)
+    if (url.includes('turbosquid.com/')) {
+      if (url.includes('/3d-models/') && !url.match(/\.(glb|gltf|zip|obj|stl|fbx|blend)(\?|$)/i)) {
+        let capturedObj = bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null;
+        if (!capturedObj) {
           try {
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (tabs && tabs[0] && tabs[0].id) {
@@ -452,25 +503,27 @@ async function handleDownload(payload, sendResponse) {
               if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
             }
           } catch (e) {}
-
-          const zipBytes = bundleGenericModelPackage(filename || 'cgtrader_model', capturedObj);
-          downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
-          targetFilename = `${(filename || 'cgtrader_model').replace(/\.[^/.]+$/, '')}_3D_Package.zip`;
         }
+
+        const zipBytes = bundleGenericModelPackage(filename || 'turbosquid_model', capturedObj);
+        downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
+        targetFilename = `${(filename || 'turbosquid_model').replace(/\.[^/.]+$/, '')}_TurboSquid_Package.zip`;
       }
     }
 
     // Universal Safety Guard: Never download raw web page URLs as 3D model files
     if (url.startsWith('http') && !downloadUrl.match(/\.(glb|gltf|zip|obj|stl|fbx|blend|3mf|step|stp|iges|binz|osgjs|splat|ply|usdz|splinecode)(\?|$)/i)) {
       if (url.includes('/3d-models/') || url.includes('/3d-model/') || url.includes('/models/')) {
-        let capturedObj = null;
-        try {
-          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (tabs && tabs[0] && tabs[0].id) {
-            const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
-            if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
-          }
-        } catch (e) {}
+        let capturedObj = bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null;
+        if (!capturedObj) {
+          try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs[0] && tabs[0].id) {
+              const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
+              if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
+            }
+          } catch (e) {}
+        }
 
         const zipBytes = bundleGenericModelPackage(filename || '3d_model', capturedObj);
         downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');

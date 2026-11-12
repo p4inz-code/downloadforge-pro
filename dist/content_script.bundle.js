@@ -566,8 +566,8 @@
     }
     try {
       const loc = window.location.href;
-      const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i);
-      if (sfMatch) {
+      const sfMatch = loc.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) || (loc.includes("sketchfab.com") ? loc.match(/([0-9a-f]{32})/i) : null);
+      if (sfMatch && sfMatch[1]) {
         const uid = sfMatch[1];
         const title = (doc.title || "Sketchfab 3D Model").replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
         items.push(buildResource({
@@ -584,8 +584,8 @@
       const sfFrames = doc.querySelectorAll('iframe[src*="sketchfab.com"]');
       for (const frame of sfFrames) {
         const src = frame.src || frame.getAttribute("src");
-        const m = src ? src.match(/models\/([0-9a-f]{32})/i) : null;
-        if (m) {
+        const m = src ? src.match(/(?:models\/|i\/models\/)([0-9a-f]{32})/i) : null;
+        if (m && m[1]) {
           items.push(buildResource({
             url: `https://sketchfab.com/i/models/${m[1]}`,
             category: CATEGORY.MODEL_3D,
@@ -597,6 +597,42 @@
             status: STATUS.DOWNLOADABLE
           }));
         }
+      }
+    } catch (e) {
+    }
+    try {
+      const loc = window.location.href;
+      const polyMatch = loc.match(/polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i);
+      if (polyMatch && polyMatch[1]) {
+        const assetId = polyMatch[1];
+        const title = (doc.title || "Poly Haven 3D Model").replace(/\s*Model\s*•\s*Poly\s*Haven.*$/i, "").trim();
+        items.push(buildResource({
+          url: loc,
+          category: CATEGORY.MODEL_3D,
+          ext: "gltf",
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || assetId}.gltf`,
+          mimeType: "model/gltf+json",
+          source: SOURCE.DOM_EMBED,
+          title: title || "Poly Haven 3D Asset",
+          status: STATUS.DOWNLOADABLE
+        }));
+      }
+    } catch (e) {
+    }
+    try {
+      const loc = window.location.href;
+      if (loc.includes("turbosquid.com/3d-models/")) {
+        const title = (doc.title || "TurboSquid 3D Model").replace(/\s*\|\s*TurboSquid.*$/i, "").trim();
+        items.push(buildResource({
+          url: loc,
+          category: CATEGORY.MODEL_3D,
+          ext: "glb",
+          filename: `${title.replace(/[^a-zA-Z0-9_-]/g, "_") || "turbosquid_model"}.glb`,
+          mimeType: "model/gltf-binary",
+          source: SOURCE.DOM_EMBED,
+          title: title || "TurboSquid 3D Model",
+          status: STATUS.DOWNLOADABLE
+        }));
       }
     } catch (e) {
     }
@@ -1206,9 +1242,12 @@
     });
     function attachOverlayTo3D(el) {
       if (!el || tracked3D.has(el)) return;
-      tracked3D.add(el);
+      if (el.tagName === "CANVAS" && el.closest(".c-viewer, #sketchfab-viewer, .product-viewer, #turbosquid-viewer, .mview-container, .interactive-viewer")) {
+        return;
+      }
       const parent = el.parentElement;
-      if (!parent) return;
+      if (!parent || parent.querySelector(".df-3d-overlay-wrap")) return;
+      tracked3D.add(el);
       const parentStyle = window.getComputedStyle(parent);
       if (parentStyle.position === "static") {
         parent.style.position = "relative";
@@ -1232,9 +1271,15 @@
       pill.addEventListener("click", (e) => {
         e.stopPropagation();
         e.preventDefault();
+        if (pill._df_downloading) return;
+        pill._df_downloading = true;
+        setTimeout(() => {
+          pill._df_downloading = false;
+        }, 3500);
         const loc = window.location.href;
-        const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) || (el.getAttribute("data-model-id") ? [null, el.getAttribute("data-model-id")] : null) || el.src && el.src.match(/models\/([0-9a-f]{32})/i);
-        let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url");
+        const sfMatch = loc.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) || (el.getAttribute("data-model-id") ? [null, el.getAttribute("data-model-id")] : null) || el.src && el.src.match(/models\/([0-9a-f]{32})/i);
+        const polyMatch = loc.match(/polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i);
+        let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url") || loc;
         let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
         window.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
         document.querySelectorAll("iframe").forEach((ifr) => {
@@ -1246,7 +1291,19 @@
         if (sfMatch && sfMatch[1]) {
           targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
           targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
-          show3DToast("DownloadForge: Packaging Sketchfab 3D Model, Textures & Materials into ZIP...");
+          show3DToast("DownloadForge: Packaging Sketchfab 3D Model & Textures into ZIP...");
+        } else if (polyMatch && polyMatch[1]) {
+          targetUrl = `https://polyhaven.com/a/${polyMatch[1]}`;
+          targetTitle = targetTitle.replace(/\s*Model\s*•\s*Poly\s*Haven.*$/i, "").trim();
+          show3DToast("DownloadForge: Packaging Poly Haven 3D Asset & Textures into ZIP...");
+        } else if (loc.includes("cgtrader.com")) {
+          targetTitle = targetTitle.replace(/\s*\|\s*CGTrader.*$/i, "").trim();
+          show3DToast("DownloadForge 3D Ripper: Extracting CGTrader GPU geometry & textures...");
+          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+        } else if (loc.includes("turbosquid.com")) {
+          targetTitle = targetTitle.replace(/\s*\|\s*TurboSquid.*$/i, "").trim();
+          show3DToast("DownloadForge 3D Ripper: Extracting TurboSquid GPU geometry & textures...");
+          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
         } else {
           show3DToast("DownloadForge 3D Ripper: Extracting GPU WebGL geometry to 3D package...");
           window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
@@ -1257,14 +1314,11 @@
             }
           });
         }
-        if (targetUrl && !targetUrl.startsWith("blob:")) {
-          const ext = targetUrl.split(".").pop().split("?")[0] || "glb";
-          const filename = `${targetTitle || "model"}.${ext.length <= 4 ? ext : "glb"}`;
-          chrome.runtime.sendMessage({
-            type: MSG.DOWNLOAD_ITEM,
-            payload: { url: targetUrl, filename }
-          });
-        }
+        const filename = `${targetTitle || "model"}.glb`;
+        chrome.runtime.sendMessage({
+          type: MSG.DOWNLOAD_ITEM,
+          payload: { url: targetUrl, filename }
+        });
       });
       overlay.appendChild(pill);
       parent.appendChild(overlay);
@@ -1526,6 +1580,19 @@
           faceCount: event.data.faceCount || 0,
           time: Date.now()
         };
+        try {
+          chrome.runtime.sendMessage({
+            type: "DF_STORE_CACHED_OBJ",
+            payload: {
+              objData: event.data.objData,
+              title: event.data.title,
+              vertexCount: event.data.vertexCount || 0,
+              faceCount: event.data.faceCount || 0
+            }
+          }).catch(() => {
+          });
+        } catch (_) {
+        }
       } else if (event.data.type === "DF_WEBGL_TELEMETRY" && event.data.data) {
         window.__df_last_telemetry = event.data.data;
       }

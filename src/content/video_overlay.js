@@ -492,10 +492,15 @@ export function init3DOverlay() {
 
   function attachOverlayTo3D(el) {
     if (!el || tracked3D.has(el)) return;
-    tracked3D.add(el);
+
+    // Skip nested canvas if enclosing 3D viewer container is already targeted
+    if (el.tagName === 'CANVAS' && el.closest('.c-viewer, #sketchfab-viewer, .product-viewer, #turbosquid-viewer, .mview-container, .interactive-viewer')) {
+      return;
+    }
 
     const parent = el.parentElement;
-    if (!parent) return;
+    if (!parent || parent.querySelector('.df-3d-overlay-wrap')) return;
+    tracked3D.add(el);
 
     const parentStyle = window.getComputedStyle(parent);
     if (parentStyle.position === 'static') {
@@ -525,16 +530,23 @@ export function init3DOverlay() {
       e.stopPropagation();
       e.preventDefault();
 
-      // Check if on dedicated 3D platform (Sketchfab, CGTrader, etc.)
+      // Guard against double click / multiple download spam
+      if (pill._df_downloading) return;
+      pill._df_downloading = true;
+      setTimeout(() => { pill._df_downloading = false; }, 3500);
+
+      // Check if on dedicated 3D platform (Sketchfab, CGTrader, Poly Haven, TurboSquid)
       const loc = window.location.href;
-      const sfMatch = loc.match(/(?:3d-models\/.*-|models\/)([0-9a-f]{32})/i) ||
+      const sfMatch = loc.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) ||
                       (el.getAttribute('data-model-id') ? [null, el.getAttribute('data-model-id')] : null) ||
                       (el.src && el.src.match(/models\/([0-9a-f]{32})/i));
 
-      let targetUrl = el.getAttribute('src') || el.src || el.getAttribute('url');
+      const polyMatch = loc.match(/polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i);
+
+      let targetUrl = el.getAttribute('src') || el.src || el.getAttribute('url') || loc;
       let targetTitle = (document.title || '3D_Model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
 
-      // Trigger canvas wake nudge
+      // Trigger canvas wake nudge to activate render loops
       window.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*');
       document.querySelectorAll('iframe').forEach(ifr => {
         try { ifr.contentWindow.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*'); } catch (err) {}
@@ -543,7 +555,19 @@ export function init3DOverlay() {
       if (sfMatch && sfMatch[1]) {
         targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
         targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, '').trim();
-        show3DToast('DownloadForge: Packaging Sketchfab 3D Model, Textures & Materials into ZIP...');
+        show3DToast('DownloadForge: Packaging Sketchfab 3D Model & Textures into ZIP...');
+      } else if (polyMatch && polyMatch[1]) {
+        targetUrl = `https://polyhaven.com/a/${polyMatch[1]}`;
+        targetTitle = targetTitle.replace(/\s*Model\s*•\s*Poly\s*Haven.*$/i, '').trim();
+        show3DToast('DownloadForge: Packaging Poly Haven 3D Asset & Textures into ZIP...');
+      } else if (loc.includes('cgtrader.com')) {
+        targetTitle = targetTitle.replace(/\s*\|\s*CGTrader.*$/i, '').trim();
+        show3DToast('DownloadForge 3D Ripper: Extracting CGTrader GPU geometry & textures...');
+        window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
+      } else if (loc.includes('turbosquid.com')) {
+        targetTitle = targetTitle.replace(/\s*\|\s*TurboSquid.*$/i, '').trim();
+        show3DToast('DownloadForge 3D Ripper: Extracting TurboSquid GPU geometry & textures...');
+        window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
       } else {
         show3DToast('DownloadForge 3D Ripper: Extracting GPU WebGL geometry to 3D package...');
         window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
@@ -552,14 +576,11 @@ export function init3DOverlay() {
         });
       }
 
-      if (targetUrl && !targetUrl.startsWith('blob:')) {
-        const ext = targetUrl.split('.').pop().split('?')[0] || 'glb';
-        const filename = `${targetTitle || 'model'}.${ext.length <= 4 ? ext : 'glb'}`;
-        chrome.runtime.sendMessage({
-          type: MSG.DOWNLOAD_ITEM,
-          payload: { url: targetUrl, filename }
-        });
-      }
+      const filename = `${targetTitle || 'model'}.glb`;
+      chrome.runtime.sendMessage({
+        type: MSG.DOWNLOAD_ITEM,
+        payload: { url: targetUrl, filename }
+      });
     });
 
     overlay.appendChild(pill);

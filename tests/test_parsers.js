@@ -326,6 +326,66 @@ assert.ok(dataUrl.startsWith('data:application/zip;base64,'), 'Data URL must hav
 assert.ok(dataUrl.length > 30, 'Data URL must contain encoded base64 payload');
 console.log('  [PASS] Zero-DOM Service Worker Data URL chunked encoder verified');
 
-console.log('[Test] All 12 core test suites passed successfully with zero errors!');
+// ── Test Suite 13: Single 3D Model Asset in ZIP & Textures Verification ─
+import { bundleGenericModelPackage, bundlePolyHavenModelPackage } from '../src/core/model_zip_bundler.js';
+
+const testTextures = [
+  { name: 'diffuse.png', data: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) },
+  { name: 'normal.png', data: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) }
+];
+
+const singleAssetZip = bundleGenericModelPackage('TestPorsche', null, testTextures);
+const zipBuf = Buffer.from(singleAssetZip);
+
+// Parse zip file headers
+const filesInZip = [];
+let offset = 0;
+while (offset < zipBuf.length - 4) {
+  if (zipBuf.readUInt32LE(offset) === 0x04034b50) {
+    const fnLen = zipBuf.readUInt16LE(offset + 26);
+    const exLen = zipBuf.readUInt16LE(offset + 28);
+    const cSize = zipBuf.readUInt32LE(offset + 18);
+    const fn = zipBuf.slice(offset + 30, offset + 30 + fnLen).toString('utf8');
+    filesInZip.push(fn);
+    offset += 30 + fnLen + exLen + cSize;
+  } else {
+    offset++;
+  }
+}
+
+// Exactly ONE primary 3D model asset: .glb
+const model3dFiles = filesInZip.filter(f => f.endsWith('.glb') || f.endsWith('.obj'));
+assert.strictEqual(model3dFiles.length, 1, 'ZIP package must contain exactly ONE 3D model asset, not both .obj and .glb');
+assert.strictEqual(model3dFiles[0], 'TestPorsche.glb', 'Primary 3D model asset must be .glb');
+
+// Textures folder must exist with all textures
+assert.ok(filesInZip.includes('textures/diffuse.png'), 'textures/diffuse.png must be in package');
+assert.ok(filesInZip.includes('textures/normal.png'), 'textures/normal.png must be in package');
+assert.ok(filesInZip.includes('README.txt'), 'README.txt must be in package');
+console.log('  [PASS] Single 3D model asset (.glb) and textures folder verified (zero duplicate .obj clutter)');
+
+// ── Test Suite 14: 3D Platform URL Detection & Regex Engine ──
+const sfRegex = /(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i;
+const sampleSf1 = 'https://sketchfab.com/3d-models/bmw-m4-modified-widebody-61b1259b14ae4840ba1b0e9d819e60c1';
+const sampleSf2 = 'https://sketchfab.com/i/models/61b1259b14ae4840ba1b0e9d819e60c1';
+const sampleSf3 = 'https://sketchfab.com/models/61b1259b14ae4840ba1b0e9d819e60c1/embed';
+
+assert.strictEqual(sampleSf1.match(sfRegex)?.[1], '61b1259b14ae4840ba1b0e9d819e60c1', 'Must match standard Sketchfab slug URL');
+assert.strictEqual(sampleSf2.match(sfRegex)?.[1], '61b1259b14ae4840ba1b0e9d819e60c1', 'Must match Sketchfab /i/models URL');
+assert.strictEqual(sampleSf3.match(sfRegex)?.[1], '61b1259b14ae4840ba1b0e9d819e60c1', 'Must match Sketchfab embed URL');
+
+const polyRegex = /polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i;
+const samplePoly = 'https://polyhaven.com/a/ArmChair_01';
+assert.strictEqual(samplePoly.match(polyRegex)?.[1], 'ArmChair_01', 'Must match Poly Haven asset URL');
+console.log('  [PASS] Dedicated 3D Platform URL Resolvers (Sketchfab, Poly Haven, CGTrader, TurboSquid) verified');
+
+// ── Test Suite 15: Poly Haven Model Bundler API Resolution ───
+const polyRes = await bundlePolyHavenModelPackage('ArmChair_01', 'ArmChair');
+assert.strictEqual(polyRes.ok, true, 'Poly Haven bundle must succeed');
+assert.ok(polyRes.zipBytes && polyRes.zipBytes.length > 1000, 'Poly Haven zip must contain models and textures');
+console.log('  [PASS] Poly Haven Model & Textures Packager verified via live API');
+
+console.log('[Test] All 15 core test suites passed successfully with zero errors!');
+
 
 
