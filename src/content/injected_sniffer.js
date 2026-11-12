@@ -421,16 +421,24 @@
         elemBufId = elemBuf._df_id;
         const buf = elemBuf._df_data;
 
-        if (type === 5123 || type === 0x1403) { // UNSIGNED_SHORT
-          const off = Math.floor(byteOffset / 2);
-          idxArray = new Uint16Array(buf, byteOffset, count);
-        } else if (type === 5125 || type === 0x1405) { // UNSIGNED_INT
-          const off = Math.floor(byteOffset / 4);
-          idxArray = new Uint32Array(buf, byteOffset, count);
-        } else if (type === 5121 || type === 0x1401) { // UNSIGNED_BYTE
-          idxArray = new Uint8Array(buf, byteOffset, count);
+        const elemSize = (type === 5125 || type === 0x1405) ? 4 : (type === 5121 || type === 0x1401) ? 1 : 2;
+        const safeByteOffset = Math.max(0, byteOffset || 0);
+        const alignedOffset = safeByteOffset - (safeByteOffset % elemSize);
+        const maxPossibleCount = Math.floor((buf.byteLength - alignedOffset) / elemSize);
+        const safeCount = Math.min(count, Math.max(0, maxPossibleCount));
+        if (safeCount < 3) return;
+
+        try {
+          if (elemSize === 2) {
+            idxArray = new Uint16Array(buf, alignedOffset, safeCount);
+          } else if (elemSize === 4) {
+            idxArray = new Uint32Array(buf, alignedOffset, safeCount);
+          } else {
+            idxArray = new Uint8Array(buf, alignedOffset, safeCount);
+          }
+        } catch (_) {
+          return;
         }
-        if (!idxArray || idxArray.length < 3) return;
       }
 
       // 2. Identify active vertex position attribute
@@ -469,12 +477,15 @@
       if (drawCallDedup.has(dedupKey)) return;
       drawCallDedup.add(dedupKey);
 
-      // 3. Extract vertices from buffer view
+      // 3. Extract vertices from buffer view safely
       const rawPosBuf = posBuf._df_data;
+      const posAlignedBytes = rawPosBuf.byteLength - (rawPosBuf.byteLength % 4);
+      if (posAlignedBytes < 12) return;
+      const floatView = new Float32Array(rawPosBuf, 0, Math.floor(posAlignedBytes / 4));
+
       const posStrideBytes = posAttrib.stride > 0 ? posAttrib.stride : (posAttrib.size * 4);
       const posOffsetBytes = posAttrib.offset || 0;
       const strideFloats = Math.floor(posStrideBytes / 4);
-      const floatView = new Float32Array(rawPosBuf);
 
       let maxIndex = 0;
       if (isElements && idxArray) {
@@ -491,6 +502,29 @@
       const positions = new Float32Array(vertexCount * 3);
       const normals = normAttrib ? new Float32Array(vertexCount * 3) : null;
       const uvs = uvAttrib ? new Float32Array(vertexCount * 2) : null;
+
+      // Pre-instantiate attribute views once outside vertex loop for 100x performance
+      let nView = null, nStride = 3, nOff = 0;
+      if (normals && normAttrib && normAttrib.buffer && normAttrib.buffer._df_data) {
+        const nBuf = normAttrib.buffer._df_data;
+        const nAlign = nBuf.byteLength - (nBuf.byteLength % 4);
+        if (nAlign >= 12) {
+          nView = new Float32Array(nBuf, 0, Math.floor(nAlign / 4));
+          nStride = normAttrib.stride > 0 ? Math.floor(normAttrib.stride / 4) : 3;
+          nOff = Math.floor((normAttrib.offset || 0) / 4);
+        }
+      }
+
+      let uvView = null, uvStride = 2, uvOff = 0;
+      if (uvs && uvAttrib && uvAttrib.buffer && uvAttrib.buffer._df_data) {
+        const uvBuf = uvAttrib.buffer._df_data;
+        const uvAlign = uvBuf.byteLength - (uvBuf.byteLength % 4);
+        if (uvAlign >= 8) {
+          uvView = new Float32Array(uvBuf, 0, Math.floor(uvAlign / 4));
+          uvStride = uvAttrib.stride > 0 ? Math.floor(uvAttrib.stride / 4) : 2;
+          uvOff = Math.floor((uvAttrib.offset || 0) / 4);
+        }
+      }
 
       // Check for active affine model matrix (uniformMatrix4fv)
       const m = gl._df_activeMatrix;
@@ -511,31 +545,27 @@
             x = wx; y = wy; z = wz;
           }
 
-          positions[v * 3] = x;
-          positions[v * 3 + 1] = y;
-          positions[v * 3 + 2] = z;
+          positions[v * 3] = isNaN(x) ? 0 : x;
+          positions[v * 3 + 1] = isNaN(y) ? 0 : y;
+          positions[v * 3 + 2] = isNaN(z) ? 0 : z;
         }
 
-        if (normals && normAttrib) {
-          const nStride = normAttrib.stride > 0 ? Math.floor(normAttrib.stride / 4) : 3;
-          const nOff = Math.floor((normAttrib.offset || 0) / 4);
-          const nView = new Float32Array(normAttrib.buffer._df_data);
+        if (nView) {
           const nIdx = nOff + v * nStride;
           if (nIdx + 2 < nView.length) {
-            normals[v * 3] = nView[nIdx];
-            normals[v * 3 + 1] = nView[nIdx + 1];
-            normals[v * 3 + 2] = nView[nIdx + 2];
+            const nx = nView[nIdx], ny = nView[nIdx + 1], nz = nView[nIdx + 2];
+            normals[v * 3] = isNaN(nx) ? 0 : nx;
+            normals[v * 3 + 1] = isNaN(ny) ? 0 : ny;
+            normals[v * 3 + 2] = isNaN(nz) ? 1 : nz;
           }
         }
 
-        if (uvs && uvAttrib) {
-          const uvStride = uvAttrib.stride > 0 ? Math.floor(uvAttrib.stride / 4) : 2;
-          const uvOff = Math.floor((uvAttrib.offset || 0) / 4);
-          const uvView = new Float32Array(uvAttrib.buffer._df_data);
+        if (uvView) {
           const uvIdx = uvOff + v * uvStride;
           if (uvIdx + 1 < uvView.length) {
-            uvs[v * 2] = uvView[uvIdx];
-            uvs[v * 2 + 1] = uvView[uvIdx + 1];
+            const u = uvView[uvIdx], uVal = uvView[uvIdx + 1];
+            uvs[v * 2] = isNaN(u) ? 0 : u;
+            uvs[v * 2 + 1] = isNaN(uVal) ? 0 : uVal;
           }
         }
       }
@@ -813,9 +843,10 @@
 
         // 1. Vertices
         for (let v = 0; v < vCount; v++) {
-          const x = Number(pos[v * 3]).toFixed(5);
-          const y = Number(pos[v * 3 + 1]).toFixed(5);
-          const z = Number(pos[v * 3 + 2]).toFixed(5);
+          const rawX = pos[v * 3], rawY = pos[v * 3 + 1], rawZ = pos[v * 3 + 2];
+          const x = isNaN(rawX) ? '0.00000' : Number(rawX).toFixed(5);
+          const y = isNaN(rawY) ? '0.00000' : Number(rawY).toFixed(5);
+          const z = isNaN(rawZ) ? '0.00000' : Number(rawZ).toFixed(5);
           objText += `v ${x} ${y} ${z}\n`;
           globalVOffset++;
         }
@@ -823,9 +854,10 @@
         // 2. Normals
         if (norm) {
           for (let v = 0; v < vCount; v++) {
-            const nx = Number(norm[v * 3]).toFixed(5);
-            const ny = Number(norm[v * 3 + 1]).toFixed(5);
-            const nz = Number(norm[v * 3 + 2]).toFixed(5);
+            const rawNx = norm[v * 3], rawNy = norm[v * 3 + 1], rawNz = norm[v * 3 + 2];
+            const nx = isNaN(rawNx) ? '0.00000' : Number(rawNx).toFixed(5);
+            const ny = isNaN(rawNy) ? '0.00000' : Number(rawNy).toFixed(5);
+            const nz = isNaN(rawNz) ? '1.00000' : Number(rawNz).toFixed(5);
             objText += `vn ${nx} ${ny} ${nz}\n`;
             globalVnOffset++;
           }
@@ -834,8 +866,9 @@
         // 3. Texture UVs
         if (uvs) {
           for (let v = 0; v < vCount; v++) {
-            const u = Number(uvs[v * 2]).toFixed(5);
-            const vCoord = Number(uvs[v * 2 + 1]).toFixed(5);
+            const rawU = uvs[v * 2], rawV = uvs[v * 2 + 1];
+            const u = isNaN(rawU) ? '0.00000' : Number(rawU).toFixed(5);
+            const vCoord = isNaN(rawV) ? '0.00000' : Number(rawV).toFixed(5);
             objText += `vt ${u} ${vCoord}\n`;
             globalVtOffset++;
           }
