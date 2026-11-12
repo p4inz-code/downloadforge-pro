@@ -83,23 +83,30 @@ When extracting audio from a streaming video or audio-only playlist, DownloadFor
 
 ---
 
-## 3D Spatial Asset Ripper & WebGL GPU Geometry Extraction
+## 3D Spatial Asset Ripper & Ninja Ripper Engine
 
-Modern 3D web platforms use fragmented delivery pipelines to prevent trivial downloading:
-- **WebGL Geometry Encryption & Proprietary Chunks**: Platforms like Sketchfab, Spline, and custom Three.js viewers stream binary buffers (`.binz`, `.osgjs`) or deliver raw JSON metadata endpoints (`/i/models/<uid>`). Direct downloads of these endpoints yield raw JSON strings or broken assets.
+Modern 3D web platforms use fragmented delivery pipelines, obfuscation, or encryption to prevent trivial downloading:
+- **Encrypted & Fragmented Chunks**: Platforms like Sketchfab, CGTrader, Spline, and custom Three.js viewers stream encrypted or obfuscated binary chunks (`.binz`, `.osgjs`) or deliver raw JSON metadata endpoints (`/i/models/<uid>`). Direct network fetching yields encrypted bytes or raw metadata.
 - **Fragmented glTF Archives**: Other sites deliver `.gltf` JSON files referencing external `.bin` geometry buffers and image textures.
 
-DownloadForge Pro solves this through a dual-mode 3D extraction pipeline:
+DownloadForge Pro solves this through the in-browser **Ninja Ripper Engine**:
 
-1. **In-Page WebGL GPU Mesh Ripper (Hardware Buffer Hook)**:
-   - Intercepts `WebGLRenderingContext.prototype.bufferData` and `WebGL2RenderingContext.prototype.bufferData`.
-   - Captures vertex arrays (`gl.ARRAY_BUFFER`, 0x8892) and element indices (`gl.ELEMENT_ARRAY_BUFFER`, 0x8893) directly as they are loaded into the GPU.
-   - Reconstructs 3D coordinates, detects stride (normals/UVs), and exports a clean Wavefront `.obj` file on demand via the floating `3D Rip` viewer badge.
-2. **Dedicated Platform Resolvers**:
-   - **Sketchfab**: Extracts model UIDs, queries authenticated download endpoints for official `.zip`/`.glb` archives, automatically resolves streaming binary geometries (`.binz`/`.osgjs`), and strictly protects against downloading raw JSON metadata as `.glb`.
-   - **Supported Ecosystems**: Automatic adapters for Sketchfab, Thingiverse, Printables, Cults3D, Spline (`.splinecode`), Ready Player Me (`.glb`), and Luma AI (`.splat`).
-3. **glTF 2.0 Binary Container Packager (`src/core/gltf_packager.js`)**:
-   - Merges external `.bin` files and embedded textures into standard standalone `.glb` containers ready for Blender, Unity, and Unreal Engine.
+1. **Draw-Call Precision Interception (Hardware GPU Hook)**:
+   - Intercepts `WebGLRenderingContext.prototype.drawElements` and `WebGL2RenderingContext.prototype.drawElements` at the exact instant geometry is submitted to the GPU (`gl.TRIANGLES`).
+   - Accurately reads active index slices directly from `gl.ELEMENT_ARRAY_BUFFER` and separates vertex coordinates, normals, and texture UVs into distinct attribute channels without guessing strides.
+   - Preserves Vertex Array Object (VAO) state across both WebGL 2.0 and the `OES_vertex_array_object` extension.
+2. **$4\times 4$ World / Model Matrix Transformation**:
+   - Intercepts `gl.uniformMatrix4fv` to capture the active Model/World transform matrix, multiplying vertex positions:
+     $$\begin{bmatrix} x' \\ y' \\ z' \\ 1 \end{bmatrix} = M_{\text{world}} \begin{bmatrix} x \\ y \\ z \\ 1 \end{bmatrix}$$
+   - Ensures multi-part models (e.g. car body, wheels, interior, spoilers) snap into their authentic physical coordinates rather than collapsing at the origin $(0,0,0)$.
+3. **Interactive 3D Viewport in Studio**:
+   - Ripped models can be previewed immediately in the DownloadForge Dashboard viewport before export.
+   - Includes mouse-orbit controls, mouse-wheel zoom, directional depth shading, wireframe toggles, and real-time vertex/face counters.
+4. **Dedicated Platform Resolvers**:
+   - **Sketchfab**: Extracts model UIDs, queries official download endpoints, resolves high-res PBR texture maps, downloads raw binary streams, and bundles everything into an organized ZIP with both `.glb` and `.obj` + `.mtl`.
+   - **Supported Ecosystems**: Sketchfab, CGTrader, TurboSquid, Thingiverse, Printables, Cults3D, Free3D, Thangs, Spline (`.splinecode`), Ready Player Me (`.glb`), and Luma AI (`.splat`).
+5. **glTF 2.0 Binary Container Packager (`src/core/gltf_packager.js`)**:
+   - Packs multi-primitive geometry and embedded buffers into standalone `.glb` containers ready for Blender, Windows 3D Viewer, macOS QuickLook, Unity, and Unreal Engine.
 
 ---
 
