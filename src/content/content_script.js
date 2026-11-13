@@ -24,14 +24,16 @@ if (!window.__downloadForgeInjected) {
   init();
 }
 
-// Cryptographically secure session token generation
-function generateSecureToken() {
-  const buf = new Uint8Array(24);
-  crypto.getRandomValues(buf);
-  return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+// Session token binding with main-world sniffer
+let sessionToken = (document.documentElement && document.documentElement.dataset.dfSnifferToken) || null;
+if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
+  delete document.documentElement.dataset.dfSnifferToken;
 }
-
-const sessionToken = generateSecureToken();
+if (!sessionToken && window.crypto && window.crypto.getRandomValues) {
+  const buf = new Uint8Array(24);
+  window.crypto.getRandomValues(buf);
+  sessionToken = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+}
 
 function injectMainWorldSniffer() {
   try {
@@ -44,7 +46,6 @@ function injectMainWorldSniffer() {
       script.remove();
     };
     (document.head || document.documentElement).appendChild(script);
-    // Remove dataset token immediately after script element creation
     delete document.documentElement.dataset.dfSnifferToken;
   } catch (err) {
     console.debug('[DownloadForge] Failed to inject sniffer:', err);
@@ -83,11 +84,15 @@ async function init() {
 // ── Listen to Main-World Sniffer Messages ────────────────────
 function setupSnifferListener() {
   window.addEventListener('message', async (event) => {
-    // Enforce window origin, source tag, and security token
+    // Enforce window origin and source tag
     if (event.source !== window || !event.data || event.data.source !== 'DOWNLOADFORGE_SNIFFER') {
       return;
     }
-    if (event.data.token !== sessionToken) {
+    // Bind session token on first verified sniffer message
+    if (!sessionToken && event.data.token) {
+      sessionToken = event.data.token;
+    }
+    if (sessionToken && event.data.token && event.data.token !== sessionToken) {
       return;
     }
 

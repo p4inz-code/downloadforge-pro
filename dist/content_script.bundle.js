@@ -1268,56 +1268,104 @@
       <span>3D Rip</span>
       <span class="df-quality-tag df-telemetry-tag" style="display:none;">Ready</span>
     `;
-      pill.addEventListener("click", (e) => {
+      function requestMeshRip(timeoutMs = 1500) {
+        return new Promise((resolve) => {
+          let done = false;
+          const onData = (e) => {
+            if (!done && e.data && e.data.type === "DF_WEBGL_RIP_DATA" && e.data.objData) {
+              done = true;
+              window.removeEventListener("message", onData);
+              resolve(e.data);
+            }
+          };
+          window.addEventListener("message", onData);
+          window.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
+          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+          document.querySelectorAll("iframe").forEach((ifr) => {
+            try {
+              ifr.contentWindow.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
+              ifr.contentWindow.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
+            } catch (_) {
+            }
+          });
+          setTimeout(() => {
+            if (!done) {
+              done = true;
+              window.removeEventListener("message", onData);
+              resolve(null);
+            }
+          }, timeoutMs);
+        });
+      }
+      pill.addEventListener("click", async (e) => {
         e.stopPropagation();
         e.preventDefault();
         if (pill._df_downloading) return;
         pill._df_downloading = true;
         setTimeout(() => {
           pill._df_downloading = false;
-        }, 3500);
+        }, 4e3);
         const loc = window.location.href;
         const sfMatch = loc.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) || (el.getAttribute("data-model-id") ? [null, el.getAttribute("data-model-id")] : null) || el.src && el.src.match(/models\/([0-9a-f]{32})/i);
         const polyMatch = loc.match(/polyhaven\.com\/a\/([a-zA-Z0-9_-]+)/i);
         let targetUrl = el.getAttribute("src") || el.src || el.getAttribute("url") || loc;
         let targetTitle = (document.title || "3D_Model").replace(/[<>:"/\\|?*]/g, "_").trim().slice(0, 80);
-        window.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
-        document.querySelectorAll("iframe").forEach((ifr) => {
-          try {
-            ifr.contentWindow.postMessage({ type: "DF_NUDGE_CANVAS" }, "*");
-          } catch (err) {
-          }
-        });
         if (sfMatch && sfMatch[1]) {
           targetUrl = `https://sketchfab.com/i/models/${sfMatch[1]}`;
           targetTitle = targetTitle.replace(/\s*-\s*(?:3D\s*model\s*by.*|Sketchfab).*$/i, "").trim();
-          show3DToast("DownloadForge: Packaging Sketchfab 3D Model & Textures into ZIP...");
+          try {
+            const authRes = await fetch(`https://sketchfab.com/v3/models/${sfMatch[1]}/download`, {
+              credentials: "include"
+            });
+            if (authRes.ok) {
+              const authData = await authRes.json();
+              const directUrl = authData.gltf && authData.gltf.url || authData.source && authData.source.url || authData.glb && authData.glb.url;
+              if (directUrl) {
+                show3DToast("DownloadForge: Starting official Sketchfab 3D package download...");
+                chrome.runtime.sendMessage({
+                  type: MSG.DOWNLOAD_ITEM,
+                  payload: {
+                    url: directUrl,
+                    filename: `${targetTitle || "model"}.zip`
+                  }
+                }, (res) => {
+                  if (res && res.ok) show3DToast("Official 3D package download started!");
+                });
+                return;
+              }
+            }
+          } catch (_) {
+          }
         } else if (polyMatch && polyMatch[1]) {
           targetUrl = `https://polyhaven.com/a/${polyMatch[1]}`;
           targetTitle = targetTitle.replace(/\s*Model\s*•\s*Poly\s*Haven.*$/i, "").trim();
           show3DToast("DownloadForge: Packaging Poly Haven 3D Asset & Textures into ZIP...");
         } else if (loc.includes("cgtrader.com")) {
           targetTitle = targetTitle.replace(/\s*\|\s*CGTrader.*$/i, "").trim();
-          show3DToast("DownloadForge 3D Ripper: Extracting CGTrader GPU geometry & textures...");
-          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
         } else if (loc.includes("turbosquid.com")) {
           targetTitle = targetTitle.replace(/\s*\|\s*TurboSquid.*$/i, "").trim();
-          show3DToast("DownloadForge 3D Ripper: Extracting TurboSquid GPU geometry & textures...");
-          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
-        } else {
-          show3DToast("DownloadForge 3D Ripper: Extracting GPU WebGL geometry to 3D package...");
-          window.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
-          document.querySelectorAll("iframe").forEach((ifr) => {
-            try {
-              ifr.contentWindow.postMessage({ type: "DF_TRIGGER_WEBGL_RIP" }, "*");
-            } catch (err) {
+        }
+        let ripped = null;
+        if (!polyMatch) {
+          show3DToast("DownloadForge 3D: Extracting GPU WebGL geometry...");
+          try {
+            ripped = await requestMeshRip(1800);
+            if (ripped && ripped.vertexCount) {
+              show3DToast(`DownloadForge: Captured ${ripped.vertexCount} vertices (${ripped.drawCalls} parts)! Packaging...`);
+            } else {
+              show3DToast("DownloadForge 3D: Rotate or interact with the 3D model in the viewport to stream geometry!", true);
             }
-          });
+          } catch (_) {
+          }
         }
         const filename = `${targetTitle || "model"}.glb`;
         chrome.runtime.sendMessage({
           type: MSG.DOWNLOAD_ITEM,
-          payload: { url: targetUrl, filename }
+          payload: {
+            url: targetUrl,
+            filename,
+            capturedObj: ripped ? ripped.objData : null
+          }
         }, (res) => {
           if (chrome.runtime.lastError) {
             console.error("[DownloadForge 3D] Runtime error:", chrome.runtime.lastError.message);
@@ -1444,12 +1492,15 @@
     window.__downloadForgeInjected = true;
     init();
   }
-  function generateSecureToken() {
-    const buf = new Uint8Array(24);
-    crypto.getRandomValues(buf);
-    return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+  var sessionToken = document.documentElement && document.documentElement.dataset.dfSnifferToken || null;
+  if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
+    delete document.documentElement.dataset.dfSnifferToken;
   }
-  var sessionToken = generateSecureToken();
+  if (!sessionToken && window.crypto && window.crypto.getRandomValues) {
+    const buf = new Uint8Array(24);
+    window.crypto.getRandomValues(buf);
+    sessionToken = Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
   function injectMainWorldSniffer() {
     try {
       document.documentElement.dataset.dfSnifferToken = sessionToken;
@@ -1495,7 +1546,10 @@
       if (event.source !== window || !event.data || event.data.source !== "DOWNLOADFORGE_SNIFFER") {
         return;
       }
-      if (event.data.token !== sessionToken) {
+      if (!sessionToken && event.data.token) {
+        sessionToken = event.data.token;
+      }
+      if (sessionToken && event.data.token && event.data.token !== sessionToken) {
         return;
       }
       if (event.data.type === "BUFFER_CHUNK_APPENDED" && event.data.data) {

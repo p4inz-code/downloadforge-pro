@@ -400,7 +400,7 @@ async function triggerScanOnTab(tabId) {
 
 // ── Handler: single download ──────────────────────────────────
 async function handleDownload(payload, sendResponse) {
-  const { url, filename, saveAs } = payload;
+  const { url, filename, saveAs, capturedObj } = payload;
 
   if (!url) {
     sendResponse({ ok: false, error: 'No URL provided' });
@@ -411,13 +411,17 @@ async function handleDownload(payload, sendResponse) {
     let downloadUrl = url;
     let targetFilename = filename || extractFilenameFromUrl(url);
 
+    let capturedObjMesh = capturedObj || (bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null);
+    if (capturedObj) {
+      bgCached3DMesh = { objData: capturedObj, time: Date.now() };
+    }
+
     // 1. Sketchfab 3D Asset Package (Model + Textures + Materials ZIP)
     const sfMatch = url.match(/(?:sketchfab\.com\/(?:[a-z0-9_-]+\/)*?(?:3d-models\/[a-z0-9_-]+-|models\/|i\/models\/)|models\/)([0-9a-f]{32})/i) ||
                     (url.includes('sketchfab.com') ? url.match(/([0-9a-f]{32})/i) : null);
     if (sfMatch && sfMatch[1]) {
       const uid = sfMatch[1];
       try {
-        let capturedObjMesh = bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null;
         if (!capturedObjMesh) {
           try {
             const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -425,6 +429,7 @@ async function handleDownload(payload, sendResponse) {
               const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
               if (tabRes && tabRes.objData) {
                 capturedObjMesh = tabRes.objData;
+                bgCached3DMesh = { objData: capturedObjMesh, time: Date.now() };
               }
             }
           } catch (e) {}

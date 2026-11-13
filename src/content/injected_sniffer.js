@@ -14,12 +14,17 @@
   if (window.__df_sniffer_injected) return;
   window.__df_sniffer_injected = true;
 
-  // Retrieve security nonce passed from content script
+  // Retrieve security nonce passed from content script or generate crypto nonce
   const scriptEl = document.currentScript;
-  const sessionToken = (document.documentElement && document.documentElement.dataset.dfSnifferToken) ||
-                       (scriptEl && scriptEl.dataset ? scriptEl.dataset.token : null);
+  let sessionToken = (document.documentElement && document.documentElement.dataset.dfSnifferToken) ||
+                     (scriptEl && scriptEl.dataset ? scriptEl.dataset.token : null);
   if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
     delete document.documentElement.dataset.dfSnifferToken;
+  }
+  if (!sessionToken && window.crypto && window.crypto.getRandomValues) {
+    const buf = new Uint8Array(24);
+    window.crypto.getRandomValues(buf);
+    sessionToken = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
   }
   if (scriptEl && scriptEl.dataset && scriptEl.dataset.token) {
     delete scriptEl.dataset.token;
@@ -856,6 +861,8 @@
       const objData = exportCapturedMeshToObj(title);
       if (objData) {
         const ripMsg = {
+          source: 'DOWNLOADFORGE_SNIFFER',
+          token: sessionToken,
           type: 'DF_WEBGL_RIP_DATA',
           objData,
           title,
@@ -863,16 +870,23 @@
           vertexCount: totalCapturedVertices,
           faceCount: totalCapturedFaces
         };
-        window.postMessage(ripMsg, '*');
+        safePostMessage(ripMsg, '*');
         if (window.parent && window.parent !== window) {
           try { window.parent.postMessage(ripMsg, '*'); } catch (_) {}
         }
         if (window.top && window.top !== window && window.top !== window.parent) {
           try { window.top.postMessage(ripMsg, '*'); } catch (_) {}
         }
-        window.postMessage({ type: 'DF_WEBGL_RIP_SUCCESS', title }, '*');
+        safePostMessage({
+          source: 'DOWNLOADFORGE_SNIFFER',
+          token: sessionToken,
+          type: 'DF_WEBGL_RIP_SUCCESS',
+          title
+        }, '*');
       } else {
-        window.postMessage({
+        safePostMessage({
+          source: 'DOWNLOADFORGE_SNIFFER',
+          token: sessionToken,
           type: 'DF_WEBGL_RIP_FAIL',
           reason: 'No WebGL buffer data captured yet. Interact with the 3D model viewer to stream geometry.'
         }, '*');

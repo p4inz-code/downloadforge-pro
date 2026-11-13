@@ -318,78 +318,61 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
       }
     }
 
-    // B. Model Geometry: Package exactly ONE primary 3D model asset
-    let activeObj = (capturedObjMesh && capturedObjMesh.length > 50) ? capturedObjMesh : null;
-
-    if (!activeObj) {
-      // Build a standard reference textured mesh with correct normals and UV coordinates
-      // Ensures the ZIP package ALWAYS contains a valid, openable 3D model
-      activeObj = [
-        `# DownloadForge Pro 3D Ripper`,
-        `# Model: ${modelName}`,
-        `mtllib ${modelName}.mtl`,
-        `g mesh_reference`,
-        `v -1.00000 -1.00000 0.00000`,
-        `v  1.00000 -1.00000 0.00000`,
-        `v  1.00000  1.00000 0.00000`,
-        `v -1.00000  1.00000 0.00000`,
-        `vn 0.00000 0.00000 1.00000`,
-        `vt 0.00000 0.00000`,
-        `vt 1.00000 0.00000`,
-        `vt 1.00000 1.00000`,
-        `vt 0.00000 1.00000`,
-        `usemtl Material_Main`,
-        `f 1/1/1 2/2/1 3/3/1`,
-        `f 1/1/1 3/3/1 4/4/1`,
-        ``
-      ].join('\n');
-    }
+    // B. Model Geometry: Package captured 3D model asset if present
+    const hasRealGeometry = Boolean(
+      capturedObjMesh &&
+      capturedObjMesh.length > 50 &&
+      (capturedObjMesh.match(/\nv /g) || []).length >= 3
+    );
+    let activeObj = hasRealGeometry ? capturedObjMesh : null;
 
     let glbBytes = null;
-    try {
-      glbBytes = convertObjToGlb(activeObj, modelName);
-    } catch (glbErr) {
-      log.warn('GLB container packaging fallback:', glbErr.message);
-    }
-
-    if (glbBytes && glbBytes.length > 50) {
-      // Universal binary 3D container (single asset)
-      zipFiles.push({
-        name: `${modelName}.glb`,
-        data: glbBytes
-      });
-    } else {
-      // Fallback single asset: Wavefront OBJ + Material MTL
-      zipFiles.push({
-        name: `${modelName}.obj`,
-        data: activeObj
-      });
-
-      let mtlContent = `# DownloadForge Pro Material Library\n# Model: ${modelName}\n\n`;
-      if (textureNames.length > 0) {
-        mtlContent += `newmtl Material_Main\n`;
-        mtlContent += `Ka 1.000 1.000 1.000\n`;
-        mtlContent += `Kd 1.000 1.000 1.000\n`;
-        mtlContent += `Ks 0.500 0.500 0.500\n`;
-        mtlContent += `Ns 250.000\n`;
-        mtlContent += `illum 2\n`;
-
-        const diffuseTex = textureNames.find(n => !n.includes('_nrm') && !n.includes('_a') && !n.includes('refl')) || textureNames[0];
-        if (diffuseTex) {
-          mtlContent += `map_Kd textures/${diffuseTex}\n`;
-        }
-        const normalTex = textureNames.find(n => n.includes('_nrm') || n.includes('normal'));
-        if (normalTex) {
-          mtlContent += `map_Bump textures/${normalTex}\n`;
-        }
-      } else {
-        mtlContent += `newmtl Material_Default\nKd 0.8 0.8 0.8\n`;
+    if (activeObj) {
+      try {
+        glbBytes = convertObjToGlb(activeObj, modelName);
+      } catch (glbErr) {
+        log.warn('GLB container packaging fallback:', glbErr.message);
       }
 
-      zipFiles.push({
-        name: `${modelName}.mtl`,
-        data: mtlContent
-      });
+      if (glbBytes && glbBytes.length > 50) {
+        // Universal binary 3D container (single asset)
+        zipFiles.push({
+          name: `${modelName}.glb`,
+          data: glbBytes
+        });
+      } else {
+        // Fallback single asset: Wavefront OBJ + Material MTL
+        zipFiles.push({
+          name: `${modelName}.obj`,
+          data: activeObj
+        });
+
+        let mtlContent = `# DownloadForge Pro Material Library\n# Model: ${modelName}\n\n`;
+        if (textureNames.length > 0) {
+          mtlContent += `newmtl Material_Main\n`;
+          mtlContent += `Ka 1.000 1.000 1.000\n`;
+          mtlContent += `Kd 1.000 1.000 1.000\n`;
+          mtlContent += `Ks 0.500 0.500 0.500\n`;
+          mtlContent += `Ns 250.000\n`;
+          mtlContent += `illum 2\n`;
+
+          const diffuseTex = textureNames.find(n => !n.includes('_nrm') && !n.includes('_a') && !n.includes('refl')) || textureNames[0];
+          if (diffuseTex) {
+            mtlContent += `map_Kd textures/${diffuseTex}\n`;
+          }
+          const normalTex = textureNames.find(n => n.includes('_nrm') || n.includes('normal'));
+          if (normalTex) {
+            mtlContent += `map_Bump textures/${normalTex}\n`;
+          }
+        } else {
+          mtlContent += `newmtl Material_Default\nKd 0.8 0.8 0.8\n`;
+        }
+
+        zipFiles.push({
+          name: `${modelName}.mtl`,
+          data: mtlContent
+        });
+      }
     }
 
     // C. Binary stream geometry fallback (.binz / .osgjs)
@@ -411,6 +394,7 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
     const author = (meta && meta.user && (meta.user.displayName || meta.user.username)) || 'Creator';
     const license = (meta && meta.license && meta.license.fullname) || 'Creative Commons Attribution';
     const hasGlb = glbBytes && glbBytes.length > 50;
+    const hasModel = hasGlb || Boolean(activeObj);
     const readme = [
       `DownloadForge Pro — 3D Asset Package`,
       `====================================`,
@@ -420,14 +404,19 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
       `Extracted  : ${new Date().toISOString()}`,
       ``,
       `Primary Model Asset:`,
-      hasGlb
-        ? `- ${modelName}.glb : Universal Binary glTF 2.0 (Compatible with Blender, Unreal Engine, Unity, 3ds Max, Maya, Windows 3D Viewer)`
-        : `- ${modelName}.obj : Wavefront OBJ with face indices & UV coordinates\n- ${modelName}.mtl : Material definitions referencing PBR maps in textures/`,
+      hasModel
+        ? (hasGlb
+            ? `- ${modelName}.glb : Universal Binary glTF 2.0 (Compatible with Blender, Unreal Engine, Unity, 3ds Max, Maya, Windows 3D Viewer)`
+            : `- ${modelName}.obj : Wavefront OBJ with face indices & UV coordinates\n- ${modelName}.mtl : Material definitions referencing PBR maps in textures/`)
+        : `- Notice: Live GPU geometry was not active during this capture session. To extract the full vertex mesh, ensure the 3D model is rendered in the viewer and rotate it slightly in the viewport before clicking Download.`,
       `- textures/        : ${textureNames.length} high-resolution PBR maps in original quality`,
+      ...(meta && meta.files && meta.files[0] ? [`- source/          : Model stream archive (model_stream.binz)`] : []),
       ``,
-      `Import Instructions:`,
-      `1. Open 3D application -> File -> Import -> ${hasGlb ? 'glTF 2.0 (.glb)' : 'Wavefront (.obj)'}`,
-      `2. Switch Viewport shading to 'Material Preview' to render all PBR textures.`,
+      ...(hasModel ? [
+        `Import Instructions:`,
+        `1. Open 3D application -> File -> Import -> ${hasGlb ? 'glTF 2.0 (.glb)' : 'Wavefront (.obj)'}`,
+        `2. Switch Viewport shading to 'Material Preview' to render all PBR textures.`
+      ] : [])
     ].join('\n');
 
     zipFiles.push({
