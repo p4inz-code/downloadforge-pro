@@ -1324,6 +1324,7 @@
       parent.appendChild(overlay);
     }
     function scan3D() {
+      if (document.hidden) return;
       try {
         document.querySelectorAll("model-viewer, spline-viewer").forEach(attachOverlayTo3D);
         document.querySelectorAll(".c-viewer, canvas.viewer, #sketchfab-viewer, div[data-model-id], div[data-uid]").forEach(attachOverlayTo3D);
@@ -1339,7 +1340,10 @@
       }
     }
     scan3D();
-    setInterval(scan3D, 2e3);
+    setInterval(scan3D, 5e3);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) scan3D();
+    });
   }
 
   // src/storage/storage.js

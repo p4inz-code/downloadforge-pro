@@ -588,6 +588,9 @@ export function init3DOverlay() {
   }
 
   function scan3D() {
+    // Guard: Never burn CPU when tab is hidden in background
+    if (document.hidden) return;
+
     try {
       // 1. Web Components
       document.querySelectorAll('model-viewer, spline-viewer').forEach(attachOverlayTo3D);
@@ -614,5 +617,9 @@ export function init3DOverlay() {
   }
 
   scan3D();
-  setInterval(scan3D, 2000);
+  // Relaxed 5-second periodic check that sleeps when tab is inactive
+  setInterval(scan3D, 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scan3D();
+  });
 }

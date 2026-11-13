@@ -37,10 +37,20 @@
     }
   }
 
+  const notifiedUrls = new Set();
+
   function notifyDetected(mediaInfo) {
     if (!mediaInfo || !mediaInfo.url) return;
     // Validate protocol
     if (!/^https?:\/\//i.test(mediaInfo.url) && !mediaInfo.url.startsWith('blob:')) return;
+
+    // Deduplicate identical URLs to prevent IPC messaging flood
+    if (notifiedUrls.has(mediaInfo.url)) return;
+    notifiedUrls.add(mediaInfo.url);
+    if (notifiedUrls.size > 1500) {
+      const first = notifiedUrls.keys().next().value;
+      notifiedUrls.delete(first);
+    }
 
     const method = mediaInfo.method || (
       mediaInfo.initiator?.includes('fetch') ? 'TIER_1_NETWORK_FETCH' :
@@ -475,6 +485,7 @@
       const posBuf = posAttrib.buffer;
       const dedupKey = `${elemBufId}_${byteOffset}_${count}_${posBuf._df_id}`;
       if (drawCallDedup.has(dedupKey)) return;
+      if (drawCallDedup.size > 2000) drawCallDedup.clear();
       drawCallDedup.add(dedupKey);
 
       // 3. Extract vertices from buffer view safely
@@ -587,6 +598,12 @@
         partId: capturedDrawCalls.length + 1,
         time: Date.now()
       });
+
+      if (capturedDrawCalls.length > 500) {
+        const dropped = capturedDrawCalls.shift();
+        totalCapturedVertices = Math.max(0, totalCapturedVertices - (dropped.vertexCount || 0));
+        totalCapturedFaces = Math.max(0, totalCapturedFaces - (dropped.faceCount || 0));
+      }
 
       totalCapturedVertices += vertexCount;
       totalCapturedFaces += Math.floor(finalIndices.length / 3);
@@ -850,7 +867,11 @@
   });
 
   function exportCapturedMeshToObj(title) {
-    let objText = `# DownloadForge Pro WebGL 3D Ripper (Ninja Ripper Engine)\n# Model: ${title}\n# Extracted: ${new Date().toISOString()}\n\n`;
+    const lines = [
+      `# DownloadForge Pro WebGL 3D Ripper (Ninja Ripper Engine)\n`,
+      `# Model: ${title}\n`,
+      `# Extracted: ${new Date().toISOString()}\n\n`
+    ];
 
     // ── PRIMARY PIPELINE: Draw-Call Precision Meshes ─────────
     if (capturedDrawCalls.length > 0) {
@@ -873,7 +894,7 @@
         const submeshVnStart = globalVnOffset;
         const submeshVtStart = globalVtOffset;
 
-        objText += `g part_${String(c + 1).padStart(2, '0')}\n`;
+        lines.push(`g part_${String(c + 1).padStart(2, '0')}\n`);
 
         // 1. Vertices
         for (let v = 0; v < vCount; v++) {
@@ -881,7 +902,7 @@
           const x = isNaN(rawX) ? '0.00000' : Number(rawX).toFixed(5);
           const y = isNaN(rawY) ? '0.00000' : Number(rawY).toFixed(5);
           const z = isNaN(rawZ) ? '0.00000' : Number(rawZ).toFixed(5);
-          objText += `v ${x} ${y} ${z}\n`;
+          lines.push(`v ${x} ${y} ${z}\n`);
           globalVOffset++;
         }
 
@@ -892,7 +913,7 @@
             const nx = isNaN(rawNx) ? '0.00000' : Number(rawNx).toFixed(5);
             const ny = isNaN(rawNy) ? '0.00000' : Number(rawNy).toFixed(5);
             const nz = isNaN(rawNz) ? '1.00000' : Number(rawNz).toFixed(5);
-            objText += `vn ${nx} ${ny} ${nz}\n`;
+            lines.push(`vn ${nx} ${ny} ${nz}\n`);
             globalVnOffset++;
           }
         }
@@ -903,7 +924,7 @@
             const rawU = uvs[v * 2], rawV = uvs[v * 2 + 1];
             const u = isNaN(rawU) ? '0.00000' : Number(rawU).toFixed(5);
             const vCoord = isNaN(rawV) ? '0.00000' : Number(rawV).toFixed(5);
-            objText += `vt ${u} ${vCoord}\n`;
+            lines.push(`vt ${u} ${vCoord}\n`);
             globalVtOffset++;
           }
         }
@@ -925,26 +946,26 @@
               const vt1 = i1 + 1 + submeshVtStart;
               const vt2 = i2 + 1 + submeshVtStart;
               const vt3 = i3 + 1 + submeshVtStart;
-              objText += `f ${f1}/${vt1}/${vn1} ${f2}/${vt2}/${vn2} ${f3}/${vt3}/${vn3}\n`;
+              lines.push(`f ${f1}/${vt1}/${vn1} ${f2}/${vt2}/${vn2} ${f3}/${vt3}/${vn3}\n`);
             } else if (norm) {
               const vn1 = i1 + 1 + submeshVnStart;
               const vn2 = i2 + 1 + submeshVnStart;
               const vn3 = i3 + 1 + submeshVnStart;
-              objText += `f ${f1}//${vn1} ${f2}//${vn2} ${f3}//${vn3}\n`;
+              lines.push(`f ${f1}//${vn1} ${f2}//${vn2} ${f3}//${vn3}\n`);
             } else if (uvs) {
               const vt1 = i1 + 1 + submeshVtStart;
               const vt2 = i2 + 1 + submeshVtStart;
               const vt3 = i3 + 1 + submeshVtStart;
-              objText += `f ${f1}/${vt1} ${f2}/${vt2} ${f3}/${vt3}\n`;
+              lines.push(`f ${f1}/${vt1} ${f2}/${vt2} ${f3}/${vt3}\n`);
             } else {
-              objText += `f ${f1} ${f2} ${f3}\n`;
+              lines.push(`f ${f1} ${f2} ${f3}\n`);
             }
             faceCount++;
           }
         }
       }
 
-      if (globalVOffset > 0) return objText;
+      if (globalVOffset > 0) return lines.join('');
     }
 
     // ── SECONDARY FALLBACK: Raw Buffer Pool ───────────────────
@@ -960,14 +981,14 @@
 
       const submeshVStart = globalVOffset;
       let submeshVCount = 0;
-      objText += `g raw_submesh_${c + 1}\n`;
+      lines.push(`g raw_submesh_${c + 1}\n`);
 
       for (let i = 0; i < arr.length - 2; i += 3) {
         const x = Number(arr[i]).toFixed(5);
         const y = Number(arr[i + 1]).toFixed(5);
         const z = Number(arr[i + 2]).toFixed(5);
         if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-          objText += `v ${x} ${y} ${z}\n`;
+          lines.push(`v ${x} ${y} ${z}\n`);
           submeshVCount++;
           globalVOffset++;
         }
@@ -981,17 +1002,17 @@
         for (let j = 0; j < iarr.length - 2; j += 3) {
           const i1 = iarr[j], i2 = iarr[j + 1], i3 = iarr[j + 2];
           if (i1 < submeshVCount && i2 < submeshVCount && i3 < submeshVCount) {
-            objText += `f ${i1 + 1 + submeshVStart} ${i2 + 1 + submeshVStart} ${i3 + 1 + submeshVStart}\n`;
+            lines.push(`f ${i1 + 1 + submeshVStart} ${i2 + 1 + submeshVStart} ${i3 + 1 + submeshVStart}\n`);
           }
         }
       } else {
         for (let j = 1; j <= submeshVCount - 2; j += 3) {
-          objText += `f ${j + submeshVStart} ${j + 1 + submeshVStart} ${j + 2 + submeshVStart}\n`;
+          lines.push(`f ${j + submeshVStart} ${j + 1 + submeshVStart} ${j + 2 + submeshVStart}\n`);
         }
       }
     }
 
-    return globalVOffset > 0 ? objText : null;
+    return globalVOffset > 0 ? lines.join('') : null;
   }
 
   hookEngineLoaders();
