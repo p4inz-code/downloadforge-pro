@@ -319,33 +319,221 @@
     }
   }
 
-  // Hook Three.js & Babylon.js Loaders if present in page runtime
+  // ── 3D Scene Graph Engine Introspection (Three.js / Babylon / OSG.js) ─
+  const capturedSceneGraphMeshes = [];
+
+  function inspectThreeScene(scene) {
+    if (!scene || !scene.traverse) return;
+    try {
+      scene.traverse(node => {
+        if (!node || !node.isMesh || !node.geometry) return;
+        const geo = node.geometry;
+        const posAttr = geo.attributes ? geo.attributes.position : null;
+        if (!posAttr || !posAttr.array || posAttr.count < 3) return;
+
+        const dedupKey = `three_${node.id || node.uuid || node.name}_${posAttr.count}`;
+        if (drawCallDedup.has(dedupKey)) return;
+        drawCallDedup.add(dedupKey);
+
+        node.updateMatrixWorld(true);
+        const m = node.matrixWorld ? node.matrixWorld.elements : null;
+        const vCount = posAttr.count;
+        const positions = new Float32Array(vCount * 3);
+        const rawPos = posAttr.array;
+
+        for (let v = 0; v < vCount; v++) {
+          const x = rawPos[v * 3];
+          const y = rawPos[v * 3 + 1];
+          const z = rawPos[v * 3 + 2];
+          if (m && m.length >= 16) {
+            positions[v * 3]     = m[0]*x + m[4]*y + m[8]*z  + m[12];
+            positions[v * 3 + 1] = m[1]*x + m[5]*y + m[9]*z  + m[13];
+            positions[v * 3 + 2] = m[2]*x + m[6]*y + m[10]*z + m[14];
+          } else {
+            positions[v * 3]     = x;
+            positions[v * 3 + 1] = y;
+            positions[v * 3 + 2] = z;
+          }
+        }
+
+        let normals = null;
+        if (geo.attributes && geo.attributes.normal && geo.attributes.normal.array) {
+          normals = new Float32Array(geo.attributes.normal.array);
+        }
+
+        let uvs = null;
+        if (geo.attributes && geo.attributes.uv && geo.attributes.uv.array) {
+          uvs = new Float32Array(geo.attributes.uv.array);
+        }
+
+        let indices = null;
+        if (geo.index && geo.index.array) {
+          indices = new Uint32Array(geo.index.array);
+        } else {
+          indices = new Uint32Array(vCount);
+          for (let i = 0; i < vCount; i++) indices[i] = i;
+        }
+
+        capturedSceneGraphMeshes.push({
+          name: node.name || `mesh_${capturedSceneGraphMeshes.length + 1}`,
+          positions,
+          normals,
+          uvs,
+          indices,
+          vertexCount: vCount,
+          faceCount: Math.floor(indices.length / 3)
+        });
+      });
+    } catch (_) {}
+  }
+
+  function inspectBabylonScene(scene) {
+    if (!scene || !Array.isArray(scene.meshes)) return;
+    try {
+      for (const mesh of scene.meshes) {
+        if (!mesh || !mesh.getVerticesData) continue;
+        const positions = mesh.getVerticesData('position');
+        if (!positions || positions.length < 9) continue;
+        const dedupKey = `bjs_${mesh.id || mesh.name}_${positions.length}`;
+        if (drawCallDedup.has(dedupKey)) continue;
+        drawCallDedup.add(dedupKey);
+
+        const normals = mesh.getVerticesData('normal');
+        const uvs = mesh.getVerticesData('uv');
+        const indices = mesh.getIndices ? mesh.getIndices() : null;
+        const vCount = Math.floor(positions.length / 3);
+
+        let finalIndices = indices;
+        if (!finalIndices) {
+          finalIndices = new Uint32Array(vCount);
+          for (let i = 0; i < vCount; i++) finalIndices[i] = i;
+        }
+
+        capturedSceneGraphMeshes.push({
+          name: mesh.name || `babylon_mesh_${capturedSceneGraphMeshes.length + 1}`,
+          positions: new Float32Array(positions),
+          normals: normals ? new Float32Array(normals) : null,
+          uvs: uvs ? new Float32Array(uvs) : null,
+          indices: new Uint32Array(finalIndices),
+          vertexCount: vCount,
+          faceCount: Math.floor(finalIndices.length / 3)
+        });
+      }
+    } catch (_) {}
+  }
+
+  function inspectOsgGeometry(geom) {
+    if (!geom || geom.__df_captured) return;
+    geom.__df_captured = true;
+    try {
+      const attrs = geom.getVertexAttributeList ? geom.getVertexAttributeList() : (geom._attributes || {});
+      const posAttr = attrs['Vertex'] || attrs['position'];
+      if (!posAttr) return;
+      const posElements = posAttr.getElements ? posAttr.getElements() : (posAttr._elements || posAttr.data);
+      if (!posElements || posElements.length < 9) return;
+
+      const normAttr = attrs['Normal'] || attrs['normal'];
+      const normElements = normAttr ? (normAttr.getElements ? normAttr.getElements() : normAttr._elements) : null;
+
+      const uvAttr = attrs['TexCoord0'] || attrs['uv'] || attrs['TexCoord'];
+      const uvElements = uvAttr ? (uvAttr.getElements ? uvAttr.getElements() : uvAttr._elements) : null;
+
+      const prims = geom.getPrimitives ? geom.getPrimitives() : (geom._primitives || []);
+      let indices = null;
+      if (prims && prims.length > 0) {
+        for (const p of prims) {
+          const idxElements = p.getIndices ? p.getIndices() : (p._indices ? p._indices.getElements() : null);
+          if (idxElements && idxElements.length >= 3) {
+            indices = new Uint32Array(idxElements);
+            break;
+          }
+        }
+      }
+      const vCount = Math.floor(posElements.length / 3);
+      if (!indices) {
+        indices = new Uint32Array(vCount);
+        for (let i = 0; i < vCount; i++) indices[i] = i;
+      }
+
+      capturedSceneGraphMeshes.push({
+        name: geom.getName ? (geom.getName() || `part_${capturedSceneGraphMeshes.length + 1}`) : `part_${capturedSceneGraphMeshes.length + 1}`,
+        positions: new Float32Array(posElements),
+        normals: normElements ? new Float32Array(normElements) : null,
+        uvs: uvElements ? new Float32Array(uvElements) : null,
+        indices,
+        vertexCount: vCount,
+        faceCount: Math.floor(indices.length / 3)
+      });
+    } catch (_) {}
+  }
+
   function hookEngineLoaders() {
     try {
-      if (window.THREE && window.THREE.GLTFLoader && !window.THREE.GLTFLoader.__df_hooked) {
-        window.THREE.GLTFLoader.__df_hooked = true;
-        const origParse = window.THREE.GLTFLoader.prototype.parse;
-        window.THREE.GLTFLoader.prototype.parse = function(data, path, onLoad, onError) {
-          try {
-            if (data instanceof ArrayBuffer) {
-              const blob = new Blob([data], { type: 'model/gltf-binary' });
-              const blobUrl = URL.createObjectURL(blob);
-              setTimeout(() => {
-                try { URL.revokeObjectURL(blobUrl); } catch (e) {}
-              }, 120000);
-              notifyDetected({
-                url: blobUrl,
-                mimeType: 'model/gltf-binary',
-                category: 'model_3d',
-                title: (document.title || 'Scene') + ' (Three.js GLB)',
-                initiator: 'threejs-ripper'
-              });
+      // 1. Three.js GLTFLoader & WebGLRenderer
+      if (window.THREE) {
+        if (window.THREE.GLTFLoader && !window.THREE.GLTFLoader.__df_hooked) {
+          window.THREE.GLTFLoader.__df_hooked = true;
+          const origParse = window.THREE.GLTFLoader.prototype.parse;
+          window.THREE.GLTFLoader.prototype.parse = function(data, path, onLoad, onError) {
+            try {
+              if (data instanceof ArrayBuffer) {
+                const blob = new Blob([data], { type: 'model/gltf-binary' });
+                const blobUrl = URL.createObjectURL(blob);
+                setTimeout(() => {
+                  try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+                }, 120000);
+                notifyDetected({
+                  url: blobUrl,
+                  mimeType: 'model/gltf-binary',
+                  category: 'model_3d',
+                  title: (document.title || 'Scene') + ' (Three.js GLB)',
+                  initiator: 'threejs-ripper'
+                });
+              }
+            } catch (e) {}
+            return origParse.apply(this, arguments);
+          };
+        }
+
+        if (window.THREE.WebGLRenderer && !window.THREE.WebGLRenderer.__df_hooked) {
+          window.THREE.WebGLRenderer.__df_hooked = true;
+          const origRender = window.THREE.WebGLRenderer.prototype.render;
+          window.THREE.WebGLRenderer.prototype.render = function(scene, camera) {
+            if (scene && !scene.__df_inspected) {
+              scene.__df_inspected = true;
+              inspectThreeScene(scene);
             }
-          } catch (e) {}
-          return origParse.apply(this, arguments);
+            return origRender.apply(this, arguments);
+          };
+        }
+      }
+
+      // 2. Babylon.js Scene Render Hook
+      if (window.BABYLON && window.BABYLON.Scene && !window.BABYLON.Scene.__df_hooked) {
+        window.BABYLON.Scene.__df_hooked = true;
+        const origBJS = window.BABYLON.Scene.prototype.render;
+        window.BABYLON.Scene.prototype.render = function() {
+          if (!this.__df_inspected) {
+            this.__df_inspected = true;
+            inspectBabylonScene(this);
+          }
+          return origBJS.apply(this, arguments);
         };
       }
-    } catch (e) {}
+
+      // 3. OSG.js / Sketchfab Runtime Hook
+      const osgObj = window.OSG || window.osg;
+      if (osgObj && osgObj.Geometry && !osgObj.Geometry.__df_hooked) {
+        osgObj.Geometry.__df_hooked = true;
+        const origDrawImpl = osgObj.Geometry.prototype.drawImplementation;
+        if (origDrawImpl) {
+          osgObj.Geometry.prototype.drawImplementation = function(state) {
+            inspectOsgGeometry(this);
+            return origDrawImpl.apply(this, arguments);
+          };
+        }
+      }
+    } catch (_) {}
   }
 
   // ── WebGL Mesh Geometry Ripper (In-Browser Ninja Ripper Core) ─
@@ -907,6 +1095,82 @@
       `# Model: ${title}\n`,
       `# Extracted: ${new Date().toISOString()}\n\n`
     ];
+
+    // ── TIER 0: Scene Graph Precision Meshes (Three.js / Babylon / OSG.js) ──
+    if (capturedSceneGraphMeshes.length > 0) {
+      let globalVOffset = 0;
+      let globalVtOffset = 0;
+      let globalVnOffset = 0;
+
+      for (let c = 0; c < capturedSceneGraphMeshes.length; c++) {
+        const part = capturedSceneGraphMeshes[c];
+        const pos = part.positions;
+        const norm = part.normals;
+        const uvs = part.uvs;
+        const idx = part.indices;
+        const vCount = part.vertexCount;
+
+        if (!pos || vCount < 3 || !idx || idx.length < 3) continue;
+
+        const submeshVStart = globalVOffset;
+        const submeshVnStart = globalVnOffset;
+        const submeshVtStart = globalVtOffset;
+
+        const cleanName = (part.name || `part_${c + 1}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+        lines.push(`g ${cleanName}\n`);
+
+        for (let v = 0; v < vCount; v++) {
+          const x = Number(pos[v * 3]).toFixed(5);
+          const y = Number(pos[v * 3 + 1]).toFixed(5);
+          const z = Number(pos[v * 3 + 2]).toFixed(5);
+          lines.push(`v ${x} ${y} ${z}\n`);
+          globalVOffset++;
+        }
+
+        if (norm) {
+          for (let v = 0; v < vCount; v++) {
+            const nx = Number(norm[v * 3]).toFixed(5);
+            const ny = Number(norm[v * 3 + 1]).toFixed(5);
+            const nz = Number(norm[v * 3 + 2]).toFixed(5);
+            lines.push(`vn ${nx} ${ny} ${nz}\n`);
+            globalVnOffset++;
+          }
+        }
+
+        if (uvs) {
+          for (let v = 0; v < vCount; v++) {
+            const u = Number(uvs[v * 2]).toFixed(5);
+            const vCoord = Number(uvs[v * 2 + 1]).toFixed(5);
+            lines.push(`vt ${u} ${vCoord}\n`);
+            globalVtOffset++;
+          }
+        }
+
+        for (let i = 0; i < idx.length - 2; i += 3) {
+          const i1 = idx[i], i2 = idx[i + 1], i3 = idx[i + 2];
+          if (i1 < vCount && i2 < vCount && i3 < vCount) {
+            const f1 = i1 + 1 + submeshVStart;
+            const f2 = i2 + 1 + submeshVStart;
+            const f3 = i3 + 1 + submeshVStart;
+            if (norm && uvs) {
+              const vn1 = i1 + 1 + submeshVnStart, vn2 = i2 + 1 + submeshVnStart, vn3 = i3 + 1 + submeshVnStart;
+              const vt1 = i1 + 1 + submeshVtStart, vt2 = i2 + 1 + submeshVtStart, vt3 = i3 + 1 + submeshVtStart;
+              lines.push(`f ${f1}/${vt1}/${vn1} ${f2}/${vt2}/${vn2} ${f3}/${vt3}/${vn3}\n`);
+            } else if (norm) {
+              const vn1 = i1 + 1 + submeshVnStart, vn2 = i2 + 1 + submeshVnStart, vn3 = i3 + 1 + submeshVnStart;
+              lines.push(`f ${f1}//${vn1} ${f2}//${vn2} ${f3}//${vn3}\n`);
+            } else if (uvs) {
+              const vt1 = i1 + 1 + submeshVtStart, vt2 = i2 + 1 + submeshVtStart, vt3 = i3 + 1 + submeshVtStart;
+              lines.push(`f ${f1}/${vt1} ${f2}/${vt2} ${f3}/${vt3}\n`);
+            } else {
+              lines.push(`f ${f1} ${f2} ${f3}\n`);
+            }
+          }
+        }
+      }
+
+      if (globalVOffset > 0) return lines.join('');
+    }
 
     // ── PRIMARY PIPELINE: Draw-Call Precision Meshes ─────────
     if (capturedDrawCalls.length > 0) {
