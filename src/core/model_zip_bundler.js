@@ -565,3 +565,46 @@ export async function bundlePolyHavenModelPackage(assetId, requestedTitle) {
     return { ok: false, error: err.message, filename: `${requestedTitle || assetId}.zip` };
   }
 }
+
+/**
+ * In-browser Wavefront OBJ to binary STL converter (for 3D printing & CAD).
+ * @param {string} objText
+ * @returns {Uint8Array}
+ */
+export function convertObjToStl(objText) {
+  const lines = (objText || '').split(/\r?\n/);
+  const verts = [];
+  const faces = [];
+  for (const l of lines) {
+    if (l.startsWith('v ')) {
+      const parts = l.trim().split(/\s+/).slice(1).map(Number);
+      verts.push(parts);
+    } else if (l.startsWith('f ')) {
+      const parts = l.trim().split(/\s+/).slice(1).map(p => parseInt(p.split('/')[0], 10) - 1);
+      if (parts.length >= 3) {
+        for (let i = 1; i < parts.length - 1; i++) {
+          faces.push([parts[0], parts[i], parts[i + 1]]);
+        }
+      }
+    }
+  }
+  const buf = new Uint8Array(84 + faces.length * 50);
+  const view = new DataView(buf.buffer);
+  view.setUint32(80, faces.length, true);
+  let off = 84;
+  for (const [i1, i2, i3] of faces) {
+    const v1 = verts[i1] || [0, 0, 0], v2 = verts[i2] || [0, 0, 0], v3 = verts[i3] || [0, 0, 0];
+    const ax = v2[0] - v1[0], ay = v2[1] - v1[1], az = v2[2] - v1[2];
+    const bx = v3[0] - v1[0], by = v3[1] - v1[1], bz = v3[2] - v1[2];
+    let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    nx /= len; ny /= len; nz /= len;
+    view.setFloat32(off, nx, true); view.setFloat32(off + 4, ny, true); view.setFloat32(off + 8, nz, true);
+    view.setFloat32(off + 12, v1[0], true); view.setFloat32(off + 16, v1[1], true); view.setFloat32(off + 20, v1[2], true);
+    view.setFloat32(off + 24, v2[0], true); view.setFloat32(off + 28, v2[1], true); view.setFloat32(off + 32, v2[2], true);
+    view.setFloat32(off + 36, v3[0], true); view.setFloat32(off + 40, v3[1], true); view.setFloat32(off + 44, v3[2], true);
+    view.setUint16(off + 48, 0, true);
+    off += 50;
+  }
+  return buf;
+}

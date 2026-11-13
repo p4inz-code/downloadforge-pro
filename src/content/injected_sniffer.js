@@ -544,6 +544,24 @@
   let totalCapturedFaces = 0;
   let lastTelemetryTimestamp = 0;
   const activeWebGlCanvases = new Set();
+  const textureDedup = new Set();
+
+  function captureGpuTexture(source) {
+    try {
+      if (!source) return;
+      if (source instanceof HTMLImageElement && source.src) {
+        if (!textureDedup.has(source.src)) {
+          textureDedup.add(source.src);
+          notifyDetected({
+            url: source.src,
+            category: 'image',
+            title: (source.alt || extractFilename(source.src) || '3D Texture Map').slice(0, 80),
+            initiator: 'webgl-texture-sniffer'
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   function dispatchTelemetry(glVersion = 'WebGL') {
     const now = Date.now();
@@ -625,7 +643,7 @@
     }
   }
 
-  function recordDrawCall(gl, count, type, byteOffset, isElements = true, first = 0) {
+  function recordDrawCall(gl, count, type, byteOffset, isElements = true, first = 0, mode = 4) {
     try {
       const glVersion = (window.WebGL2RenderingContext && gl instanceof window.WebGL2RenderingContext) ? 'WebGL 2.0' : 'WebGL 1.0';
 
@@ -788,12 +806,49 @@
         }
       }
 
-      // Synthesize indices for drawArrays if needed
-      let finalIndices = idxArray;
+      // Synthesize indices for drawArrays or decompose TRIANGLE_STRIP / TRIANGLE_FAN
+      let sourceIndices = idxArray;
       if (!isElements) {
-        finalIndices = new Uint32Array(count);
-        for (let i = 0; i < count; i++) finalIndices[i] = first + i;
+        sourceIndices = new Uint32Array(count);
+        for (let i = 0; i < count; i++) sourceIndices[i] = first + i;
       }
+
+      let finalIndices = null;
+      if (mode === 5 && sourceIndices) { // gl.TRIANGLE_STRIP
+        const triCount = Math.max(0, sourceIndices.length - 2);
+        finalIndices = new Uint32Array(triCount * 3);
+        let outIdx = 0;
+        for (let i = 0; i < triCount; i++) {
+          const a = sourceIndices[i];
+          const b = sourceIndices[i + 1];
+          const c = sourceIndices[i + 2];
+          if (a === b || b === c || a === c) continue;
+          if (i % 2 === 0) {
+            finalIndices[outIdx++] = a;
+            finalIndices[outIdx++] = b;
+            finalIndices[outIdx++] = c;
+          } else {
+            finalIndices[outIdx++] = b;
+            finalIndices[outIdx++] = a;
+            finalIndices[outIdx++] = c;
+          }
+        }
+        finalIndices = finalIndices.subarray(0, outIdx);
+      } else if (mode === 6 && sourceIndices) { // gl.TRIANGLE_FAN
+        const triCount = Math.max(0, sourceIndices.length - 2);
+        finalIndices = new Uint32Array(triCount * 3);
+        let outIdx = 0;
+        const origin = sourceIndices[0];
+        for (let i = 1; i < sourceIndices.length - 1; i++) {
+          finalIndices[outIdx++] = origin;
+          finalIndices[outIdx++] = sourceIndices[i];
+          finalIndices[outIdx++] = sourceIndices[i + 1];
+        }
+      } else {
+        finalIndices = sourceIndices;
+      }
+
+      if (!finalIndices || finalIndices.length < 3) return;
 
       capturedDrawCalls.push({
         positions,
@@ -950,12 +1005,12 @@
         return origUniformMatrix4fv.apply(this, arguments);
       };
 
-      // 5. Draw call precision interception
+      // 5. Draw call precision interception (TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN)
       const origDrawElements = proto.drawElements;
       proto.drawElements = function(mode, count, type, offset) {
         try {
-          if (mode === 4 && count >= 3 && this._df_boundElementBuffer) { // gl.TRIANGLES
-            recordDrawCall(this, count, type, offset || 0, true);
+          if ((mode === 4 || mode === 5 || mode === 6) && count >= 3 && this._df_boundElementBuffer) {
+            recordDrawCall(this, count, type, offset || 0, true, 0, mode);
           }
         } catch (_) {}
         return origDrawElements.apply(this, arguments);
@@ -964,14 +1019,59 @@
       const origDrawArrays = proto.drawArrays;
       proto.drawArrays = function(mode, first, count) {
         try {
-          if (mode === 4 && count >= 3) { // gl.TRIANGLES
-            recordDrawCall(this, count, 0, 0, false, first || 0);
+          if ((mode === 4 || mode === 5 || mode === 6) && count >= 3) {
+            recordDrawCall(this, count, 0, 0, false, first || 0, mode);
           }
         } catch (_) {}
         return origDrawArrays.apply(this, arguments);
       };
 
-      // 6. WebGL2 VAO support
+      if (proto.drawElementsInstanced) {
+        const origDEI = proto.drawElementsInstanced;
+        proto.drawElementsInstanced = function(mode, count, type, offset, instanceCount) {
+          try {
+            if ((mode === 4 || mode === 5 || mode === 6) && count >= 3 && this._df_boundElementBuffer) {
+              recordDrawCall(this, count, type, offset || 0, true, 0, mode);
+            }
+          } catch (_) {}
+          return origDEI.apply(this, arguments);
+        };
+      }
+
+      if (proto.drawArraysInstanced) {
+        const origDAI = proto.drawArraysInstanced;
+        proto.drawArraysInstanced = function(mode, first, count, instanceCount) {
+          try {
+            if ((mode === 4 || mode === 5 || mode === 6) && count >= 3) {
+              recordDrawCall(this, count, 0, 0, false, first || 0, mode);
+            }
+          } catch (_) {}
+          return origDAI.apply(this, arguments);
+        };
+      }
+
+      // 6. Texture map interception
+      const origTexImage2D = proto.texImage2D;
+      proto.texImage2D = function() {
+        try {
+          const argLen = arguments.length;
+          const src = argLen === 6 ? arguments[5] : (argLen === 9 ? arguments[8] : null);
+          if (src) captureGpuTexture(src);
+        } catch (_) {}
+        return origTexImage2D.apply(this, arguments);
+      };
+
+      const origTexSubImage2D = proto.texSubImage2D;
+      proto.texSubImage2D = function() {
+        try {
+          const argLen = arguments.length;
+          const src = argLen === 7 ? arguments[6] : (argLen === 9 ? arguments[8] : null);
+          if (src) captureGpuTexture(src);
+        } catch (_) {}
+        return origTexSubImage2D.apply(this, arguments);
+      };
+
+      // 7. WebGL2 VAO support
       if (proto.bindVertexArray) {
         const origBVA = proto.bindVertexArray;
         proto.bindVertexArray = function(vao) {
@@ -999,22 +1099,50 @@
           activeWebGlCanvases.add(this);
           try {
             hookContext(Object.getPrototypeOf(ctx));
-            // Hook OES_vertex_array_object extension if requested
+            // Hook OES_vertex_array_object & ANGLE_instanced_arrays extensions
             if (ctx.getExtension) {
               const origGetExtension = ctx.getExtension;
               ctx.getExtension = function(name) {
                 const ext = origGetExtension.apply(this, arguments);
-                if (ext && name && name.toLowerCase().includes('vertex_array_object') && !ext.__df_hooked) {
-                  ext.__df_hooked = true;
-                  const origBVAOES = ext.bindVertexArrayOES;
-                  ext.bindVertexArrayOES = function(vao) {
-                    ctx._df_currentVao = vao;
-                    if (vao) {
-                      if (vao._df_elementBuffer) ctx._df_boundElementBuffer = vao._df_elementBuffer;
-                      if (vao._df_attribs) ctx._df_attribs = { ...vao._df_attribs };
+                if (ext && name) {
+                  const lname = name.toLowerCase();
+                  if (lname.includes('vertex_array_object') && !ext.__df_hooked) {
+                    ext.__df_hooked = true;
+                    const origBVAOES = ext.bindVertexArrayOES;
+                    ext.bindVertexArrayOES = function(vao) {
+                      ctx._df_currentVao = vao;
+                      if (vao) {
+                        if (vao._df_elementBuffer) ctx._df_boundElementBuffer = vao._df_elementBuffer;
+                        if (vao._df_attribs) ctx._df_attribs = { ...vao._df_attribs };
+                      }
+                      return origBVAOES.apply(this, arguments);
+                    };
+                  }
+                  if (lname.includes('instanced_arrays') && !ext.__df_hooked) {
+                    ext.__df_hooked = true;
+                    const origDEIANGLE = ext.drawElementsInstancedANGLE;
+                    if (origDEIANGLE) {
+                      ext.drawElementsInstancedANGLE = function(mode, count, type, offset, primcount) {
+                        try {
+                          if ((mode === 4 || mode === 5 || mode === 6) && count >= 3 && ctx._df_boundElementBuffer) {
+                            recordDrawCall(ctx, count, type, offset || 0, true, 0, mode);
+                          }
+                        } catch (_) {}
+                        return origDEIANGLE.apply(this, arguments);
+                      };
                     }
-                    return origBVAOES.apply(this, arguments);
-                  };
+                    const origDAIANGLE = ext.drawArraysInstancedANGLE;
+                    if (origDAIANGLE) {
+                      ext.drawArraysInstancedANGLE = function(mode, first, count, primcount) {
+                        try {
+                          if ((mode === 4 || mode === 5 || mode === 6) && count >= 3) {
+                            recordDrawCall(ctx, count, 0, 0, false, first || 0, mode);
+                          }
+                        } catch (_) {}
+                        return origDAIANGLE.apply(this, arguments);
+                      };
+                    }
+                  }
                 }
                 return ext;
               };

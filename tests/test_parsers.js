@@ -327,7 +327,7 @@ assert.ok(dataUrl.length > 30, 'Data URL must contain encoded base64 payload');
 console.log('  [PASS] Zero-DOM Service Worker Data URL chunked encoder verified');
 
 // ── Test Suite 13: Single 3D Model Asset in ZIP & Textures Verification ─
-import { bundleGenericModelPackage, bundlePolyHavenModelPackage } from '../src/core/model_zip_bundler.js';
+import { bundleGenericModelPackage, bundlePolyHavenModelPackage, convertObjToStl } from '../src/core/model_zip_bundler.js';
 
 const testTextures = [
   { name: 'diffuse.png', data: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) },
@@ -406,7 +406,16 @@ const failedCount = sampleResults.filter(r => !r.ok).length;
 assert.strictEqual(failedCount, 1, 'Batch failure count must accurately reflect failing items');
 console.log('  [PASS] Cryptographic Session Token Entropy & Batch Error Diagnostics verified');
 
-console.log('[Test] All 16 core test suites passed successfully with zero errors!');
+// 17. In-Browser Wavefront OBJ to binary STL Converter
+const testObjForStl = 'v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n';
+const testStlBuf = convertObjToStl(testObjForStl);
+assert.ok(testStlBuf instanceof Uint8Array, 'STL output must be Uint8Array');
+assert.strictEqual(testStlBuf.length, 134, '1-triangle binary STL must be exactly 134 bytes (80 header + 4 count + 50 triangle)');
+const stlView = new DataView(testStlBuf.buffer);
+assert.strictEqual(stlView.getUint32(80, true), 1, 'STL triangle count must be 1');
+console.log('  [PASS] Pure in-browser Wavefront OBJ to binary STL converter verified');
+
+console.log('[Test] All 17 core test suites passed successfully with zero errors!');
 
 
 
