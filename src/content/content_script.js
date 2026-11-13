@@ -122,6 +122,7 @@ function setupSnifferListener() {
 
       // Sanitize filename against path traversal and HTML injection
       const cleanTitle = (item.title || 'media_asset')
+        .replace(/\.{2,}/g, '_')
         .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
         .trim()
         .slice(0, 100);

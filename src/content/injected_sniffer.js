@@ -28,6 +28,14 @@
   // Cache native postMessage to prevent page script overriding/hijacking
   const safePostMessage = window.postMessage.bind(window);
 
+  // Cache native constructors and utility functions against prototype tampering
+  const _Uint8Array = window.Uint8Array;
+  const _Float32Array = window.Float32Array;
+  const _Uint16Array = window.Uint16Array;
+  const _Uint32Array = window.Uint32Array;
+  const _Array_isArray = Array.isArray;
+  const _Object_freeze = Object.freeze;
+
   const MEDIA_REGEX = /\.(m3u8|mpd|mp4|webm|ts|m4s|f4m|flv|mov|m4v|m4a|aac|opus|wav)(\?|$)|(googlevideo\.com\/videoplayback|vimeocdn\.com|video\.twimg\.com|tiktokcdn\.com|v\.redd\.it)/i;
   const MIME_REGEX = /(mpegurl|x-mpegurl|video\/|audio\/|dash\+xml)/i;
   const MODEL_3D_REGEX = /\.(glb|gltf|obj|mtl|fbx|stl|usdz|splat|ply|3mf|dae|blend|step|stp|iges|osgjs|binz|splinecode|drc)(\?|$)|(sketchfab\.com\/(?:i\/models|3d-models)|media\.sketchfab\.com\/models|models\.readyplayer\.me|prod\.spline\.design|lumalabs\.ai)/i;

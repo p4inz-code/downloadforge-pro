@@ -129,6 +129,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 
 // ── Message routing ──────────────────────────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Security Layer 1: Strict Sender ID Verification
+  if (sender.id && sender.id !== chrome.runtime.id) {
+    log.warn('Rejected unauthorized IPC message from untrusted sender ID:', sender.id);
+    return false;
+  }
+
   const { type, payload } = message;
   const tabId = sender.tab?.id ?? payload?.tabId;
 
@@ -654,7 +660,8 @@ function extractFilenameFromUrl(url) {
   try {
     const u = new URL(url);
     const parts = u.pathname.split('/');
-    return parts[parts.length - 1] || 'download';
+    let raw = decodeURIComponent(parts[parts.length - 1] || 'download');
+    return raw.replace(/\.{2,}/g, '_').replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim().slice(0, 150) || 'download';
   } catch {
     return 'download';
   }

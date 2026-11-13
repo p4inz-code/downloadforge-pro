@@ -1519,7 +1519,7 @@
           else if (category === CATEGORY.IMAGE) ext = "jpg";
           else ext = "mp4";
         }
-        const cleanTitle = (item.title || "media_asset").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 100);
+        const cleanTitle = (item.title || "media_asset").replace(/\.{2,}/g, "_").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim().slice(0, 100);
         const filename = cleanTitle.toLowerCase().endsWith("." + ext) ? cleanTitle : `${cleanTitle}.${ext}`;
         const resource = {
           id: `sniff_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
