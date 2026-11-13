@@ -222,6 +222,7 @@ function buildItemEl(item) {
   el.dataset.id = item.id;
   el.role = 'listitem';
 
+  const is3D     = item.category === CATEGORY.MODEL_3D;
   const isStream = item.category === CATEGORY.STREAM || item.status === STATUS.STREAM;
   const isAuth   = item.status === STATUS.REQUIRES_AUTH;
 
@@ -231,9 +232,11 @@ function buildItemEl(item) {
 
   const badgeHtml = isStream
     ? `<span class="item-badge stream">HLS</span>`
-    : isAuth
-      ? `<span class="item-badge auth">Auth</span>`
-      : '';
+    : is3D
+      ? `<span class="item-badge model_3d">3D MESH</span>`
+      : isAuth
+        ? `<span class="item-badge auth">Auth</span>`
+        : '';
 
   const companionBtn = '';
 
@@ -327,17 +330,21 @@ async function downloadItem(item) {
   }
 
   try {
+    showToast(`Downloading ${item.filename || 'file'}…`);
     const response = await chrome.runtime.sendMessage({
       type: MSG.DOWNLOAD_ITEM,
       payload: { url: item.url, filename: item.filename },
     });
     if (response?.ok) {
-      showToast(`Downloading ${item.filename || 'file'}…`);
+      showToast(`Started: ${item.filename || 'file'}`);
     } else {
-      showToast(`Failed: ${response?.error || 'unknown error'}`);
+      const errDetail = response?.error || 'Unknown download error';
+      console.error('[DownloadForge Popup] Download failed:', errDetail, item);
+      showToast(`Failed: ${errDetail}`);
     }
   } catch (err) {
-    showToast('Download failed');
+    console.error('[DownloadForge Popup] Download exception:', err);
+    showToast(`Download error: ${err.message || 'connection failed'}`);
   }
 }
 
@@ -399,10 +406,24 @@ async function bulkDownload() {
   showToast(`Starting ${items.length} downloads…`);
   clearSelection();
 
-  await chrome.runtime.sendMessage({
-    type: MSG.DOWNLOAD_BATCH,
-    payload: { items: items.map(i => ({ url: i.url, filename: i.filename })) },
-  });
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: MSG.DOWNLOAD_BATCH,
+      payload: { items: items.map(i => ({ url: i.url, filename: i.filename })) },
+    });
+    if (res?.ok === false) {
+      console.error('[DownloadForge Popup] Batch download error:', res.error);
+      showToast(`Batch failed: ${res.error || 'Failed to download items'}`);
+    } else if (res?.failedCount > 0) {
+      console.warn('[DownloadForge Popup] Batch partial failure:', res);
+      showToast(`Finished with ${res.failedCount} failed items`);
+    } else {
+      showToast(`Triggered ${items.length} downloads`);
+    }
+  } catch (err) {
+    console.error('[DownloadForge Popup] Batch exception:', err);
+    showToast(`Batch error: ${err.message || 'unknown error'}`);
+  }
 }
 
 async function bulkCopyUrls() {

@@ -410,6 +410,7 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
     // D. Documentation / README.txt
     const author = (meta && meta.user && (meta.user.displayName || meta.user.username)) || 'Creator';
     const license = (meta && meta.license && meta.license.fullname) || 'Creative Commons Attribution';
+    const hasGlb = glbBytes && glbBytes.length > 50;
     const readme = [
       `DownloadForge Pro — 3D Asset Package`,
       `====================================`,
@@ -418,15 +419,15 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
       `License    : ${license}`,
       `Extracted  : ${new Date().toISOString()}`,
       ``,
-      `Included Model Formats:`,
-      `- ${modelName}.glb : Universal Binary glTF 2.0 (Direct double-click for Windows 3D Viewer & Blender)`,
-      `- ${modelName}.obj : Wavefront OBJ with face indices & UV coordinates`,
-      `- ${modelName}.mtl : Material definitions referencing PBR maps in textures/`,
+      `Primary Model Asset:`,
+      hasGlb
+        ? `- ${modelName}.glb : Universal Binary glTF 2.0 (Compatible with Blender, Unreal Engine, Unity, 3ds Max, Maya, Windows 3D Viewer)`
+        : `- ${modelName}.obj : Wavefront OBJ with face indices & UV coordinates\n- ${modelName}.mtl : Material definitions referencing PBR maps in textures/`,
       `- textures/        : ${textureNames.length} high-resolution PBR maps in original quality`,
       ``,
-      `Blender Import Instructions:`,
-      `1. Open Blender -> File -> Import -> glTF 2.0 (.glb) or Wavefront (.obj)`,
-      `2. Switch 3D Viewport shading to 'Material Preview' (Z key) to render all PBR textures.`,
+      `Import Instructions:`,
+      `1. Open 3D application -> File -> Import -> ${hasGlb ? 'glTF 2.0 (.glb)' : 'Wavefront (.obj)'}`,
+      `2. Switch Viewport shading to 'Material Preview' to render all PBR textures.`,
     ].join('\n');
 
     zipFiles.push({

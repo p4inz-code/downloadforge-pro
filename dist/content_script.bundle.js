@@ -1318,6 +1318,16 @@
         chrome.runtime.sendMessage({
           type: MSG.DOWNLOAD_ITEM,
           payload: { url: targetUrl, filename }
+        }, (res) => {
+          if (chrome.runtime.lastError) {
+            console.error("[DownloadForge 3D] Runtime error:", chrome.runtime.lastError.message);
+            show3DToast("Download failed: " + chrome.runtime.lastError.message, true);
+          } else if (res && !res.ok) {
+            console.error("[DownloadForge 3D] Download error:", res.error);
+            show3DToast("Download error: " + (res.error || "Failed to start download"), true);
+          } else if (res && res.ok) {
+            show3DToast("Download started for " + filename);
+          }
         });
       });
       overlay.appendChild(pill);
@@ -1434,15 +1444,24 @@
     window.__downloadForgeInjected = true;
     init();
   }
-  var sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  function generateSecureToken() {
+    const buf = new Uint8Array(24);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  var sessionToken = generateSecureToken();
   function injectMainWorldSniffer() {
     try {
       document.documentElement.dataset.dfSnifferToken = sessionToken;
       const script = document.createElement("script");
       script.src = chrome.runtime.getURL("src/content/injected_sniffer.js");
       script.dataset.token = sessionToken;
-      script.onload = () => script.remove();
+      script.onload = () => {
+        delete script.dataset.token;
+        script.remove();
+      };
       (document.head || document.documentElement).appendChild(script);
+      delete document.documentElement.dataset.dfSnifferToken;
     } catch (err) {
       console.debug("[DownloadForge] Failed to inject sniffer:", err);
     }

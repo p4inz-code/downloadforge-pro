@@ -589,8 +589,9 @@ async function handleBatchDownload(payload, sendResponse) {
     }
   }
 
+  const failedCount = results.filter(r => !r.ok).length;
   await StorageService.addBatchToHistory(results);
-  sendResponse({ ok: true, results });
+  sendResponse({ ok: failedCount === 0, count: results.length, failedCount, results });
 }
 
 // ── Badge helpers ─────────────────────────────────────────────

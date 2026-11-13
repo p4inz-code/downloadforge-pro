@@ -580,6 +580,16 @@ export function init3DOverlay() {
       chrome.runtime.sendMessage({
         type: MSG.DOWNLOAD_ITEM,
         payload: { url: targetUrl, filename }
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          console.error('[DownloadForge 3D] Runtime error:', chrome.runtime.lastError.message);
+          show3DToast('Download failed: ' + chrome.runtime.lastError.message, true);
+        } else if (res && !res.ok) {
+          console.error('[DownloadForge 3D] Download error:', res.error);
+          show3DToast('Download error: ' + (res.error || 'Failed to start download'), true);
+        } else if (res && res.ok) {
+          show3DToast('Download started for ' + filename);
+        }
       });
     });
 

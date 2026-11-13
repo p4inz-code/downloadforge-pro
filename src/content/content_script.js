@@ -24,7 +24,14 @@ if (!window.__downloadForgeInjected) {
   init();
 }
 
-const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+// Cryptographically secure session token generation
+function generateSecureToken() {
+  const buf = new Uint8Array(24);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const sessionToken = generateSecureToken();
 
 function injectMainWorldSniffer() {
   try {
@@ -32,8 +39,13 @@ function injectMainWorldSniffer() {
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('src/content/injected_sniffer.js');
     script.dataset.token = sessionToken;
-    script.onload = () => script.remove();
+    script.onload = () => {
+      delete script.dataset.token;
+      script.remove();
+    };
     (document.head || document.documentElement).appendChild(script);
+    // Remove dataset token immediately after script element creation
+    delete document.documentElement.dataset.dfSnifferToken;
   } catch (err) {
     console.debug('[DownloadForge] Failed to inject sniffer:', err);
   }

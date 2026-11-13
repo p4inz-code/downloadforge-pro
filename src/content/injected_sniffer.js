@@ -17,10 +17,16 @@
   // Retrieve security nonce passed from content script
   const scriptEl = document.currentScript;
   const sessionToken = (document.documentElement && document.documentElement.dataset.dfSnifferToken) ||
-                       (scriptEl ? scriptEl.dataset.token : null);
+                       (scriptEl && scriptEl.dataset ? scriptEl.dataset.token : null);
   if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
     delete document.documentElement.dataset.dfSnifferToken;
   }
+  if (scriptEl && scriptEl.dataset && scriptEl.dataset.token) {
+    delete scriptEl.dataset.token;
+  }
+
+  // Cache native postMessage to prevent page script overriding/hijacking
+  const safePostMessage = window.postMessage.bind(window);
 
   const MEDIA_REGEX = /\.(m3u8|mpd|mp4|webm|ts|m4s|f4m|flv|mov|m4v|m4a|aac|opus|wav)(\?|$)|(googlevideo\.com\/videoplayback|vimeocdn\.com|video\.twimg\.com|tiktokcdn\.com|v\.redd\.it)/i;
   const MIME_REGEX = /(mpegurl|x-mpegurl|video\/|audio\/|dash\+xml)/i;
@@ -61,7 +67,7 @@
     );
 
     try {
-      window.postMessage({
+      safePostMessage({
         source: 'DOWNLOADFORGE_SNIFFER',
         token: sessionToken,
         type: 'MEDIA_DETECTED',
@@ -217,7 +223,7 @@
             copy = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
           }
           if (copy && copy.byteLength > 0) {
-            window.postMessage({
+            safePostMessage({
               source: 'DOWNLOADFORGE_SNIFFER',
               token: sessionToken,
               type: 'BUFFER_CHUNK_APPENDED',
@@ -343,7 +349,7 @@
     if (now - lastTelemetryTimestamp < 800) return;
     lastTelemetryTimestamp = now;
     try {
-      window.postMessage({
+      safePostMessage({
         source: 'DOWNLOADFORGE_SNIFFER',
         token: sessionToken,
         type: 'DF_WEBGL_TELEMETRY',
