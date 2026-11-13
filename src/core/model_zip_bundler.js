@@ -321,8 +321,8 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
     // B. Model Geometry: Package captured 3D model asset if present
     const hasRealGeometry = Boolean(
       capturedObjMesh &&
-      capturedObjMesh.length > 50 &&
-      (capturedObjMesh.match(/\nv /g) || []).length >= 3
+      capturedObjMesh.length >= 30 &&
+      (capturedObjMesh.match(/(?:^|[\r\n])v\s+/g) || []).length >= 3
     );
     let activeObj = hasRealGeometry ? capturedObjMesh : null;
 

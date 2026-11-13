@@ -209,6 +209,12 @@ function setupMessageListener() {
       window.addEventListener('message', onRipData);
       window.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*');
       window.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
+      document.querySelectorAll('iframe').forEach(ifr => {
+        try {
+          ifr.contentWindow.postMessage({ type: 'DF_NUDGE_CANVAS' }, '*');
+          ifr.contentWindow.postMessage({ type: 'DF_TRIGGER_WEBGL_RIP' }, '*');
+        } catch (_) {}
+      });
 
       setTimeout(() => {
         if (!replied) {

@@ -848,8 +848,15 @@
       try {
         // Trigger requestAnimationFrame or dispatch synthetic resize/wheel event to wake draw calls
         activeWebGlCanvases.forEach(canvas => {
-          if (canvas) {
-            canvas.dispatchEvent(new Event('mousemove', { bubbles: true }));
+          if (canvas && canvas.dispatchEvent) {
+            const rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : null;
+            const cx = rect ? (rect.left + rect.width / 2) : 200;
+            const cy = rect ? (rect.top + rect.height / 2) : 200;
+            canvas.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: cx, clientY: cy }));
+            canvas.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: cx, clientY: cy, button: 0 }));
+            canvas.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: cx + 5, clientY: cy + 5 }));
+            canvas.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: cx + 5, clientY: cy + 5, button: 0 }));
+            canvas.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 2 }));
           }
         });
         window.requestAnimationFrame(() => {});
