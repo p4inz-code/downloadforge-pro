@@ -383,6 +383,7 @@
           vertexCount: vCount,
           faceCount: Math.floor(indices.length / 3)
         });
+        if (capturedSceneGraphMeshes.length > 500) capturedSceneGraphMeshes.shift();
       });
     } catch (_) {}
   }
@@ -418,6 +419,7 @@
           vertexCount: vCount,
           faceCount: Math.floor(finalIndices.length / 3)
         });
+        if (capturedSceneGraphMeshes.length > 500) capturedSceneGraphMeshes.shift();
       }
     } catch (_) {}
   }
@@ -464,6 +466,7 @@
         vertexCount: vCount,
         faceCount: Math.floor(indices.length / 3)
       });
+      if (capturedSceneGraphMeshes.length > 500) capturedSceneGraphMeshes.shift();
     } catch (_) {}
   }
 
@@ -1183,15 +1186,21 @@
       const title = (document.title || 'model').replace(/[<>:"/\\|?*]/g, '_').trim().slice(0, 80);
       const objData = exportCapturedMeshToObj(title);
       if (objData) {
+        const sceneVertices = capturedSceneGraphMeshes.reduce((sum, m) => sum + (m.vertexCount || 0), 0);
+        const sceneFaces = capturedSceneGraphMeshes.reduce((sum, m) => sum + (m.faceCount || 0), 0);
+        const effectiveVertices = Math.max(totalCapturedVertices, sceneVertices);
+        const effectiveFaces = Math.max(totalCapturedFaces, sceneFaces);
+        const effectiveDrawCalls = Math.max(capturedDrawCalls.length, capturedSceneGraphMeshes.length);
+
         const ripMsg = {
           source: 'DOWNLOADFORGE_SNIFFER',
           token: sessionToken,
           type: 'DF_WEBGL_RIP_DATA',
           objData,
           title,
-          drawCalls: capturedDrawCalls.length,
-          vertexCount: totalCapturedVertices,
-          faceCount: totalCapturedFaces
+          drawCalls: effectiveDrawCalls,
+          vertexCount: effectiveVertices,
+          faceCount: effectiveFaces
         };
         safePostMessage(ripMsg, '*');
         if (window.parent && window.parent !== window) {
