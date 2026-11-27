@@ -358,6 +358,8 @@ async function downloadSubtitles() {
         url: blobUrl,
         filename: subFilename,
         saveAs: true,
+      }, () => {
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
       });
     } else {
       const a = document.createElement('a');
@@ -366,6 +368,7 @@ async function downloadSubtitles() {
       document.body.appendChild(a);
       a.click();
       a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
     }
     statusMessage.textContent = `Subtitles downloaded: ${subFilename}`;
   } catch (err) {
@@ -550,9 +553,10 @@ async function startDownload() {
         currentBlob = await convertMediaToWav(result.blob, { gainDb });
         targetFilename = targetFilename.replace(/\.[^/.]+$/, '.wav');
       } else if (selectedFormat === 'mp3') {
-        statusMessage.textContent = 'Extracting audio track as MP3...';
+        // Browser runtime decodes via WebAudio to uncompressed PCM WAV (no native LAME MP3 encoder)
+        statusMessage.textContent = 'Transcoding audio track to lossless WAV (PCM)...';
         currentBlob = await convertMediaToWav(result.blob, { gainDb });
-        targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp3');
+        targetFilename = targetFilename.replace(/\.[^/.]+$/, '.wav');
       } else if (selectedFormat === 'm4a') {
         currentBlob = new Blob([result.blob], { type: 'audio/mp4' });
         targetFilename = targetFilename.replace(/\.[^/.]+$/, '.m4a');
@@ -754,8 +758,7 @@ if (formatSelect) {
     const isAudio = val === 'm4a' || val === 'wav' || val === 'mp3';
     if (audioTuningItem) audioTuningItem.style.display = isAudio ? 'block' : 'none';
 
-    if (val === 'wav') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.wav');
-    else if (val === 'mp3') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp3');
+    if (val === 'wav' || val === 'mp3') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.wav');
     else if (val === 'm4a') targetFilename = targetFilename.replace(/\.[^/.]+$/, '.m4a');
     else targetFilename = targetFilename.replace(/\.[^/.]+$/, '.mp4');
 
@@ -764,7 +767,7 @@ if (formatSelect) {
       video_only: 'Extract Video (Muted MP4)',
       m4a: 'Extract Audio (M4A)',
       wav: 'Transcode & Export (WAV Master)',
-      mp3: 'Extract Audio (MP3)',
+      mp3: 'Transcode & Export (Universal WAV)',
     };
     const startSpan = btnStart?.querySelector('span');
     if (startSpan) startSpan.textContent = startLabelMap[val] || 'Start Download';
@@ -775,7 +778,7 @@ if (formatSelect) {
         video_only: 'Save Video (Muted MP4)',
         m4a: 'Save Audio (M4A)',
         wav: 'Save Studio Audio (WAV)',
-        mp3: 'Save Audio (MP3)',
+        mp3: 'Save Studio Audio (WAV)',
       };
       const span = btnSave.querySelector('span');
       if (span) span.textContent = labelMap[val] || 'Save File';

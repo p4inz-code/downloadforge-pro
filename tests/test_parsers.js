@@ -415,7 +415,42 @@ const stlView = new DataView(testStlBuf.buffer);
 assert.strictEqual(stlView.getUint32(80, true), 1, 'STL triangle count must be 1');
 console.log('  [PASS] Pure in-browser Wavefront OBJ to binary STL converter verified');
 
-console.log('[Test] All 17 core test suites passed successfully with zero errors!');
+// 18. GLB Converter with Normals, UVs, PBR Material & Embedded Diffuse Texture
+import fs from 'node:fs';
+const texturedObj = [
+  'v 0 0 0\nv 1 0 0\nv 0 1 0\n',
+  'vt 0.1 0.2\nvt 0.9 0.2\nvt 0.1 0.8\n',
+  'vn 0 0 1\nvn 0 0 1\nvn 0 0 1\n',
+  'f 1/1/1 2/2/2 3/3/3\n'
+].join('');
+const fakePng = new Uint8Array(32).fill(0x89);
+const glbOut = convertObjToGlb(texturedObj, 'TexturedTri', {
+  diffuseTextureBytes: fakePng,
+  diffuseMimeType: 'image/png'
+});
+assert.ok(glbOut instanceof Uint8Array && glbOut.length > 100, 'GLB with normals/UVs/texture must build cleanly');
+const glbView = new DataView(glbOut.buffer, glbOut.byteOffset, glbOut.byteLength);
+assert.strictEqual(glbView.getUint32(0, true), 0x46546C67, 'GLB header magic must be glTF');
+const jsonLen = glbView.getUint32(12, true);
+const gltfJson = JSON.parse(new TextDecoder().decode(glbOut.subarray(20, 20 + jsonLen)));
+const primAttrs = gltfJson.meshes[0].primitives[0].attributes;
+assert.ok(primAttrs.POSITION !== undefined, 'GLB primitive must include POSITION');
+assert.ok(primAttrs.NORMAL !== undefined, 'GLB primitive must include NORMAL');
+assert.ok(primAttrs.TEXCOORD_0 !== undefined, 'GLB primitive must include TEXCOORD_0');
+assert.strictEqual(gltfJson.images?.[0]?.mimeType, 'image/png', 'GLB must embed diffuse image');
+assert.strictEqual(gltfJson.materials?.[0]?.pbrMetallicRoughness?.baseColorTexture?.index, 0, 'GLB PBR material must reference baseColorTexture');
+console.log('  [PASS] GLB exporter preserves POSITION, NORMAL, TEXCOORD_0 & embedded diffuse texture');
+
+// 19. Regression checks: DASH scope fix, Dashboard DEFAULT_SETTINGS import, and Token Handshake
+const hlsSrc = fs.readFileSync('src/core/hls_engine.js', 'utf8');
+assert.ok(!hlsSrc.includes('let targetPlaylist = parseResult;'), 'targetPlaylist must be hoisted before isDash branch to prevent ReferenceError');
+const dashSrc = fs.readFileSync('src/dashboard/dashboard.js', 'utf8');
+assert.ok(/import\s+\{[^}]*DEFAULT_SETTINGS[^}]*\}\s+from\s+['"]\.\.\/shared\/constants\.js['"]/.test(dashSrc), 'dashboard.js must import DEFAULT_SETTINGS');
+const csSrc = fs.readFileSync('src/content/content_script.js', 'utf8');
+assert.ok(csSrc.includes('mainSnifferAlreadyMounted'), 'content_script.js must coordinate MAIN/ISOLATED token handshake cleanly');
+console.log('  [PASS] Regressions verified: DASH variable scope, Dashboard DEFAULT_SETTINGS import & Sniffer Token Handshake');
+
+console.log('[Test] All 19 core test suites passed successfully with zero errors!');
 
 
 

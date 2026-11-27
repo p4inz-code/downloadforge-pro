@@ -1493,6 +1493,7 @@
     init();
   }
   var sessionToken = document.documentElement && document.documentElement.dataset.dfSnifferToken || null;
+  var mainSnifferAlreadyMounted = !!sessionToken;
   if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
     delete document.documentElement.dataset.dfSnifferToken;
   }
@@ -1503,16 +1504,24 @@
   }
   function injectMainWorldSniffer() {
     try {
+      if (mainSnifferAlreadyMounted) return;
       document.documentElement.dataset.dfSnifferToken = sessionToken;
       const script = document.createElement("script");
       script.src = chrome.runtime.getURL("src/content/injected_sniffer.js");
       script.dataset.token = sessionToken;
-      script.onload = () => {
-        delete script.dataset.token;
+      const cleanupToken = () => {
+        if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
+          delete document.documentElement.dataset.dfSnifferToken;
+        }
+        if (script.dataset && script.dataset.token) {
+          delete script.dataset.token;
+        }
         script.remove();
       };
+      script.onload = cleanupToken;
+      script.onerror = cleanupToken;
       (document.head || document.documentElement).appendChild(script);
-      delete document.documentElement.dataset.dfSnifferToken;
+      setTimeout(cleanupToken, 1e3);
     } catch (err) {
       console.debug("[DownloadForge] Failed to inject sniffer:", err);
     }
@@ -1620,17 +1629,24 @@
         return false;
       }
       if (message.type === "DF_GET_CACHED_OBJ") {
+        const replyObj = (objData, title) => {
+          if (objData && objData.length > 20 * 1024 * 1024) {
+            sendResponse({ ok: true, chunked: true, title });
+          } else {
+            sendResponse({ ok: true, objData, title });
+          }
+        };
         if (lastCapturedObj && lastCapturedObj.objData) {
-          sendResponse({ ok: true, objData: lastCapturedObj.objData, title: lastCapturedObj.title });
+          replyObj(lastCapturedObj.objData, lastCapturedObj.title);
           return false;
         }
         let replied = false;
         const onRipData = (event) => {
-          if (!replied && event.data && event.data.type === "DF_WEBGL_RIP_DATA" && event.data.objData) {
+          if (!replied && event.data && event.data.source === "DOWNLOADFORGE_SNIFFER" && event.data.type === "DF_WEBGL_RIP_DATA" && event.data.objData) {
             replied = true;
             window.removeEventListener("message", onRipData);
             lastCapturedObj = { objData: event.data.objData, title: event.data.title, time: Date.now() };
-            sendResponse({ ok: true, objData: event.data.objData, title: event.data.title });
+            replyObj(event.data.objData, event.data.title);
           }
         };
         window.addEventListener("message", onRipData);
@@ -1654,7 +1670,7 @@
       }
     });
     window.addEventListener("message", (event) => {
-      if (!event.data) return;
+      if (!event.data || event.data.source !== "DOWNLOADFORGE_SNIFFER") return;
       if (event.data.type === "DF_WEBGL_RIP_DATA" && event.data.objData) {
         lastCapturedObj = {
           objData: event.data.objData,
@@ -1664,23 +1680,36 @@
           faceCount: event.data.faceCount || 0,
           time: Date.now()
         };
-        try {
-          chrome.runtime.sendMessage({
-            type: "DF_STORE_CACHED_OBJ",
-            payload: {
-              objData: event.data.objData,
-              title: event.data.title,
-              vertexCount: event.data.vertexCount || 0,
-              faceCount: event.data.faceCount || 0
-            }
-          }).catch(() => {
-          });
-        } catch (_) {
+        if (event.data.objData.length <= 28 * 1024 * 1024) {
+          try {
+            chrome.runtime.sendMessage({
+              type: "DF_STORE_CACHED_OBJ",
+              payload: {
+                objData: event.data.objData,
+                title: event.data.title,
+                vertexCount: event.data.vertexCount || 0,
+                faceCount: event.data.faceCount || 0
+              }
+            }).catch(() => {
+            });
+          } catch (_) {
+          }
         }
       } else if (event.data.type === "DF_WEBGL_TELEMETRY" && event.data.data) {
         window.__df_last_telemetry = event.data.data;
       }
     });
+    if (chrome?.runtime?.onConnect) {
+      chrome.runtime.onConnect.addListener((port) => {
+        if (port.name !== "df_obj_stream") return;
+        const obj = lastCapturedObj?.objData || "";
+        const chunkSize = 4 * 1024 * 1024;
+        for (let i = 0; i < obj.length; i += chunkSize) {
+          port.postMessage({ type: "CHUNK", text: obj.slice(i, i + chunkSize) });
+        }
+        port.postMessage({ type: "END" });
+      });
+    }
   }
   async function runScan(settings = {}) {
     try {

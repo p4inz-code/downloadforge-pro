@@ -6,7 +6,7 @@
 // Manages: history, domain rules, settings, companion, diagnostics
 // ============================================================
 
-import { MSG, APP, CATEGORY_META } from '../shared/constants.js';
+import { MSG, APP, CATEGORY_META, DEFAULT_SETTINGS } from '../shared/constants.js';
 import { StorageService }          from '../storage/storage.js';
 import { addRule, removeRule, getRules } from '../core/rules.js';
 import { checkCompanion }          from '../core/companion_bridge.js';
@@ -335,7 +335,7 @@ async function loadSettings() {
     'autoScan', 'deduplicateUrls', 'showImages', 'showDocuments',
     'showArchives', 'showStreams', 'enableVideoOverlay', 'directDiskStream',
     'defaultSaveAs', 'showBadge', 'debugMode', 'sniff3d', 'packGltf',
-    'enable3dOverlay', 'autoHealErrors'
+    'autoHealErrors'
   ];
 
   for (const key of boolKeys) {

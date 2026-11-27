@@ -18,60 +18,193 @@ const log = new Logger('ModelZipBundler');
  * @param {string} [modelTitle]
  * @returns {Uint8Array|null}
  */
-export function convertObjToGlb(objText, modelTitle = 'Model') {
+/**
+ * Convert an ASCII Wavefront .obj text string into a binary glTF 2.0 (.glb) buffer.
+ * Preserves POSITION, NORMAL, TEXCOORD_0, PBR Material, and optional embedded baseColor texture.
+ * @param {string} objText
+ * @param {string} [modelTitle='Model']
+ * @param {object} [options={}]
+ * @param {Uint8Array} [options.diffuseTextureBytes]
+ * @param {string} [options.diffuseMimeType]
+ * @returns {Uint8Array|null}
+ */
+export function convertObjToGlb(objText, modelTitle = 'Model', options = {}) {
   if (!objText || typeof objText !== 'string') return null;
-  const positions = [];
-  const indices = [];
+  const rawPos = [];
+  const rawNorm = [];
+  const rawUv = [];
+  const rawFaces = [];
   const lines = objText.split('\n');
-  let vCount = 0;
 
   for (const line of lines) {
     const trimmed = line.trim();
+    if (!trimmed || trimmed[0] === '#') continue;
     if (trimmed.startsWith('v ')) {
-      const parts = trimmed.split(/\s+/).slice(1).map(Number);
-      if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
-        positions.push(parts[0], parts[1], parts[2]);
-        vCount++;
+      const parts = trimmed.split(/\s+/);
+      const x = Number(parts[1]), y = Number(parts[2]), z = Number(parts[3]);
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+        rawPos.push(x, y, z);
+      }
+    } else if (trimmed.startsWith('vn ')) {
+      const parts = trimmed.split(/\s+/);
+      const nx = Number(parts[1]), ny = Number(parts[2]), nz = Number(parts[3]);
+      if (Number.isFinite(nx) && Number.isFinite(ny) && Number.isFinite(nz)) {
+        rawNorm.push(nx, ny, nz);
+      }
+    } else if (trimmed.startsWith('vt ')) {
+      const parts = trimmed.split(/\s+/);
+      const u = Number(parts[1]), v = Number(parts[2]);
+      if (Number.isFinite(u) && Number.isFinite(v)) {
+        rawUv.push(u, v);
       }
     } else if (trimmed.startsWith('f ')) {
       const parts = trimmed.split(/\s+/).slice(1);
-      const faceIndices = [];
+      if (parts.length < 3) continue;
+      const vTotal = rawPos.length / 3;
+      const vtTotal = rawUv.length / 2;
+      const vnTotal = rawNorm.length / 3;
+      const verts = [];
       for (const p of parts) {
-        const idx = parseInt(p.split('/')[0], 10);
-        if (!isNaN(idx)) {
-          faceIndices.push(idx > 0 ? idx - 1 : vCount + idx);
+        const segs = p.split('/');
+        const viRaw = parseInt(segs[0], 10);
+        if (isNaN(viRaw)) continue;
+        const vi = viRaw > 0 ? viRaw - 1 : vTotal + viRaw;
+        const vtiRaw = segs[1] ? parseInt(segs[1], 10) : NaN;
+        const vti = !isNaN(vtiRaw) ? (vtiRaw > 0 ? vtiRaw - 1 : vtTotal + vtiRaw) : -1;
+        const vniRaw = segs[2] ? parseInt(segs[2], 10) : NaN;
+        const vni = !isNaN(vniRaw) ? (vniRaw > 0 ? vniRaw - 1 : vnTotal + vniRaw) : -1;
+        if (vi >= 0 && vi < vTotal) {
+          verts.push([vi, vti >= 0 && vti < vtTotal ? vti : -1, vni >= 0 && vni < vnTotal ? vni : -1]);
         }
       }
-      for (let t = 1; t < faceIndices.length - 1; t++) {
-        indices.push(faceIndices[0], faceIndices[t], faceIndices[t + 1]);
+      for (let t = 1; t < verts.length - 1; t++) {
+        rawFaces.push(verts[0], verts[t], verts[t + 1]);
       }
     }
   }
 
-  if (positions.length < 9 || indices.length < 3) return null;
+  if (rawPos.length < 9 || rawFaces.length < 3) return null;
 
+  const hasNormals = rawNorm.length >= 3 && rawFaces.some(f => f[2] >= 0);
+  const hasUvs = rawUv.length >= 2 && rawFaces.some(f => f[1] >= 0);
+
+  const vertMap = new Map();
+  const outPos = [];
+  const outNorm = [];
+  const outUv = [];
+  const indices = [];
+
+  for (let i = 0; i < rawFaces.length; i++) {
+    const [vi, vti, vni] = rawFaces[i];
+    const key = (vti === -1 && vni === -1) ? vi : `${vi}|${vti}|${vni}`;
+    let outIdx = vertMap.get(key);
+    if (outIdx === undefined) {
+      outIdx = outPos.length / 3;
+      vertMap.set(key, outIdx);
+      outPos.push(rawPos[vi * 3], rawPos[vi * 3 + 1], rawPos[vi * 3 + 2]);
+      if (hasNormals) {
+        if (vni >= 0) {
+          outNorm.push(rawNorm[vni * 3], rawNorm[vni * 3 + 1], rawNorm[vni * 3 + 2]);
+        } else {
+          outNorm.push(0, 0, 1);
+        }
+      }
+      if (hasUvs) {
+        if (vti >= 0) {
+          outUv.push(rawUv[vti * 2], 1.0 - rawUv[vti * 2 + 1]);
+        } else {
+          outUv.push(0, 0);
+        }
+      }
+    }
+    indices.push(outIdx);
+  }
+
+  const vCount = outPos.length / 3;
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-  for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+  for (let i = 0; i < outPos.length; i += 3) {
+    const x = outPos[i], y = outPos[i + 1], z = outPos[i + 2];
     if (x < minX) minX = x; if (x > maxX) maxX = x;
     if (y < minY) minY = y; if (y > maxY) maxY = y;
     if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
   }
 
-  const posArray = new Float32Array(positions);
+  const posArray = new Float32Array(outPos);
+  const normArray = hasNormals ? new Float32Array(outNorm) : null;
+  const uvArray = hasUvs ? new Float32Array(outUv) : null;
   const use32BitIndices = vCount > 65535;
   const idxArray = use32BitIndices ? new Uint32Array(indices) : new Uint16Array(indices);
 
-  const idxByteLength = idxArray.byteLength;
-  const idxPadding = (4 - (idxByteLength % 4)) % 4;
-  const posByteOffset = idxByteLength + idxPadding;
-  const posByteLength = posArray.byteLength;
-  const totalBinaryLength = posByteOffset + posByteLength;
+  const chunks = [];
+  const bufferViews = [];
+  const accessors = [];
+  let cursor = 0;
 
-  const combinedBin = new Uint8Array(totalBinaryLength);
-  combinedBin.set(new Uint8Array(idxArray.buffer, idxArray.byteOffset, idxArray.byteLength), 0);
-  combinedBin.set(new Uint8Array(posArray.buffer, posArray.byteOffset, posArray.byteLength), posByteOffset);
+  const appendBin = (typedOrBytes, target) => {
+    const raw = typedOrBytes instanceof Uint8Array
+      ? typedOrBytes
+      : new Uint8Array(typedOrBytes.buffer, typedOrBytes.byteOffset, typedOrBytes.byteLength);
+    const pad = (4 - (raw.byteLength % 4)) % 4;
+    const bvIndex = bufferViews.length;
+    const bv = { buffer: 0, byteOffset: cursor, byteLength: raw.byteLength };
+    if (target) bv.target = target;
+    bufferViews.push(bv);
+    chunks.push({ bytes: raw, pad });
+    cursor += raw.byteLength + pad;
+    return bvIndex;
+  };
+
+  // 0: Indices
+  const idxBv = appendBin(idxArray, 34963);
+  accessors.push({
+    bufferView: idxBv,
+    byteOffset: 0,
+    componentType: use32BitIndices ? 5125 : 5123,
+    count: indices.length,
+    type: 'SCALAR'
+  });
+
+  // 1: Positions
+  const posBv = appendBin(posArray, 34962);
+  const posAcc = accessors.length;
+  accessors.push({
+    bufferView: posBv,
+    byteOffset: 0,
+    componentType: 5126,
+    count: vCount,
+    type: 'VEC3',
+    min: [minX, minY, minZ],
+    max: [maxX, maxY, maxZ]
+  });
+
+  const attributes = { POSITION: posAcc };
+
+  if (normArray) {
+    const normBv = appendBin(normArray, 34962);
+    const normAcc = accessors.length;
+    accessors.push({
+      bufferView: normBv,
+      byteOffset: 0,
+      componentType: 5126,
+      count: vCount,
+      type: 'VEC3'
+    });
+    attributes.NORMAL = normAcc;
+  }
+
+  if (uvArray) {
+    const uvBv = appendBin(uvArray, 34962);
+    const uvAcc = accessors.length;
+    accessors.push({
+      bufferView: uvBv,
+      byteOffset: 0,
+      componentType: 5126,
+      count: vCount,
+      type: 'VEC2'
+    });
+    attributes.TEXCOORD_0 = uvAcc;
+  }
 
   const gltf = {
     asset: { version: '2.0', generator: 'DownloadForge Pro 3D Ripper' },
@@ -79,45 +212,48 @@ export function convertObjToGlb(objText, modelTitle = 'Model') {
     nodes: [{ mesh: 0, name: modelTitle }],
     meshes: [{
       primitives: [{
-        attributes: { POSITION: 1 },
+        attributes,
         indices: 0,
+        material: 0,
         mode: 4
       }]
     }],
-    buffers: [{ byteLength: totalBinaryLength }],
-    bufferViews: [
-      {
-        buffer: 0,
-        byteOffset: 0,
-        byteLength: idxByteLength,
-        target: 34963
-      },
-      {
-        buffer: 0,
-        byteOffset: posByteOffset,
-        byteLength: posByteLength,
-        target: 34962
+    materials: [{
+      name: `${modelTitle}_Material`,
+      pbrMetallicRoughness: {
+        baseColorFactor: [1.0, 1.0, 1.0, 1.0],
+        metallicFactor: 0.1,
+        roughnessFactor: 0.65
       }
-    ],
-    accessors: [
-      {
-        bufferView: 0,
-        byteOffset: 0,
-        componentType: use32BitIndices ? 5125 : 5123,
-        count: indices.length,
-        type: 'SCALAR'
-      },
-      {
-        bufferView: 1,
-        byteOffset: 0,
-        componentType: 5126,
-        count: vCount,
-        type: 'VEC3',
-        min: [minX, minY, minZ],
-        max: [maxX, maxY, maxZ]
-      }
-    ]
+    }],
+    buffers: [{ byteLength: cursor }],
+    bufferViews,
+    accessors
   };
+
+  if (options.diffuseTextureBytes && options.diffuseTextureBytes.byteLength > 16) {
+    const imgBv = appendBin(options.diffuseTextureBytes, 0);
+    gltf.buffers[0].byteLength = cursor;
+    gltf.images = [{
+      bufferView: imgBv,
+      mimeType: options.diffuseMimeType || 'image/png'
+    }];
+    gltf.samplers = [{
+      magFilter: 9729,
+      minFilter: 9987,
+      wrapS: 10497,
+      wrapT: 10497
+    }];
+    gltf.textures = [{ sampler: 0, source: 0 }];
+    gltf.materials[0].pbrMetallicRoughness.baseColorTexture = { index: 0 };
+  }
+
+  const combinedBin = new Uint8Array(cursor);
+  let writePos = 0;
+  for (const ch of chunks) {
+    combinedBin.set(ch.bytes, writePos);
+    writePos += ch.bytes.byteLength + ch.pad;
+  }
 
   return createGlbContainer(gltf, combinedBin);
 }
@@ -290,6 +426,8 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
     // A. Textures from /i/models/<uid>/textures
     const texturesRes = await fetch(`https://sketchfab.com/i/models/${uid}/textures`);
     const textureNames = [];
+    let diffuseTextureBytes = null;
+    let diffuseMimeType = 'image/png';
     if (texturesRes.ok) {
       const texJson = await texturesRes.json();
       if (texJson && Array.isArray(texJson.results)) {
@@ -302,12 +440,24 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
                 const imgRes = await fetch(best.url);
                 if (imgRes.ok) {
                   const imgBuf = await imgRes.arrayBuffer();
+                  const imgBytes = new Uint8Array(imgBuf);
                   const filename = texItem.name || best.url.split('/').pop().split('?')[0] || `texture_${Date.now()}.png`;
                   zipFiles.push({
                     name: `textures/${filename}`,
-                    data: new Uint8Array(imgBuf)
+                    data: imgBytes
                   });
                   textureNames.push(filename);
+
+                  const lowerName = filename.toLowerCase();
+                  const isDiffuseCandidate = !lowerName.includes('nrm') && !lowerName.includes('normal') &&
+                    !lowerName.includes('rough') && !lowerName.includes('metal') && !lowerName.includes('_ao') &&
+                    !lowerName.includes('bump') && !lowerName.includes('opacity');
+                  if (!diffuseTextureBytes || (isDiffuseCandidate && (lowerName.includes('diff') || lowerName.includes('albedo') || lowerName.includes('base') || lowerName.includes('col')))) {
+                    if (isDiffuseCandidate || !diffuseTextureBytes) {
+                      diffuseTextureBytes = imgBytes;
+                      diffuseMimeType = (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) ? 'image/jpeg' : 'image/png';
+                    }
+                  }
                 }
               } catch (texErr) {
                 log.warn('Texture fetch failed:', best.url);
@@ -329,7 +479,10 @@ export async function bundleSketchfabModelPackage(uid, requestedTitle, capturedO
     let glbBytes = null;
     if (activeObj) {
       try {
-        glbBytes = convertObjToGlb(activeObj, modelName);
+        glbBytes = convertObjToGlb(activeObj, modelName, {
+          diffuseTextureBytes,
+          diffuseMimeType
+        });
       } catch (glbErr) {
         log.warn('GLB container packaging fallback:', glbErr.message);
       }

@@ -8779,6 +8779,8 @@
       let segments = [];
       let audioSegments = [];
       let initUrl = null;
+      let mediaUrl = manifestUrl;
+      let targetPlaylist = null;
       if (isDash) {
         this.onStatus("Parsing MPEG-DASH MPD manifest...");
         const dashResult = manifest && manifest.type === "dash" ? manifest : await parseDASHManifest(manifestUrl);
@@ -8787,6 +8789,7 @@
         if (!track || !track.segments) throw new Error("No valid MPEG-DASH representation found");
         segments = track.segments;
         initUrl = track.initUrl || null;
+        targetPlaylist = { isLive: !!dashResult.isLive, targetDuration: dashResult.minBufferTime || 4 };
         if (dashResult.defaultAudioTrack && dashResult.defaultAudioTrack.segments) {
           audioSegments = dashResult.defaultAudioTrack.segments;
         }
@@ -8795,17 +8798,16 @@
         if (parseResult.error) {
           throw new Error(`Playlist parse error: ${parseResult.error}`);
         }
-        let mediaUrl2 = manifestUrl;
-        let targetPlaylist2 = parseResult;
+        targetPlaylist = parseResult;
         if (parseResult.type === "master") {
           const variant = selectedVariant || parseResult.variants[0];
           if (!variant) throw new Error("No valid video variants found in master playlist");
-          mediaUrl2 = variant.url;
+          mediaUrl = variant.url;
           this.onStatus(`Loading video track: ${variant.label || variant.resolution || "best"}...`);
-          targetPlaylist2 = await parseHLSManifest(mediaUrl2);
-          if (targetPlaylist2.error) throw new Error(targetPlaylist2.error);
+          targetPlaylist = await parseHLSManifest(mediaUrl);
+          if (targetPlaylist.error) throw new Error(targetPlaylist.error);
         }
-        segments = targetPlaylist2.segments;
+        segments = targetPlaylist.segments;
         if (!segments || segments.length === 0) {
           throw new Error("Playlist contains zero media segments");
         }
@@ -8989,7 +8991,7 @@
         throw new Error("Download cancelled");
       }
       pumpNextSegments();
-      if (audioSegments.length > 0 && !this.aborted) {
+      if (audioSegments.length > 0 && !isDash && !initUrl && !this.aborted) {
         this.onStatus("Multiplexing synchronized audio track into MP4...");
         for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
           const aSeg = audioSegments[i];
@@ -9025,7 +9027,7 @@
     /**
      * Continuous sliding-window DVR recorder for ongoing live broadcasts.
      */
-    async downloadLiveStream(mediaUrl2, options = {}) {
+    async downloadLiveStream(mediaUrl, options = {}) {
       const { writableStream, targetDuration = 4 } = options;
       this.stopLive = false;
       this.aborted = false;
@@ -9052,7 +9054,7 @@
       let pollInterval = Math.max(2e3, targetDuration * 1e3 / 2);
       while (!this.aborted && !this.stopLive) {
         try {
-          const playlist = await parseHLSManifest(mediaUrl2);
+          const playlist = await parseHLSManifest(mediaUrl);
           if (playlist.error) {
             console.warn("[Live DVR] Playlist refresh warning:", playlist.error);
           } else if (playlist.segments && playlist.segments.length > 0) {
@@ -9604,6 +9606,8 @@
           url: blobUrl,
           filename: subFilename,
           saveAs: true
+        }, () => {
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 15e3);
         });
       } else {
         const a = document.createElement("a");
@@ -9612,6 +9616,7 @@
         document.body.appendChild(a);
         a.click();
         a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 5e3);
       }
       statusMessage.textContent = `Subtitles downloaded: ${subFilename}`;
     } catch (err) {
@@ -9772,9 +9777,9 @@
           currentBlob = await convertMediaToWav(result.blob, { gainDb });
           targetFilename = targetFilename.replace(/\.[^/.]+$/, ".wav");
         } else if (selectedFormat === "mp3") {
-          statusMessage.textContent = "Extracting audio track as MP3...";
+          statusMessage.textContent = "Transcoding audio track to lossless WAV (PCM)...";
           currentBlob = await convertMediaToWav(result.blob, { gainDb });
-          targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp3");
+          targetFilename = targetFilename.replace(/\.[^/.]+$/, ".wav");
         } else if (selectedFormat === "m4a") {
           currentBlob = new Blob([result.blob], { type: "audio/mp4" });
           targetFilename = targetFilename.replace(/\.[^/.]+$/, ".m4a");
@@ -9951,8 +9956,7 @@
       const val = formatSelect.value;
       const isAudio = val === "m4a" || val === "wav" || val === "mp3";
       if (audioTuningItem) audioTuningItem.style.display = isAudio ? "block" : "none";
-      if (val === "wav") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".wav");
-      else if (val === "mp3") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp3");
+      if (val === "wav" || val === "mp3") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".wav");
       else if (val === "m4a") targetFilename = targetFilename.replace(/\.[^/.]+$/, ".m4a");
       else targetFilename = targetFilename.replace(/\.[^/.]+$/, ".mp4");
       const startLabelMap = {
@@ -9960,7 +9964,7 @@
         video_only: "Extract Video (Muted MP4)",
         m4a: "Extract Audio (M4A)",
         wav: "Transcode & Export (WAV Master)",
-        mp3: "Extract Audio (MP3)"
+        mp3: "Transcode & Export (Universal WAV)"
       };
       const startSpan = btnStart?.querySelector("span");
       if (startSpan) startSpan.textContent = startLabelMap[val] || "Start Download";
@@ -9970,7 +9974,7 @@
           video_only: "Save Video (Muted MP4)",
           m4a: "Save Audio (M4A)",
           wav: "Save Studio Audio (WAV)",
-          mp3: "Save Audio (MP3)"
+          mp3: "Save Studio Audio (WAV)"
         };
         const span = btnSave.querySelector("span");
         if (span) span.textContent = labelMap[val] || "Save File";

@@ -128,23 +128,12 @@ export async function convertMediaToWav(mediaSource, options = {}) {
 export async function extractAudioTrack(mediaBlob, targetFormat = 'm4a', options = {}) {
   const baseName = options.filename ? options.filename.replace(/\.[^/.]+$/, '') : 'audio_track';
 
-  if (targetFormat === 'wav') {
+  if (targetFormat === 'mp3' || targetFormat === 'wav') {
     const wavBlob = await convertMediaToWav(mediaBlob, options);
     return {
       blob: wavBlob,
       filename: `${baseName}.wav`,
       extension: 'wav',
-    };
-  }
-
-  if (targetFormat === 'mp3') {
-    // Transcode via decoded PCM with MP3 compatibility framing
-    const wavBlob = await convertMediaToWav(mediaBlob, options);
-    // Export standard high-compatibility audio container
-    return {
-      blob: wavBlob,
-      filename: `${baseName}.mp3`,
-      extension: 'mp3',
     };
   }
 

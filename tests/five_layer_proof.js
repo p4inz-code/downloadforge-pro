@@ -196,8 +196,8 @@ console.log('[LAYER 5: Automated Testing & Release Integrity]');
 // 5.1 Manifest V3 Strict Compliance
 const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf-8'));
 assert.strictEqual(manifest.manifest_version, 3, 'Manifest must be MV3');
-assert.strictEqual(manifest.version, '1.3.2', 'Manifest version must be 1.3.2');
-console.log('  ✓ [5.1] Manifest V3: Verified version 1.3.2');
+assert.strictEqual(manifest.version, '1.3.3', 'Manifest version must be 1.3.3');
+console.log('  ✓ [5.1] Manifest V3: Verified version 1.3.3');
 
 // 5.2 Compiled Dist Bundles
 const requiredBundles = [
@@ -213,7 +213,7 @@ for (const b of requiredBundles) {
 console.log('  ✓ [5.2] Distribution Bundles: All 3 bundles compiled without external CDN dependencies');
 
 // 5.3 Release Archive Validation
-const releaseZipPath = 'release/downloadforge-pro-v1.3.2.zip';
+const releaseZipPath = 'release/downloadforge-pro-v1.3.3.zip';
 assert.ok(fs.existsSync(releaseZipPath), `Release zip must exist: ${releaseZipPath}`);
 const zipStats = fs.statSync(releaseZipPath);
 assert.ok(zipStats.size > 100000, `Release zip must be substantial: ${zipStats.size} bytes`);

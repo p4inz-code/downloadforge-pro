@@ -204,6 +204,25 @@ async function runDownloadPipeline(config) {
   // Drain remaining segments
   pumpSequential();
 
+  // Fetch & feed paired HLS MPEG-TS audio segments into transmuxer if present
+  if (transmuxer && Array.isArray(audioSegments) && audioSegments.length > 0 && !isAborted) {
+    self.postMessage({ type: 'STATUS', message: `Worker multiplexing ${audioSegments.length} paired audio segments...` });
+    for (let i = 0; i < audioSegments.length && !isAborted; i++) {
+      const aSeg = audioSegments[i];
+      try {
+        let aBuf = await fetchBufferWithRetry(aSeg.url, aSeg.byteRange, 1, { maxRetries, timeoutMs, referer });
+        if (aSeg.key && aSeg.key.method === 'AES-128') {
+          aBuf = await decryptSegment(aBuf, aSeg.key, aSeg.sequence || i);
+        }
+        if (aBuf && aBuf.byteLength > 0) {
+          transmuxer.push(new Uint8Array(aBuf));
+        }
+      } catch (e) {
+        console.warn(`[Worker] Audio segment ${i} skip:`, e.message);
+      }
+    }
+  }
+
   if (transmuxer) {
     transmuxer.flush();
   }

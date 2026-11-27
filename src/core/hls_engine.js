@@ -81,6 +81,8 @@ export class HLSEngine {
     let segments = [];
     let audioSegments = [];
     let initUrl = null;
+    let mediaUrl = manifestUrl;
+    let targetPlaylist = null;
 
     if (isDash) {
       this.onStatus('Parsing MPEG-DASH MPD manifest...');
@@ -92,6 +94,7 @@ export class HLSEngine {
 
       segments = track.segments;
       initUrl = track.initUrl || null;
+      targetPlaylist = { isLive: !!dashResult.isLive, targetDuration: dashResult.minBufferTime || 4 };
 
       if (dashResult.defaultAudioTrack && dashResult.defaultAudioTrack.segments) {
         audioSegments = dashResult.defaultAudioTrack.segments;
@@ -102,8 +105,7 @@ export class HLSEngine {
         throw new Error(`Playlist parse error: ${parseResult.error}`);
       }
 
-      let mediaUrl = manifestUrl;
-      let targetPlaylist = parseResult;
+      targetPlaylist = parseResult;
 
       if (parseResult.type === 'master') {
         const variant = selectedVariant || parseResult.variants[0];
@@ -341,8 +343,8 @@ export class HLSEngine {
     // Final drain pump
     pumpNextSegments();
 
-    // Feed paired audio segments into transmuxer if present
-    if (audioSegments.length > 0 && !this.aborted) {
+    // Feed paired MPEG-TS audio segments into transmuxer only when pipeline uses TS transmuxer
+    if (audioSegments.length > 0 && !isDash && !initUrl && !this.aborted) {
       this.onStatus('Multiplexing synchronized audio track into MP4...');
       for (let i = 0; i < audioSegments.length && !this.aborted; i++) {
         const aSeg = audioSegments[i];

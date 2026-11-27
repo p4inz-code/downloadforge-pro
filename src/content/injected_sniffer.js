@@ -14,17 +14,29 @@
   if (window.__df_sniffer_injected) return;
   window.__df_sniffer_injected = true;
 
-  // Retrieve security nonce passed from content script or generate crypto nonce
+  // Retrieve security nonce passed from content script or coordinate document_start handshake
   const scriptEl = document.currentScript;
-  let sessionToken = (document.documentElement && document.documentElement.dataset.dfSnifferToken) ||
+  const docEl = document.documentElement;
+  let sessionToken = (docEl && docEl.dataset && docEl.dataset.dfSnifferToken) ||
                      (scriptEl && scriptEl.dataset ? scriptEl.dataset.token : null);
-  if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
-    delete document.documentElement.dataset.dfSnifferToken;
-  }
-  if (!sessionToken && window.crypto && window.crypto.getRandomValues) {
-    const buf = new Uint8Array(24);
-    window.crypto.getRandomValues(buf);
-    sessionToken = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+  if (sessionToken) {
+    if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
+      delete document.documentElement.dataset.dfSnifferToken;
+    }
+  } else {
+    if (window.crypto && window.crypto.getRandomValues) {
+      const buf = new Uint8Array(24);
+      window.crypto.getRandomValues(buf);
+      sessionToken = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+    }
+    if (sessionToken && docEl && docEl.dataset) {
+      docEl.dataset.dfSnifferToken = sessionToken;
+      setTimeout(() => {
+        if (document.documentElement && document.documentElement.dataset.dfSnifferToken) {
+          delete document.documentElement.dataset.dfSnifferToken;
+        }
+      }, 500);
+    }
   }
   if (scriptEl && scriptEl.dataset && scriptEl.dataset.token) {
     delete scriptEl.dataset.token;
@@ -542,7 +554,7 @@
   // ── WebGL Mesh Geometry Ripper (In-Browser Ninja Ripper Core) ─
   const capturedGeometries = [];
   const capturedDrawCalls = [];
-  const drawCallDedup = new Set();
+  const drawCallIndexByKey = new Map();
   let totalCapturedVertices = 0;
   let totalCapturedFaces = 0;
   let lastTelemetryTimestamp = 0;
@@ -646,15 +658,106 @@
     }
   }
 
+  const vaoStateMap = new WeakMap();
+  const uniformLocationNames = new WeakMap();
+  const programUniformsMap = new WeakMap();
+
+  function getVaoState(gl, vao) {
+    if (vao) {
+      let state = vaoStateMap.get(vao);
+      if (!state) {
+        state = { attribs: {}, enabled: {}, elementBuffer: null };
+        vaoStateMap.set(vao, state);
+      }
+      return state;
+    }
+    if (!gl._df_defaultVao) {
+      gl._df_defaultVao = { attribs: {}, enabled: {}, elementBuffer: null };
+    }
+    return gl._df_defaultVao;
+  }
+
+  function getGlTypeByteSize(type) {
+    switch (type) {
+      case 5120: // BYTE
+      case 5121: // UNSIGNED_BYTE
+        return 1;
+      case 5122: // SHORT
+      case 5123: // UNSIGNED_SHORT
+      case 5131: // HALF_FLOAT (WebGL2)
+      case 36193: // HALF_FLOAT_OES (WebGL1)
+        return 2;
+      case 5124: // INT
+      case 5125: // UNSIGNED_INT
+      case 5126: // FLOAT
+      default:
+        return 4;
+    }
+  }
+
+  function halfToFloat(h) {
+    const s = (h & 0x8000) >> 15;
+    const e = (h & 0x7C00) >> 10;
+    const f = h & 0x03FF;
+    if (e === 0) return (s ? -1 : 1) * Math.pow(2, -14) * (f / 1024);
+    if (e === 0x1F) return f ? NaN : (s ? -Infinity : Infinity);
+    return (s ? -1 : 1) * Math.pow(2, e - 15) * (1 + f / 1024);
+  }
+
+  function readGlComponent(view, bytePos, type, normalized) {
+    if (type === 5126) return view.getFloat32(bytePos, true);
+    if (type === 5123) {
+      const val = view.getUint16(bytePos, true);
+      return normalized ? (val / 65535.0) : val;
+    }
+    if (type === 5122) {
+      const val = view.getInt16(bytePos, true);
+      return normalized ? Math.max(-1.0, val / 32767.0) : val;
+    }
+    if (type === 5121) {
+      const val = view.getUint8(bytePos);
+      return normalized ? (val / 255.0) : val;
+    }
+    if (type === 5120) {
+      const val = view.getInt8(bytePos);
+      return normalized ? Math.max(-1.0, val / 127.0) : val;
+    }
+    if (type === 5131 || type === 36193) {
+      return halfToFloat(view.getUint16(bytePos, true));
+    }
+    if (type === 5125) {
+      const val = view.getUint32(bytePos, true);
+      return normalized ? (val / 4294967295.0) : val;
+    }
+    if (type === 5124) {
+      const val = view.getInt32(bytePos, true);
+      return normalized ? Math.max(-1.0, val / 2147483647.0) : val;
+    }
+    return view.getFloat32(bytePos, true);
+  }
+
+  function decodeOctNormal(ox, oy) {
+    let x = ox, y = oy;
+    let z = 1.0 - Math.abs(x) - Math.abs(y);
+    if (z < 0.0) {
+      const oldX = x;
+      x = (1.0 - Math.abs(y)) * (oldX >= 0.0 ? 1.0 : -1.0);
+      y = (1.0 - Math.abs(oldX)) * (y >= 0.0 ? 1.0 : -1.0);
+    }
+    const len = Math.hypot(x, y, z) || 1.0;
+    return [x / len, y / len, z / len];
+  }
+
   function recordDrawCall(gl, count, type, byteOffset, isElements = true, first = 0, mode = 4) {
     try {
       const glVersion = (window.WebGL2RenderingContext && gl instanceof window.WebGL2RenderingContext) ? 'WebGL 2.0' : 'WebGL 1.0';
+      const vaoState = getVaoState(gl, gl._df_currentVao);
 
       // 1. Identify active index buffer (if drawElements)
       let idxArray = null;
       let elemBufId = 'arr';
       if (isElements) {
-        const elemBuf = gl._df_boundElementBuffer;
+        const elemBuf = vaoState.elementBuffer || gl._df_boundElementBuffer;
         if (!elemBuf || !elemBuf._df_data) return;
         elemBufId = elemBuf._df_id;
         const buf = elemBuf._df_data;
@@ -679,137 +782,81 @@
         }
       }
 
-      // 2. Identify active vertex position attribute
-      const attribs = gl._df_attribs || {};
+      // 2. Identify active vertex position attribute (skipping disabled slots & 2D screen passes)
+      const attribs = vaoState.attribs && Object.keys(vaoState.attribs).length > 0
+        ? vaoState.attribs
+        : (gl._df_attribs || {});
+      const enabledMap = vaoState.enabled || {};
+      const hasAnyEnabledTracking = Object.keys(enabledMap).length > 0;
+      const isAttribActive = (k, a) => {
+        if (!a || !a.buffer || !a.buffer._df_data) return false;
+        if (hasAnyEnabledTracking && enabledMap[k] === false) return false;
+        if (hasAnyEnabledTracking && enabledMap[k] === undefined && Object.values(enabledMap).some(Boolean)) return false;
+        return true;
+      };
+
       let posAttrib = null;
       let normAttrib = null;
       let uvAttrib = null;
 
-      // Slot 0 is standard POSITION in Three.js / OSG.js / WebGL conventions
-      if (attribs[0] && attribs[0].buffer && attribs[0].buffer._df_data) {
+      if (isAttribActive('0', attribs[0]) && attribs[0].size >= 3) {
         posAttrib = attribs[0];
       }
-
-      // If slot 0 is not position, scan attributes for size 3 float arrays
       if (!posAttrib) {
+        // If slot 0 is active with size < 3 (2D fullscreen quad / UI pass), abort early!
+        if (isAttribActive('0', attribs[0]) && attribs[0].size < 3) return;
         for (const k of Object.keys(attribs)) {
           const a = attribs[k];
-          if (a && a.buffer && a.buffer._df_data && a.size >= 3) {
+          if (isAttribActive(k, a) && a.size >= 3) {
             posAttrib = a;
             break;
           }
         }
       }
-      if (!posAttrib || !posAttrib.buffer || !posAttrib.buffer._df_data) return;
+      if (!posAttrib || !posAttrib.buffer || !posAttrib.buffer._df_data || posAttrib.size < 3) return;
 
-      // Look for Normal attribute (size 3) and UV attribute (size 2)
+      // Skip fullscreen post-process passes on slot 0 unindexed drawArrays with <= 6 verts
+      if (!isElements && count <= 6) return;
+
+      // Classify Normal vs UV attributes cleanly (Octahedral SHORT size=2 vs FLOAT/USHORT UV size=2)
       for (const k of Object.keys(attribs)) {
         const a = attribs[k];
-        if (!a || !a.buffer || !a.buffer._df_data || a === posAttrib) continue;
-        if (a.size === 3 && !normAttrib) normAttrib = a;
-        else if (a.size === 2 && !uvAttrib) uvAttrib = a;
+        if (!isAttribActive(k, a) || a === posAttrib) continue;
+        if (a.size === 3 && !normAttrib) {
+          normAttrib = a;
+        } else if (a.size === 2 && a.type === 5122 && !normAttrib && Number(k) <= 2) {
+          normAttrib = a; // Signed SHORT 2-component octahedral normal (Sketchfab)
+        }
+      }
+      for (const k of Object.keys(attribs)) {
+        const a = attribs[k];
+        if (!isAttribActive(k, a) || a === posAttrib || a === normAttrib) continue;
+        if (a.size === 2 && !uvAttrib) {
+          uvAttrib = a;
+        }
       }
 
       const posBuf = posAttrib.buffer;
-      const dedupKey = `${elemBufId}_${byteOffset}_${count}_${posBuf._df_id}`;
-      if (drawCallDedup.has(dedupKey)) return;
-      if (drawCallDedup.size > 2000) drawCallDedup.clear();
-      drawCallDedup.add(dedupKey);
+      const progState = gl._df_currentProgram ? programUniformsMap.get(gl._df_currentProgram) : null;
+      const m = (progState && progState.modelMatrix) || gl._df_modelMatrix || null;
+      const hasTransform = m && m.length >= 16 && Math.abs(m[15] - 1.0) < 0.05 && Math.abs(m[3]) < 1e-4 && Math.abs(m[7]) < 1e-4;
+      const dedupKey = `${elemBufId}_${byteOffset}_${count}_${posBuf._df_id}_${posAttrib.offset}`;
+      const existingIdx = drawCallIndexByKey.get(dedupKey);
+      if (existingIdx !== undefined) {
+        const prev = capturedDrawCalls[existingIdx];
+        const prevRichness = (prev?.normals ? 1 : 0) + (prev?.uvs ? 2 : 0) + (prev?.hasTransform ? 4 : 0);
+        const curRichness = (normAttrib ? 1 : 0) + (uvAttrib ? 2 : 0) + (hasTransform ? 4 : 0);
+        if (prev && curRichness <= prevRichness) return;
+      }
 
-      // 3. Extract vertices from buffer view safely
+      // 3. Collect min/max referenced vertex indices (avoids duplicating entire shared VBO per submesh!)
       const rawPosBuf = posBuf._df_data;
-      const posAlignedBytes = rawPosBuf.byteLength - (rawPosBuf.byteLength % 4);
-      if (posAlignedBytes < 12) return;
-      const floatView = new Float32Array(rawPosBuf, 0, Math.floor(posAlignedBytes / 4));
-
-      const posStrideBytes = posAttrib.stride > 0 ? posAttrib.stride : (posAttrib.size * 4);
+      const posCompBytes = getGlTypeByteSize(posAttrib.type || 5126);
+      const posStrideBytes = posAttrib.stride > 0 ? posAttrib.stride : (posAttrib.size * posCompBytes);
       const posOffsetBytes = posAttrib.offset || 0;
-      const strideFloats = Math.floor(posStrideBytes / 4);
+      if (rawPosBuf.byteLength < posOffsetBytes + posCompBytes * 3) return;
 
-      let maxIndex = 0;
-      if (isElements && idxArray) {
-        for (let i = 0; i < idxArray.length; i++) {
-          if (idxArray[i] > maxIndex) maxIndex = idxArray[i];
-        }
-      } else {
-        maxIndex = first + count;
-      }
-
-      const vertexCount = maxIndex + 1;
-      if (vertexCount > 500000) return; // Guard against corrupt buffer length
-
-      const positions = new Float32Array(vertexCount * 3);
-      const normals = normAttrib ? new Float32Array(vertexCount * 3) : null;
-      const uvs = uvAttrib ? new Float32Array(vertexCount * 2) : null;
-
-      // Pre-instantiate attribute views once outside vertex loop for 100x performance
-      let nView = null, nStride = 3, nOff = 0;
-      if (normals && normAttrib && normAttrib.buffer && normAttrib.buffer._df_data) {
-        const nBuf = normAttrib.buffer._df_data;
-        const nAlign = nBuf.byteLength - (nBuf.byteLength % 4);
-        if (nAlign >= 12) {
-          nView = new Float32Array(nBuf, 0, Math.floor(nAlign / 4));
-          nStride = normAttrib.stride > 0 ? Math.floor(normAttrib.stride / 4) : 3;
-          nOff = Math.floor((normAttrib.offset || 0) / 4);
-        }
-      }
-
-      let uvView = null, uvStride = 2, uvOff = 0;
-      if (uvs && uvAttrib && uvAttrib.buffer && uvAttrib.buffer._df_data) {
-        const uvBuf = uvAttrib.buffer._df_data;
-        const uvAlign = uvBuf.byteLength - (uvBuf.byteLength % 4);
-        if (uvAlign >= 8) {
-          uvView = new Float32Array(uvBuf, 0, Math.floor(uvAlign / 4));
-          uvStride = uvAttrib.stride > 0 ? Math.floor(uvAttrib.stride / 4) : 2;
-          uvOff = Math.floor((uvAttrib.offset || 0) / 4);
-        }
-      }
-
-      // Check for active affine model matrix (uniformMatrix4fv)
-      const m = gl._df_activeMatrix;
-      const hasTransform = m && m.length >= 16 && Math.abs(m[15] - 1.0) < 0.1 && m[3] === 0 && m[7] === 0;
-
-      for (let v = 0; v < vertexCount; v++) {
-        const fIdx = Math.floor(posOffsetBytes / 4) + v * strideFloats;
-        if (fIdx + 2 < floatView.length) {
-          let x = floatView[fIdx];
-          let y = floatView[fIdx + 1];
-          let z = floatView[fIdx + 2];
-
-          // Apply 4x4 World Transformation Matrix if available
-          if (hasTransform) {
-            const wx = m[0]*x + m[4]*y + m[8]*z + m[12];
-            const wy = m[1]*x + m[5]*y + m[9]*z + m[13];
-            const wz = m[2]*x + m[6]*y + m[10]*z + m[14];
-            x = wx; y = wy; z = wz;
-          }
-
-          positions[v * 3] = isNaN(x) ? 0 : x;
-          positions[v * 3 + 1] = isNaN(y) ? 0 : y;
-          positions[v * 3 + 2] = isNaN(z) ? 0 : z;
-        }
-
-        if (nView) {
-          const nIdx = nOff + v * nStride;
-          if (nIdx + 2 < nView.length) {
-            const nx = nView[nIdx], ny = nView[nIdx + 1], nz = nView[nIdx + 2];
-            normals[v * 3] = isNaN(nx) ? 0 : nx;
-            normals[v * 3 + 1] = isNaN(ny) ? 0 : ny;
-            normals[v * 3 + 2] = isNaN(nz) ? 1 : nz;
-          }
-        }
-
-        if (uvView) {
-          const uvIdx = uvOff + v * uvStride;
-          if (uvIdx + 1 < uvView.length) {
-            const u = uvView[uvIdx], uVal = uvView[uvIdx + 1];
-            uvs[v * 2] = isNaN(u) ? 0 : u;
-            uvs[v * 2 + 1] = isNaN(uVal) ? 0 : uVal;
-          }
-        }
-      }
-
-      // Synthesize indices for drawArrays or decompose TRIANGLE_STRIP / TRIANGLE_FAN
+      // Decompose source indices first (before allocating vertex buffers)
       let sourceIndices = idxArray;
       if (!isElements) {
         sourceIndices = new Uint32Array(count);
@@ -843,35 +890,183 @@
         let outIdx = 0;
         const origin = sourceIndices[0];
         for (let i = 1; i < sourceIndices.length - 1; i++) {
+          const b = sourceIndices[i];
+          const c = sourceIndices[i + 1];
+          if (origin === b || b === c || origin === c) continue;
           finalIndices[outIdx++] = origin;
-          finalIndices[outIdx++] = sourceIndices[i];
-          finalIndices[outIdx++] = sourceIndices[i + 1];
+          finalIndices[outIdx++] = b;
+          finalIndices[outIdx++] = c;
         }
+        finalIndices = finalIndices.subarray(0, outIdx);
       } else {
         finalIndices = sourceIndices;
       }
 
       if (!finalIndices || finalIndices.length < 3) return;
 
-      capturedDrawCalls.push({
+      let minIndex = Infinity;
+      let maxIndex = 0;
+      for (let i = 0; i < finalIndices.length; i++) {
+        const vi = finalIndices[i];
+        if (vi < minIndex) minIndex = vi;
+        if (vi > maxIndex) maxIndex = vi;
+      }
+      if (minIndex > maxIndex || maxIndex > 1000000) return;
+
+      // Compact strictly referenced vertices in [minIndex..maxIndex]
+      const span = maxIndex - minIndex + 1;
+      const remap = new Int32Array(span).fill(-1);
+      const localToGlobal = [];
+      const remappedIndices = new Uint32Array(finalIndices.length);
+      for (let i = 0; i < finalIndices.length; i++) {
+        const gIdx = finalIndices[i];
+        const sIdx = gIdx - minIndex;
+        let localIdx = remap[sIdx];
+        if (localIdx === -1) {
+          localIdx = localToGlobal.length;
+          remap[sIdx] = localIdx;
+          localToGlobal.push(gIdx);
+        }
+        remappedIndices[i] = localIdx;
+      }
+
+      const vertexCount = localToGlobal.length;
+      if (vertexCount < 3 || vertexCount > 500000) return;
+
+      const posView = new DataView(rawPosBuf);
+      const positions = new Float32Array(vertexCount * 3);
+      const normals = normAttrib ? new Float32Array(vertexCount * 3) : null;
+      const uvs = uvAttrib ? new Float32Array(vertexCount * 2) : null;
+
+      let nView = null, nStrideBytes = 0, nOffBytes = 0, nCompBytes = 4, nSize = 3, nType = 5126, nNorm = false;
+      if (normals && normAttrib?.buffer?._df_data) {
+        const nBuf = normAttrib.buffer._df_data;
+        nType = normAttrib.type || 5126;
+        nSize = normAttrib.size || 3;
+        nNorm = !!normAttrib.normalized;
+        nCompBytes = getGlTypeByteSize(nType);
+        nStrideBytes = normAttrib.stride > 0 ? normAttrib.stride : (nSize * nCompBytes);
+        nOffBytes = normAttrib.offset || 0;
+        if (nBuf.byteLength >= nOffBytes + nCompBytes * nSize) {
+          nView = new DataView(nBuf);
+        }
+      }
+
+      let uvView = null, uvStrideBytes = 0, uvOffBytes = 0, uvCompBytes = 4, uvType = 5126, uvNorm = false;
+      if (uvs && uvAttrib?.buffer?._df_data) {
+        const uvBuf = uvAttrib.buffer._df_data;
+        uvType = uvAttrib.type || 5126;
+        uvNorm = !!uvAttrib.normalized;
+        uvCompBytes = getGlTypeByteSize(uvType);
+        uvStrideBytes = uvAttrib.stride > 0 ? uvAttrib.stride : (2 * uvCompBytes);
+        uvOffBytes = uvAttrib.offset || 0;
+        if (uvBuf.byteLength >= uvOffBytes + uvCompBytes * 2) {
+          uvView = new DataView(uvBuf);
+        }
+      }
+
+      const quv0 = progState && progState.quv0 ? progState.quv0 : null;
+      const pType = posAttrib.type || 5126;
+      const pNorm = !!posAttrib.normalized;
+
+      for (let localV = 0; localV < vertexCount; localV++) {
+        const v = localToGlobal[localV];
+        const pByte = posOffsetBytes + v * posStrideBytes;
+        if (pByte + posCompBytes * 3 <= rawPosBuf.byteLength) {
+          let x = readGlComponent(posView, pByte, pType, pNorm);
+          let y = readGlComponent(posView, pByte + posCompBytes, pType, pNorm);
+          let z = readGlComponent(posView, pByte + posCompBytes * 2, pType, pNorm);
+
+          if (hasTransform) {
+            const wx = m[0]*x + m[4]*y + m[8]*z + m[12];
+            const wy = m[1]*x + m[5]*y + m[9]*z + m[13];
+            const wz = m[2]*x + m[6]*y + m[10]*z + m[14];
+            x = wx; y = wy; z = wz;
+          }
+
+          positions[localV * 3] = Number.isFinite(x) ? x : 0;
+          positions[localV * 3 + 1] = Number.isFinite(y) ? y : 0;
+          positions[localV * 3 + 2] = Number.isFinite(z) ? z : 0;
+        }
+
+        if (nView) {
+          const nByte = nOffBytes + v * nStrideBytes;
+          if (nByte + nCompBytes * nSize <= nView.byteLength) {
+            if (nSize === 2) {
+              const ox = readGlComponent(nView, nByte, nType, nNorm);
+              const oy = readGlComponent(nView, nByte + nCompBytes, nType, nNorm);
+              const [nx, ny, nz] = decodeOctNormal(ox, oy);
+              normals[localV * 3] = Number.isFinite(nx) ? nx : 0;
+              normals[localV * 3 + 1] = Number.isFinite(ny) ? ny : 0;
+              normals[localV * 3 + 2] = Number.isFinite(nz) ? nz : 1;
+            } else {
+              const nx = readGlComponent(nView, nByte, nType, nNorm);
+              const ny = readGlComponent(nView, nByte + nCompBytes, nType, nNorm);
+              const nz = readGlComponent(nView, nByte + nCompBytes * 2, nType, nNorm);
+              normals[localV * 3] = Number.isFinite(nx) ? nx : 0;
+              normals[localV * 3 + 1] = Number.isFinite(ny) ? ny : 0;
+              normals[localV * 3 + 2] = Number.isFinite(nz) ? nz : 1;
+            }
+          }
+        }
+
+        if (uvView) {
+          const uByte = uvOffBytes + v * uvStrideBytes;
+          if (uByte + uvCompBytes * 2 <= uvView.byteLength) {
+            let u = readGlComponent(uvView, uByte, uvType, uvNorm);
+            let vCoord = readGlComponent(uvView, uByte + uvCompBytes, uvType, uvNorm);
+            if (quv0 && uvType !== 5126) {
+              u = quv0[0] + u * quv0[2];
+              vCoord = quv0[1] + vCoord * quv0[3];
+            }
+            uvs[localV * 2] = Number.isFinite(u) ? u : 0;
+            uvs[localV * 2 + 1] = Number.isFinite(vCoord) ? vCoord : 0;
+          }
+        }
+      }
+
+      // Filter screen-space post-processing clip quads
+      if (vertexCount <= 4) {
+        let allClip = true;
+        for (let v = 0; v < vertexCount; v++) {
+          const x = positions[v * 3], y = positions[v * 3 + 1], z = positions[v * 3 + 2];
+          if (!(Math.abs(x) <= 4.1 && Math.abs(y) <= 4.1 && Math.abs(z) <= 1.05)) {
+            allClip = false;
+            break;
+          }
+        }
+        if (allClip && (!hasTransform || vertexCount <= 3)) return;
+      }
+
+      const entry = {
         positions,
         normals,
         uvs,
-        indices: finalIndices,
+        indices: remappedIndices,
         vertexCount,
-        faceCount: Math.floor(finalIndices.length / 3),
-        partId: capturedDrawCalls.length + 1,
+        faceCount: Math.floor(remappedIndices.length / 3),
+        hasTransform: !!hasTransform,
+        partId: existingIdx !== undefined ? capturedDrawCalls[existingIdx].partId : (capturedDrawCalls.length + 1),
         time: Date.now()
-      });
+      };
 
-      if (capturedDrawCalls.length > 500) {
-        const dropped = capturedDrawCalls.shift();
-        totalCapturedVertices = Math.max(0, totalCapturedVertices - (dropped.vertexCount || 0));
-        totalCapturedFaces = Math.max(0, totalCapturedFaces - (dropped.faceCount || 0));
+      if (existingIdx !== undefined) {
+        const old = capturedDrawCalls[existingIdx];
+        totalCapturedVertices = Math.max(0, totalCapturedVertices - (old.vertexCount || 0)) + vertexCount;
+        totalCapturedFaces = Math.max(0, totalCapturedFaces - (old.faceCount || 0)) + entry.faceCount;
+        capturedDrawCalls[existingIdx] = entry;
+      } else {
+        drawCallIndexByKey.set(dedupKey, capturedDrawCalls.length);
+        capturedDrawCalls.push(entry);
+        if (capturedDrawCalls.length > 500) {
+          drawCallIndexByKey.clear();
+          const dropped = capturedDrawCalls.shift();
+          totalCapturedVertices = Math.max(0, totalCapturedVertices - (dropped.vertexCount || 0));
+          totalCapturedFaces = Math.max(0, totalCapturedFaces - (dropped.faceCount || 0));
+        }
+        totalCapturedVertices += vertexCount;
+        totalCapturedFaces += entry.faceCount;
       }
-
-      totalCapturedVertices += vertexCount;
-      totalCapturedFaces += Math.floor(finalIndices.length / 3);
 
       dispatchTelemetry(glVersion);
     } catch (_) {}
@@ -898,9 +1093,7 @@
           this._df_boundArrayBuffer = buffer;
         } else if (target === 0x8893) { // ELEMENT_ARRAY_BUFFER
           this._df_boundElementBuffer = buffer;
-          if (this._df_currentVao) {
-            this._df_currentVao._df_elementBuffer = buffer;
-          }
+          getVaoState(this, this._df_currentVao).elementBuffer = buffer;
         }
         return origBindBuffer.apply(this, arguments);
       };
@@ -910,7 +1103,7 @@
       proto.bufferData = function(target, data, usage, srcOffset, length) {
         try {
           const bound = target === 0x8892 ? this._df_boundArrayBuffer :
-                        target === 0x8893 ? this._df_boundElementBuffer : null;
+                        target === 0x8893 ? (getVaoState(this, this._df_currentVao).elementBuffer || this._df_boundElementBuffer) : null;
           if (bound) {
             ensureBufferMeta(bound);
             bound._df_target = target;
@@ -948,7 +1141,7 @@
       proto.bufferSubData = function(target, dstByteOffset, data, srcOffset, length) {
         try {
           const bound = target === 0x8892 ? this._df_boundArrayBuffer :
-                        target === 0x8893 ? this._df_boundElementBuffer : null;
+                        target === 0x8893 ? (getVaoState(this, this._df_currentVao).elementBuffer || this._df_boundElementBuffer) : null;
           if (bound && bound._df_data && data) {
             let srcBytes = null;
             if (ArrayBuffer.isView(data)) {
@@ -975,45 +1168,114 @@
         return origBufferSubData.apply(this, arguments);
       };
 
-      // 3. Vertex Attribute Pointers
+      // 3. Vertex Attribute Pointers & Enable/Disable tracking
+      const origEnableVAA = proto.enableVertexAttribArray;
+      if (origEnableVAA) {
+        proto.enableVertexAttribArray = function(index) {
+          try { getVaoState(this, this._df_currentVao).enabled[index] = true; } catch (_) {}
+          return origEnableVAA.apply(this, arguments);
+        };
+      }
+      const origDisableVAA = proto.disableVertexAttribArray;
+      if (origDisableVAA) {
+        proto.disableVertexAttribArray = function(index) {
+          try { getVaoState(this, this._df_currentVao).enabled[index] = false; } catch (_) {}
+          return origDisableVAA.apply(this, arguments);
+        };
+      }
+
       const origVertexAttribPointer = proto.vertexAttribPointer;
       proto.vertexAttribPointer = function(index, size, type, normalized, stride, offset) {
         try {
-          if (!this._df_attribs) this._df_attribs = {};
+          const vaoState = getVaoState(this, this._df_currentVao);
+          const compBytes = getGlTypeByteSize(type);
           const state = {
             buffer: this._df_boundArrayBuffer,
             size,
             type,
-            normalized,
-            stride: stride || (size * 4),
+            normalized: !!normalized,
+            stride: stride > 0 ? stride : (size * compBytes),
             offset: offset || 0
           };
-          this._df_attribs[index] = state;
-          if (this._df_currentVao) {
-            if (!this._df_currentVao._df_attribs) this._df_currentVao._df_attribs = {};
-            this._df_currentVao._df_attribs[index] = state;
-          }
+          vaoState.attribs[index] = state;
+          this._df_attribs = vaoState.attribs;
         } catch (_) {}
         return origVertexAttribPointer.apply(this, arguments);
       };
 
-      // 4. Uniform Matrix tracking (World / Model matrix)
+      // 4. Shader Program & Uniform Matrix tracking (World / Model matrix + QUV0)
+      if (proto.useProgram) {
+        const origUseProgram = proto.useProgram;
+        proto.useProgram = function(program) {
+          this._df_currentProgram = program || null;
+          return origUseProgram.apply(this, arguments);
+        };
+      }
+
+      if (proto.getUniformLocation) {
+        const origGetUniformLocation = proto.getUniformLocation;
+        proto.getUniformLocation = function(program, name) {
+          const loc = origGetUniformLocation.apply(this, arguments);
+          if (loc && name) {
+            try { uniformLocationNames.set(loc, name); } catch (_) {}
+          }
+          return loc;
+        };
+      }
+
       const origUniformMatrix4fv = proto.uniformMatrix4fv;
       proto.uniformMatrix4fv = function(location, transpose, value) {
         try {
-          if (value && value.length >= 16) {
-            this._df_activeMatrix = new Float32Array(value.slice(0, 16));
+          const uname = (location && uniformLocationNames.get(location)) || '';
+          const lower = uname.toLowerCase();
+          const isModelOnly = lower && (
+            /^(?:u?model(?:matrix)?|u_?model(?:_?matrix)?|modelmatrix|u?world(?:matrix)?|worldmatrix|u?geometry(?:matrix)?|matrixworld|mmatrix|localtoworld)$/.test(lower) ||
+            ((lower.includes('model') || lower.includes('world')) && !/(?:view|proj|mvp|inv|normal|shadow|light|prev|motion|reproject)/.test(lower))
+          );
+          if (isModelOnly && value && value.length >= 16) {
+            const mat = new Float32Array(16);
+            if (transpose) {
+              for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) mat[c * 4 + r] = value[r * 4 + c];
+              }
+            } else {
+              for (let i = 0; i < 16; i++) mat[i] = value[i];
+            }
+            this._df_modelMatrix = mat;
+            if (this._df_currentProgram) {
+              let pState = programUniformsMap.get(this._df_currentProgram);
+              if (!pState) { pState = {}; programUniformsMap.set(this._df_currentProgram, pState); }
+              pState.modelMatrix = mat;
+            }
           }
         } catch (_) {}
         return origUniformMatrix4fv.apply(this, arguments);
       };
 
+      if (proto.uniform4fv) {
+        const origUniform4fv = proto.uniform4fv;
+        proto.uniform4fv = function(location, value) {
+          try {
+            const uname = (location && uniformLocationNames.get(location)) || '';
+            if (/^u?quv0$/i.test(uname) && value && value.length >= 4 && this._df_currentProgram) {
+              let pState = programUniformsMap.get(this._df_currentProgram);
+              if (!pState) { pState = {}; programUniformsMap.set(this._df_currentProgram, pState); }
+              pState.quv0 = [value[0], value[1], value[2], value[3]];
+            }
+          } catch (_) {}
+          return origUniform4fv.apply(this, arguments);
+        };
+      }
+
       // 5. Draw call precision interception (TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN)
       const origDrawElements = proto.drawElements;
       proto.drawElements = function(mode, count, type, offset) {
         try {
-          if ((mode === 4 || mode === 5 || mode === 6) && count >= 3 && this._df_boundElementBuffer) {
-            recordDrawCall(this, count, type, offset || 0, true, 0, mode);
+          if ((mode === 4 || mode === 5 || mode === 6) && count >= 3) {
+            const vaoState = getVaoState(this, this._df_currentVao);
+            if (vaoState.elementBuffer || this._df_boundElementBuffer) {
+              recordDrawCall(this, count, type, offset || 0, true, 0, mode);
+            }
           }
         } catch (_) {}
         return origDrawElements.apply(this, arguments);
@@ -1033,8 +1295,11 @@
         const origDEI = proto.drawElementsInstanced;
         proto.drawElementsInstanced = function(mode, count, type, offset, instanceCount) {
           try {
-            if ((mode === 4 || mode === 5 || mode === 6) && count >= 3 && this._df_boundElementBuffer) {
-              recordDrawCall(this, count, type, offset || 0, true, 0, mode);
+            if ((mode === 4 || mode === 5 || mode === 6) && count >= 3) {
+              const vaoState = getVaoState(this, this._df_currentVao);
+              if (vaoState.elementBuffer || this._df_boundElementBuffer) {
+                recordDrawCall(this, count, type, offset || 0, true, 0, mode);
+              }
             }
           } catch (_) {}
           return origDEI.apply(this, arguments);
@@ -1078,11 +1343,10 @@
       if (proto.bindVertexArray) {
         const origBVA = proto.bindVertexArray;
         proto.bindVertexArray = function(vao) {
-          this._df_currentVao = vao;
-          if (vao) {
-            if (vao._df_elementBuffer) this._df_boundElementBuffer = vao._df_elementBuffer;
-            if (vao._df_attribs) this._df_attribs = { ...vao._df_attribs };
-          }
+          this._df_currentVao = vao || null;
+          const vaoState = getVaoState(this, this._df_currentVao);
+          this._df_boundElementBuffer = vaoState.elementBuffer;
+          this._df_attribs = vaoState.attribs;
           return origBVA.apply(this, arguments);
         };
       }
@@ -1113,11 +1377,10 @@
                     ext.__df_hooked = true;
                     const origBVAOES = ext.bindVertexArrayOES;
                     ext.bindVertexArrayOES = function(vao) {
-                      ctx._df_currentVao = vao;
-                      if (vao) {
-                        if (vao._df_elementBuffer) ctx._df_boundElementBuffer = vao._df_elementBuffer;
-                        if (vao._df_attribs) ctx._df_attribs = { ...vao._df_attribs };
-                      }
+                      ctx._df_currentVao = vao || null;
+                      const vaoState = getVaoState(ctx, ctx._df_currentVao);
+                      ctx._df_boundElementBuffer = vaoState.elementBuffer;
+                      ctx._df_attribs = vaoState.attribs;
                       return origBVAOES.apply(this, arguments);
                     };
                   }

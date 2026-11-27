@@ -21,8 +21,98 @@ import { bundleSketchfabModelPackage, bundleGenericModelPackage, bundlePolyHaven
 
 const log = new Logger('ServiceWorker');
 
-// ── In-memory cache for live GPU WebGL mesh rips ─────────────
+// ── In-memory cache for live GPU WebGL mesh rips & blob cleanup ─
 let bgCached3DMesh = null;
+const pendingBlobRevocations = new Map();
+
+async function ensureOffscreenDocument() {
+  const offscreenUrl = chrome.runtime.getURL('src/offscreen/offscreen.html');
+  if (chrome.runtime.getContexts) {
+    const existing = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+      documentUrls: [offscreenUrl],
+    });
+    if (existing && existing.length > 0) return;
+  }
+  if (chrome.offscreen && chrome.offscreen.createDocument) {
+    await chrome.offscreen.createDocument({
+      url: 'src/offscreen/offscreen.html',
+      reasons: ['BLOBS'],
+      justification: 'Create Blob URLs for multi-megabyte 3D packages exceeding Chrome data URI limits.',
+    });
+  }
+}
+
+async function createDownloadUrlFromBytes(bytes, mimeType = 'application/zip') {
+  if (!bytes) return '';
+  if (bytes.byteLength <= 1024 * 1024 || !chrome.offscreen || !chrome.runtime?.connect) {
+    return uint8ArrayToDataUrl(bytes, mimeType);
+  }
+  await ensureOffscreenDocument();
+  return await new Promise((resolve, reject) => {
+    const port = chrome.runtime.connect({ name: 'df_offscreen_blob' });
+    let settled = false;
+    port.onMessage.addListener((msg) => {
+      if (settled) return;
+      settled = true;
+      try { port.disconnect(); } catch (_) {}
+      if (msg && msg.ok && msg.blobUrl) resolve(msg.blobUrl);
+      else reject(new Error(msg?.error || 'Offscreen blob URL creation failed'));
+    });
+    port.onDisconnect.addListener(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('Offscreen blob port disconnected'));
+      }
+    });
+    port.postMessage({ type: 'BEGIN', mimeType });
+    const chunkSize = 768 * 1024;
+    for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+      const slice = bytes.subarray(i, Math.min(i + chunkSize, bytes.byteLength));
+      let bin = '';
+      const subChunk = 0x8000;
+      for (let j = 0; j < slice.length; j += subChunk) {
+        bin += String.fromCharCode.apply(null, slice.subarray(j, Math.min(j + subChunk, slice.length)));
+      }
+      port.postMessage({ type: 'CHUNK', b64: btoa(bin) });
+    }
+    port.postMessage({ type: 'END' });
+  });
+}
+
+async function fetchCapturedObjFromActiveTab(currentObj) {
+  if (currentObj) return currentObj;
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tabs?.[0]?.id;
+    if (!tabId) return null;
+    const tabRes = await chrome.tabs.sendMessage(tabId, { type: 'DF_GET_CACHED_OBJ' });
+    let objData = tabRes?.objData || null;
+    if (!objData && tabRes?.chunked && chrome.tabs.connect) {
+      objData = await new Promise((resolve) => {
+        const port = chrome.tabs.connect(tabId, { name: 'df_obj_stream' });
+        const parts = [];
+        let done = false;
+        port.onMessage.addListener((msg) => {
+          if (msg?.type === 'CHUNK' && msg.text) parts.push(msg.text);
+          else if (msg?.type === 'END' && !done) {
+            done = true;
+            try { port.disconnect(); } catch (_) {}
+            resolve(parts.join(''));
+          }
+        });
+        port.onDisconnect.addListener(() => {
+          if (!done) { done = true; resolve(parts.length ? parts.join('') : null); }
+        });
+      });
+    }
+    if (objData) {
+      bgCached3DMesh = { objData, time: Date.now() };
+      return objData;
+    }
+  } catch (e) {}
+  return null;
+}
 
 // ── Per-tab resource store ───────────────────────────────────
 // Map<tabId, { resources: [], scannedAt: timestamp, scanning: bool }>
@@ -81,6 +171,40 @@ if (chrome.alarms) {
       checkForGitHubUpdate();
     }
   });
+}
+
+async function fetchCapturedObjFromActiveTab(currentObj) {
+  if (currentObj) return currentObj;
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tabs?.[0]?.id;
+    if (!tabId) return null;
+    const tabRes = await chrome.tabs.sendMessage(tabId, { type: 'DF_GET_CACHED_OBJ' });
+    let objData = tabRes?.objData || null;
+    if (!objData && tabRes?.chunked && chrome.tabs.connect) {
+      objData = await new Promise((resolve) => {
+        const port = chrome.tabs.connect(tabId, { name: 'df_obj_stream' });
+        const parts = [];
+        let done = false;
+        port.onMessage.addListener((msg) => {
+          if (msg?.type === 'CHUNK' && msg.text) parts.push(msg.text);
+          else if (msg?.type === 'END' && !done) {
+            done = true;
+            try { port.disconnect(); } catch (_) {}
+            resolve(parts.join(''));
+          }
+        });
+        port.onDisconnect.addListener(() => {
+          if (!done) { done = true; resolve(parts.length ? parts.join('') : null); }
+        });
+      });
+    }
+    if (objData) {
+      bgCached3DMesh = { objData, time: Date.now() };
+      return objData;
+    }
+  } catch (e) {}
+  return null;
 }
 
 // ── Install / startup ────────────────────────────────────────
@@ -357,6 +481,40 @@ async function handleGetResources(tabId, sendResponse) {
   });
 }
 
+async function fetchCapturedObjFromActiveTab(currentObj) {
+  if (currentObj) return currentObj;
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tabs?.[0]?.id;
+    if (!tabId) return null;
+    const tabRes = await chrome.tabs.sendMessage(tabId, { type: 'DF_GET_CACHED_OBJ' });
+    let objData = tabRes?.objData || null;
+    if (!objData && tabRes?.chunked && chrome.tabs.connect) {
+      objData = await new Promise((resolve) => {
+        const port = chrome.tabs.connect(tabId, { name: 'df_obj_stream' });
+        const parts = [];
+        let done = false;
+        port.onMessage.addListener((msg) => {
+          if (msg?.type === 'CHUNK' && msg.text) parts.push(msg.text);
+          else if (msg?.type === 'END' && !done) {
+            done = true;
+            try { port.disconnect(); } catch (_) {}
+            resolve(parts.join(''));
+          }
+        });
+        port.onDisconnect.addListener(() => {
+          if (!done) { done = true; resolve(parts.length ? parts.join('') : null); }
+        });
+      });
+    }
+    if (objData) {
+      bgCached3DMesh = { objData, time: Date.now() };
+      return objData;
+    }
+  } catch (e) {}
+  return null;
+}
+
 // ── Handler: trigger rescan ───────────────────────────────────
 async function handleRescan(tabId, sendResponse) {
   if (!tabId) {
@@ -422,25 +580,14 @@ async function handleDownload(payload, sendResponse) {
     if (sfMatch && sfMatch[1]) {
       const uid = sfMatch[1];
       try {
-        if (!capturedObjMesh) {
-          try {
-            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tabs && tabs[0] && tabs[0].id) {
-              const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
-              if (tabRes && tabRes.objData) {
-                capturedObjMesh = tabRes.objData;
-                bgCached3DMesh = { objData: capturedObjMesh, time: Date.now() };
-              }
-            }
-          } catch (e) {}
-        }
+        capturedObjMesh = await fetchCapturedObjFromActiveTab(capturedObjMesh);
 
         const bundle = await bundleSketchfabModelPackage(uid, filename, capturedObjMesh);
         if (bundle.officialUrl) {
           downloadUrl = bundle.officialUrl;
           targetFilename = bundle.filename;
         } else if (bundle.zipBytes) {
-          downloadUrl = uint8ArrayToDataUrl(bundle.zipBytes, 'application/zip');
+          downloadUrl = await createDownloadUrlFromBytes(bundle.zipBytes, 'application/zip');
           targetFilename = bundle.filename;
         }
       } catch (e) {
@@ -455,7 +602,7 @@ async function handleDownload(payload, sendResponse) {
         try {
           const bundle = await bundlePolyHavenModelPackage(polyMatch[1], filename);
           if (bundle.zipBytes) {
-            downloadUrl = uint8ArrayToDataUrl(bundle.zipBytes, 'application/zip');
+            downloadUrl = await createDownloadUrlFromBytes(bundle.zipBytes, 'application/zip');
             targetFilename = bundle.filename;
           }
         } catch (e) {
@@ -484,19 +631,10 @@ async function handleDownload(payload, sendResponse) {
         }
 
         if (!cgtResolved) {
-          let capturedObj = bgCached3DMesh && bgCached3DMesh.objData ? bgCached3DMesh.objData : null;
-          if (!capturedObj) {
-            try {
-              const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-              if (tabs && tabs[0] && tabs[0].id) {
-                const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
-                if (tabRes && tabRes.objData) capturedObj = tabRes.objData;
-              }
-            } catch (e) {}
-          }
+          capturedObjMesh = await fetchCapturedObjFromActiveTab(capturedObjMesh);
 
-          const zipBytes = bundleGenericModelPackage(filename || 'cgtrader_model', capturedObj);
-          downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
+          const zipBytes = bundleGenericModelPackage(filename || 'cgtrader_model', capturedObjMesh);
+          downloadUrl = await createDownloadUrlFromBytes(zipBytes, 'application/zip');
           targetFilename = `${(filename || 'cgtrader_model').replace(/\.[^/.]+$/, '')}_CGTrader_Package.zip`;
         }
       }
@@ -505,21 +643,10 @@ async function handleDownload(payload, sendResponse) {
     // 4. TurboSquid 3D Asset Package (Hardware GPU Mesh + Textures ZIP)
     if (url.includes('turbosquid.com/')) {
       if (url.includes('/3d-models/') && !url.match(/\.(glb|gltf|zip|obj|stl|fbx|blend)(\?|$)/i)) {
-        if (!capturedObjMesh) {
-          try {
-            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tabs && tabs[0] && tabs[0].id) {
-              const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
-              if (tabRes && tabRes.objData) {
-                capturedObjMesh = tabRes.objData;
-                bgCached3DMesh = { objData: capturedObjMesh, time: Date.now() };
-              }
-            }
-          } catch (e) {}
-        }
+        capturedObjMesh = await fetchCapturedObjFromActiveTab(capturedObjMesh);
 
         const zipBytes = bundleGenericModelPackage(filename || 'turbosquid_model', capturedObjMesh);
-        downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
+        downloadUrl = await createDownloadUrlFromBytes(zipBytes, 'application/zip');
         targetFilename = `${(filename || 'turbosquid_model').replace(/\.[^/.]+$/, '')}_TurboSquid_Package.zip`;
       }
     }
@@ -527,21 +654,10 @@ async function handleDownload(payload, sendResponse) {
     // Universal Safety Guard: Never download raw web page URLs as 3D model files
     if (url.startsWith('http') && !downloadUrl.match(/\.(glb|gltf|zip|obj|stl|fbx|blend|3mf|step|stp|iges|binz|osgjs|splat|ply|usdz|splinecode)(\?|$)/i)) {
       if (url.includes('/3d-models/') || url.includes('/3d-model/') || url.includes('/models/')) {
-        if (!capturedObjMesh) {
-          try {
-            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (tabs && tabs[0] && tabs[0].id) {
-              const tabRes = await chrome.tabs.sendMessage(tabs[0].id, { type: 'DF_GET_CACHED_OBJ' });
-              if (tabRes && tabRes.objData) {
-                capturedObjMesh = tabRes.objData;
-                bgCached3DMesh = { objData: capturedObjMesh, time: Date.now() };
-              }
-            }
-          } catch (e) {}
-        }
+        capturedObjMesh = await fetchCapturedObjFromActiveTab(capturedObjMesh);
 
         const zipBytes = bundleGenericModelPackage(filename || '3d_model', capturedObjMesh);
-        downloadUrl = uint8ArrayToDataUrl(zipBytes, 'application/zip');
+        downloadUrl = await createDownloadUrlFromBytes(zipBytes, 'application/zip');
         targetFilename = `${(filename || '3d_model').replace(/\.[^/.]+$/, '')}_3D_Package.zip`;
       }
     }
@@ -554,6 +670,10 @@ async function handleDownload(payload, sendResponse) {
       saveAs: saveAs ?? settings.defaultSaveAs ?? false,
       conflictAction: 'uniquify',
     });
+
+    if (downloadUrl.startsWith('blob:')) {
+      pendingBlobRevocations.set(downloadId, downloadUrl);
+    }
 
     log.info(`Download started: id=${downloadId} url=${downloadUrl}`);
 
@@ -656,6 +776,13 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     if (current === 'complete' || current === 'interrupted') {
       await StorageService.updateHistoryItem(delta.id, { status: current });
       log.debug(`Download ${delta.id} → ${current}`);
+      const blobUrl = pendingBlobRevocations.get(delta.id);
+      if (blobUrl) {
+        pendingBlobRevocations.delete(delta.id);
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: 'DF_REVOKE_BLOB_URL', blobUrl }).catch(() => {});
+        }, 5000);
+      }
     }
   }
 });
